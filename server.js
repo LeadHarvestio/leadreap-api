@@ -268,7 +268,7 @@ app.post("/api/cache/clear", (req, res) => {
   res.json({ cleared, message: `Cleared ${cleared} cache entries` });
 });
 
-// ── DEBUG: Screenshot what the scraper sees ──────────────────
+// ── DEBUG: Screenshot what the scraper sees (with consent bypass) ──
 app.get("/api/debug/screenshot", async (req, res) => {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch({
@@ -276,13 +276,63 @@ app.get("/api/debug/screenshot", async (req, res) => {
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"],
   });
   try {
-    const page = await browser.newPage();
-    await page.goto("https://www.google.com/maps/search/Electrician+near+Folsom+CA", {
+    const context = await browser.newContext({
+      locale: "en-US",
+      extraHTTPHeaders: { "Accept-Language": "en-US,en;q=0.9" },
+    });
+
+    // Inject consent cookies to bypass EU wall
+    await context.addCookies([
+      {
+        name: "SOCS",
+        value: "CAISHAgBEhJnd3NfMjAyNDAzMTAtMF9SQzIaAmVuIAEaBgiA_ZS2Bg",
+        domain: ".google.com",
+        path: "/",
+        secure: true,
+        sameSite: "Lax",
+      },
+      {
+        name: "CONSENT",
+        value: "PENDING+987",
+        domain: ".google.com",
+        path: "/",
+        secure: true,
+        sameSite: "Lax",
+      },
+    ]);
+
+    const page = await context.newPage();
+    const query = req.query.q || "Electrician near Folsom CA";
+    await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(query)}?hl=en`, {
       waitUntil: "domcontentloaded",
     });
     await new Promise(r => setTimeout(r, 5000));
+
+    // If consent wall still shows, try clicking through
+    const stillConsent = await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      for (const btn of buttons) {
+        const t = btn.textContent.trim().toLowerCase();
+        if (t.includes("accept") || t.includes("accepteren") || t.includes("akzeptieren")) {
+          btn.click();
+          return "clicked";
+        }
+      }
+      return "none";
+    }).catch(() => "error");
+
+    if (stillConsent === "clicked") {
+      await new Promise(r => setTimeout(r, 3000));
+      // Reload after consent
+      await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(query)}?hl=en`, {
+        waitUntil: "domcontentloaded",
+      });
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
     const screenshot = await page.screenshot({ fullPage: true });
     res.setHeader("Content-Type", "image/png");
+    res.setHeader("X-Consent-Status", stillConsent);
     res.send(screenshot);
   } finally {
     await browser.close();
