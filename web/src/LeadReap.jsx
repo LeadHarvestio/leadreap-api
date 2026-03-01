@@ -529,7 +529,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         <nav className="nav">
           <div className="logo">
             <div className="logo-icon">🎯</div>
-            Lead<span>Harvest</span>
+            Lead<span>Reap</span>
           </div>
           <div className="nav-actions">
             <span className="badge mono">BETA</span>
@@ -724,7 +724,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             <div className="search-card">
               <div className="empty-state">
                 <div className="empty-icon">🎯</div>
-                <div className="empty-title">Ready to harvest leads</div>
+                <div className="empty-title">Ready to reap leads</div>
                 <div className="empty-sub">Select a niche and location above, then hit Find Leads to get started.</div>
               </div>
             </div>
