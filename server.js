@@ -267,6 +267,31 @@ app.post("/api/cache/clear", (req, res) => {
   const cleared = clearCache(niche, location);
   res.json({ cleared, message: `Cleared ${cleared} cache entries` });
 });
+// ── DEBUG: Screenshot what the scraper sees ──────────────────
+app.get("/api/debug/screenshot", async (req, res) => {
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"],
+  });
+  try {
+    const page = await browser.newPage();
+    await page.goto("https://www.google.com/maps/search/Electrician+near+Folsom+CA", {
+      waitUntil: "domcontentloaded",
+    });
+    await new Promise(r => setTimeout(r, 5000));
+    const screenshot = await page.screenshot({ fullPage: true });
+    res.setHeader("Content-Type", "image/png");
+    res.send(screenshot);
+  } finally {
+    await browser.close();
+  }
+});
+```
+
+Commit that to GitHub, wait for Railway to redeploy, then open this URL in your browser:
+```
+https://leadreap-api-production.up.railway.app/api/debug/screenshot
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
