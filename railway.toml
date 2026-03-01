@@ -1,12 +1,6 @@
-# railway.toml
-# Deploy config for Railway.app
-# Backend only — frontend deploys separately to Vercel
-
 [build]
 builder = "nixpacks"
-
-[build.buildCommand]
-cmd = "npm install && npm run install:browsers"
+buildCommand = "npm install && npx playwright install chromium --with-deps"
 
 [deploy]
 startCommand = "npm start"
@@ -14,24 +8,3 @@ healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-[[services]]
-name = "leadreap-api"
-
-[services.variables]
-PORT = "3001"
-NODE_ENV = "production"
-# Set ALL of these in the Railway dashboard:
-# FRONTEND_URL = "https://leadreap.vercel.app"
-# LEMONSQUEEZY_API_KEY = "..."
-# LEMONSQUEEZY_STORE_ID = "..."
-# LEMONSQUEEZY_WEBHOOK_SECRET = "..."
-# LEMON_VARIANT_STARTER = "..."
-# LEMON_VARIANT_PRO = "..."
-# LEMON_VARIANT_AGENCY = "..."
-# SCRAPER_CONCURRENCY = "5"
-# EMAIL_CONCURRENCY = "8"
-# LINKEDIN_ENRICHMENT = "true"
-# CACHE_TTL_HOURS = "72"
-# FREE_SEARCHES_PER_HOUR = "3"
-# PRO_SEARCHES_PER_HOUR = "60"
