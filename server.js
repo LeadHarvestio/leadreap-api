@@ -267,6 +267,7 @@ app.post("/api/cache/clear", (req, res) => {
   const cleared = clearCache(niche, location);
   res.json({ cleared, message: `Cleared ${cleared} cache entries` });
 });
+
 // ── DEBUG: Screenshot what the scraper sees ──────────────────
 app.get("/api/debug/screenshot", async (req, res) => {
   const { chromium } = await import("playwright");
@@ -287,11 +288,6 @@ app.get("/api/debug/screenshot", async (req, res) => {
     await browser.close();
   }
 });
-```
-
-Commit that to GitHub, wait for Railway to redeploy, then open this URL in your browser:
-```
-https://leadreap-api-production.up.railway.app/api/debug/screenshot
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -326,6 +322,7 @@ app.listen(PORT, () => {
 
   SYSTEM
    GET  /api/metrics             → scraper health
+   GET  /api/debug/screenshot    → see what Google Maps looks like
    GET  /health                  → uptime check
 ────────────────────────────────────────
   `);
