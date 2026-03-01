@@ -21,7 +21,7 @@ const USER_AGENTS = [
 
 const TIMEZONES = [
   "America/New_York", "America/Chicago", "America/Denver",
-  "America/Los_Angeles", "America/Phoenix", "America/Seattle",
+  "America/Los_Angeles", "America/Phoenix",
 ];
 
 const LOCALES = ["en-US", "en-US", "en-US", "en-GB", "en-CA"]; // weight toward en-US
