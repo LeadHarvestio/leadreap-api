@@ -375,8 +375,8 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
 
     // ── Phase 1: URL collection ──────────────────────────────
     const t1 = Date.now();
-    await searchPage.goto(buildSearchUrl(niche, location), { waitUntil: "networkidle" });
-    await sleep(1500);
+    await searchPage.goto(buildSearchUrl(niche, location), { waitUntil: "domcontentloaded" });
+    await sleep(2000);
 
     const check1 = await detectBlock(searchPage);
     if (check1.blocked) {
@@ -387,7 +387,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     }
 
     const consent = await searchPage.$('button[aria-label*="Accept"], button[jsname="higCR"]').catch(() => null);
-    if (consent) { await consent.click(); await sleep(800); }
+    if (consent) { await consent.click({ noWaitAfter: true }); await sleep(1500); }
 
     const listingUrls = await collectListingUrls(searchPage, limit);
 
