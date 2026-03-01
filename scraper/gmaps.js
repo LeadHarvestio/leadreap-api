@@ -106,6 +106,66 @@ function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, sc
 }
 
 // ─────────────────────────────────────────────────────────────
+// COOKIE CONSENT HANDLER (multi-language EU support)
+// ─────────────────────────────────────────────────────────────
+async function dismissCookieConsent(page) {
+  // Strategy 1: Click by known button selectors
+  const consentSelectors = [
+    'button[aria-label*="Accept"]',
+    'button[aria-label*="accept"]',
+    'button[aria-label*="Accepter"]',
+    'button[aria-label*="Akzeptieren"]',
+    'button[aria-label*="Aceptar"]',
+    'button[aria-label*="Accetta"]',
+    'button[aria-label*="accepteren"]',
+    'button[jsname="higCR"]',
+    'button[jsname="b3VHJd"]',
+  ];
+
+  for (const sel of consentSelectors) {
+    const btn = await page.$(sel).catch(() => null);
+    if (btn) {
+      console.log(`  → Cookie consent: clicking ${sel}`);
+      await btn.click({ noWaitAfter: true }).catch(() => null);
+      await sleep(1500);
+      return true;
+    }
+  }
+
+  // Strategy 2: Find button by text content (catches all languages)
+  const acceptTexts = [
+    "accept all", "accept", "agree",
+    "alles accepteren", "alles akzeptieren",
+    "tout accepter", "accepter",
+    "aceptar todo", "accetta tutto",
+    "aceitar tudo", "zaakceptuj wszystko",
+  ];
+
+  const clicked = await page.evaluate((texts) => {
+    const buttons = Array.from(document.querySelectorAll("button"));
+    for (const btn of buttons) {
+      const btnText = btn.textContent.trim().toLowerCase();
+      for (const text of texts) {
+        if (btnText.includes(text)) {
+          btn.click();
+          return true;
+        }
+      }
+    }
+    return false;
+  }, acceptTexts).catch(() => false);
+
+  if (clicked) {
+    console.log("  → Cookie consent: clicked via text match");
+    await sleep(1500);
+    return true;
+  }
+
+  console.log("  → Cookie consent: no consent wall detected");
+  return false;
+}
+
+// ─────────────────────────────────────────────────────────────
 // CAPTCHA / BLOCK DETECTION
 // ─────────────────────────────────────────────────────────────
 const CAPTCHA_SIGNALS = [
@@ -373,10 +433,29 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     const searchPage = await context.newPage();
     searchPage.setDefaultNavigationTimeout(CONFIG.navigationTimeout);
 
+    // Force English locale so selectors work consistently
+    await searchPage.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
+
     // ── Phase 1: URL collection ──────────────────────────────
     const t1 = Date.now();
     await searchPage.goto(buildSearchUrl(niche, location), { waitUntil: "domcontentloaded" });
     await sleep(2000);
+
+    // ── Handle cookie consent (EU datacenters) ───────────────
+    await dismissCookieConsent(searchPage);
+
+    // Wait for Maps to actually load after consent
+    await searchPage.waitForSelector(SEL.resultLinks, { timeout: 10000 }).catch(() => {
+      console.log("  ⚠ No result links found after consent — retrying page load...");
+    });
+
+    // If still no results, the consent may have reloaded — try navigating again
+    const hasResults = await searchPage.$(SEL.resultLinks).catch(() => null);
+    if (!hasResults) {
+      console.log("  → Reloading Maps after consent...");
+      await searchPage.goto(buildSearchUrl(niche, location), { waitUntil: "domcontentloaded" });
+      await sleep(3000);
+    }
 
     const check1 = await detectBlock(searchPage);
     if (check1.blocked) {
@@ -385,9 +464,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       await sendBlockAlert({ reason: check1.reason, niche, location });
       return [];
     }
-
-    const consent = await searchPage.$('button[aria-label*="Accept"], button[jsname="higCR"]').catch(() => null);
-    if (consent) { await consent.click({ noWaitAfter: true }); await sleep(1500); }
 
     const listingUrls = await collectListingUrls(searchPage, limit);
 
