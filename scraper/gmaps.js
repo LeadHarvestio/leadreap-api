@@ -391,10 +391,6 @@ if (!finalReviewLabel) {
     return null;
   }).catch(() => null);
 }
-    })),
-  };
-}).catch(() => ({ found: false, error: 'evaluate failed' }));
-console.log('  🔍 DEBUG rating area:', JSON.stringify(debugRating, null, 2));
 
       const websiteEl = await page.$(SEL.website);
       const rawWebsite = websiteEl ? await websiteEl.getAttribute("href") : null;
