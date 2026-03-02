@@ -370,14 +370,95 @@ const STYLE = `
   .footer-link { font-size: 13px; color: var(--muted); cursor: pointer; transition: color 0.15s; }
   .footer-link:hover { color: var(--text); }
 
+  /* ─── MOBILE ─────────────────────────────────── */
   @media (max-width: 768px) {
-    .nav { padding: 14px 20px; }
-    .hero { padding: 50px 20px 40px; }
-    .tool-section { padding: 0 20px 60px; }
-    .search-row { grid-template-columns: 1fr; }
-    .pricing-grid { grid-template-columns: 1fr; }
-    .hero-stats { flex-wrap: wrap; gap: 20px; }
-    .footer { flex-direction: column; gap: 12px; }
+    /* NAV: compact, no overflow */
+    .nav { padding: 12px 16px; gap: 8px; }
+    .nav-actions { gap: 8px; }
+    .nav-actions .btn-sm { padding: 6px 10px; font-size: 12px; }
+    .nav-email { display: none; }
+    .badge { padding: 3px 8px; font-size: 10px; }
+
+    /* HERO: tighter, less fluff */
+    .hero { padding: 40px 20px 32px; }
+    .hero-tag { font-size: 10px; padding: 5px 12px; margin-bottom: 20px; }
+    .hero h1 { font-size: 28px; letter-spacing: -1px; margin-bottom: 14px; line-height: 1.15; }
+    .hero h1 br { display: none; }
+    .hero p { font-size: 14px; margin-bottom: 28px; line-height: 1.5; }
+    .hero-stats {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 16px; margin-top: 28px; padding-top: 24px;
+    }
+    .stat-num { font-size: 22px; }
+    .stat-label { font-size: 11px; }
+
+    /* SEARCH CARD */
+    .tool-section { padding: 0 16px 48px; }
+    .search-card { padding: 20px 16px; border-radius: 12px; margin-bottom: 20px; }
+    .search-label { font-size: 10px; margin-bottom: 14px; }
+    .search-row { grid-template-columns: 1fr; gap: 10px; }
+    .field input, .field select { padding: 11px 14px; font-size: 13px; border-radius: 8px; }
+    .btn-primary { width: 100%; justify-content: center; }
+
+    /* OPTIONS ROW: wrap nicely */
+    .options-row { gap: 8px; margin-top: 12px; }
+    .toggle-chip { padding: 6px 10px; font-size: 12px; }
+    .options-hint { display: none; }
+
+    /* RESULTS */
+    .results-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+    .results-meta { flex-wrap: wrap; gap: 8px; }
+    .results-actions { width: 100%; display: flex; gap: 8px; }
+    .results-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 12px; }
+
+    /* TABLE: horizontal scroll with momentum */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { min-width: 700px; }
+    th { padding: 10px 12px; font-size: 10px; }
+    td { padding: 10px 12px; font-size: 12px; }
+    .name-cell { font-size: 13px; }
+
+    /* UPSELL BANNERS: stack vertically */
+    .upsell-banner {
+      flex-direction: column !important; gap: 12px !important;
+      text-align: center; padding: 14px 16px !important;
+    }
+    .upsell-banner .btn { width: 100%; justify-content: center; }
+    .upgrade-bar { flex-direction: column; gap: 12px; padding: 18px 16px; }
+    .upgrade-bar .btn { width: 100%; justify-content: center; }
+
+    /* LOADING */
+    .loading-title { font-size: 16px; }
+    .loading-sub { font-size: 12px; }
+    .loading-tip { font-size: 12px; padding: 12px 16px; max-width: 100%; }
+
+    /* PRICING MODAL */
+    .modal-overlay { padding: 12px; align-items: flex-start; overflow-y: auto; }
+    .modal { padding: 24px 18px; border-radius: 14px; margin-top: 40px; }
+    .modal h2 { font-size: 22px; }
+    .modal > p { font-size: 13px; margin-bottom: 24px; }
+    .pricing-grid { grid-template-columns: 1fr; gap: 12px; }
+    .plan-card { padding: 20px; }
+    .plan-price { font-size: 32px; }
+    .plan-feature { font-size: 13px; }
+
+    /* EMPTY STATE */
+    .empty-state { padding: 48px 16px; }
+    .empty-title { font-size: 17px; }
+    .empty-sub { font-size: 13px; }
+
+    /* FOOTER */
+    .footer { flex-direction: column; gap: 10px; padding: 20px 16px; text-align: center; }
+  }
+
+  /* Small phones */
+  @media (max-width: 380px) {
+    .hero h1 { font-size: 24px; }
+    .hero-stats { gap: 12px; }
+    .stat-num { font-size: 20px; }
+    .logo { font-size: 17px; }
+    .logo-mark { width: 28px; height: 28px; }
+    .logo-mark svg { width: 28px; height: 28px; }
   }
 `;
 
@@ -627,7 +708,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 <span className="badge mono" style={{ background: isPro ? "rgba(34,197,94,0.12)" : undefined, color: isPro ? "#22c55e" : undefined, borderColor: isPro ? "rgba(34,197,94,0.3)" : undefined }}>
                   {user.plan.toUpperCase()}
                 </span>
-                <span style={{ fontSize: 13, color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace" }}>{user.email}</span>
+                <span className="nav-email" style={{ fontSize: 13, color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace" }}>{user.email}</span>
                 <button className="btn btn-ghost btn-sm" onClick={onLogout}>Log out</button>
               </>
             ) : (
@@ -695,7 +776,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                   {opt.label}
                 </label>
               ))}
-              <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>
+              <span className="options-hint" style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>
                 FREE: 5 leads preview · PRO: unlimited exports
               </span>
             </div>
@@ -732,7 +813,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
           {/* PRICING UPSELL (in results) */}
           {!loading && searchDone && !searchError && leads.length > 0 && !isPro && (
-            <div style={{
+            <div className="upsell-banner" style={{
               display: "flex", gap: 16, marginBottom: 20,
               padding: "14px 20px", borderRadius: 10,
               background: "rgba(240,180,41,0.04)", border: "1px solid rgba(240,180,41,0.12)",
@@ -770,7 +851,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                   <span className="count-tag">✓ {displayTotal} leads found</span>
                   <span style={{fontSize:13, color:"var(--muted)", fontFamily:"IBM Plex Mono"}}>{targetNiche} · {location}</span>
                 </div>
-                <div style={{display:"flex",gap:10}}>
+                <div className="results-actions" style={{display:"flex",gap:10}}>
                   <button className="btn btn-outline btn-sm" onClick={handleSearch}>↻ Refresh</button>
                   <button className="btn btn-green btn-sm" onClick={handleExport}>
                     ⬇ Export CSV {!isPro && "🔒"}
