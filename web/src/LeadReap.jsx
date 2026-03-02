@@ -447,6 +447,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [includePhone, setIncludePhone] = useState(true);
   const [includeSocial, setIncludeSocial] = useState(false);
   const [leads, setLeads] = useState([]);
+  const [totalLeads, setTotalLeads] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadStep, setLoadStep] = useState(0);
@@ -476,6 +477,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     return () => clearInterval(tipRef.current);
   }, [loading]);
 
+  // Poll job — resolves with full job object (includes .leads, .total, .gated)
   async function pollJob(jobId) {
     return new Promise((resolve, reject) => {
       let attempts = 0;
@@ -493,7 +495,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           if (job.status === "done") {
             clearInterval(pollRef.current);
             setLoadStep(LOADING_STEPS.length);
-            resolve(job.leads || []);
+            resolve(job);
           } else if (job.status === "error") {
             clearInterval(pollRef.current);
             reject(new Error(job.error || "Search failed"));
@@ -513,6 +515,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     if (!targetNiche || !location) return;
     setLoading(true);
     setLeads([]);
+    setTotalLeads(0);
     setSearchDone(false);
     setSearchError("");
     setLoadStep(0);
@@ -536,8 +539,9 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         throw new Error(`Something went wrong (${res.status}). Please try again.`);
       }
       const { jobId } = await res.json();
-      const newLeads = await pollJob(jobId);
-      setLeads(newLeads);
+      const job = await pollJob(jobId);
+      setLeads(job.leads || []);
+      setTotalLeads(job.total || job.leads?.length || 0);
       setSearchDone(true);
     } catch (e) {
       console.error(e);
@@ -577,6 +581,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       const existingNames = new Set(leads.map(l => l.name));
       const fresh = moreLeads.filter(l => !existingNames.has(l.name));
       setLeads(prev => [...prev, ...fresh]);
+      setTotalLeads(prev => prev + fresh.length);
       setBatchNum(b => b + 1);
     } catch (e) {
       console.error(e);
@@ -603,6 +608,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
   const visibleLeads = isPro ? leads : leads.slice(0, 5);
   const progressPercent = Math.min(100, (loadStep / LOADING_STEPS.length) * 100);
+  const displayTotal = totalLeads > leads.length ? totalLeads : leads.length;
 
   return (
     <>
@@ -733,7 +739,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               alignItems: "center", justifyContent: "space-between",
             }}>
               <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                Showing <strong style={{ color: "var(--text)" }}>5 of {leads.length}</strong> leads — upgrade to unlock all results, CSV export, and unlimited searches.
+                Showing <strong style={{ color: "var(--text)" }}>{visibleLeads.length} of {displayTotal}</strong> leads — upgrade to unlock all results, CSV export, and unlimited searches.
               </span>
               <button className="btn btn-primary btn-sm" onClick={() => setShowPricing(true)}>Unlock Full Access →</button>
             </div>
@@ -761,7 +767,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               <div className="results-header">
                 <div className="results-meta">
                   <span style={{fontWeight:700, fontSize:15}}>Results</span>
-                  <span className="count-tag">✓ {leads.length} leads found</span>
+                  <span className="count-tag">✓ {displayTotal} leads found</span>
                   <span style={{fontSize:13, color:"var(--muted)", fontFamily:"IBM Plex Mono"}}>{targetNiche} · {location}</span>
                 </div>
                 <div style={{display:"flex",gap:10}}>
@@ -819,7 +825,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
               {!isPro ? (
                 <div className="upgrade-bar">
-                  <p>🔒 Showing <strong style={{color:"var(--text)"}}>5 of {leads.length}</strong> leads — unlock all results + CSV export</p>
+                  <p>🔒 Showing <strong style={{color:"var(--text)"}}>{visibleLeads.length} of {displayTotal}</strong> leads — unlock all results + CSV export</p>
                   <button className="btn btn-primary" onClick={() => setShowPricing(true)}>Unlock Full Access →</button>
                 </div>
               ) : (
