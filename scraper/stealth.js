@@ -117,22 +117,6 @@ export async function createStealthContext(browser, opts = {}) {
 
   const context = await browser.newContext({
     ...opts,
-```
-
-This passes through the geolocation and permissions from `gmaps.js` so Google thinks the browser is in the US.
-
-**Full push summary — 4 files to update on GitHub:**
-
-| File | Location | What it fixes |
-|------|----------|---------------|
-| `email.js` | root | Real emails via Resend |
-| `server.js` | root | Debug endpoint removed |
-| `scraper/gmaps.js` | scraper/ | More results (geolocation + gl=us) |
-| `scraper/stealth.js` | scraper/ | 2-line edit to accept geolocation opts |
-
-**Also add to `package.json` dependencies:**
-```
-"resend": "^4.0.0"
     userAgent: fp.userAgent,
     viewport: fp.viewport,
     screen: fp.screen,
@@ -146,8 +130,8 @@ This passes through the geolocation and permissions from `gmaps.js` so Google th
       "sec-ch-ua-mobile": "?0",
       "sec-ch-ua-platform": '"macOS"',
     },
-    // Disable WebRTC — can leak real IP
-    permissions: [],
+    // Merge permissions — include any passed in opts (e.g. geolocation)
+    permissions: [...(opts.permissions || [])],
   });
 
   // Inject stealth script before any page script runs
