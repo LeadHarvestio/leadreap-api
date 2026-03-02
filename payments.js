@@ -31,6 +31,7 @@ export async function createCheckout(plan, email) {
     throw new Error("LemonSqueezy API key or store ID not configured");
   }
 
+  console.log(`[Payments] Creating checkout: store=${storeId}, variant=${variantId}, email=${email}`);
   const res = await fetch(`${LEMON_API}/checkouts`, {
     method: "POST",
     headers: {
