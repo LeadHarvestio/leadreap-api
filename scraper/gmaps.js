@@ -32,7 +32,7 @@ const SEL = {
   scrollContainer: 'div[role="feed"]',
   businessName:    'h1.DUwDvf, h1[class*="fontHeadlineLarge"]',
   rating:          'div.F7nice span[aria-hidden="true"]',
-  reviewCount:     'div.F7nice span[aria-label*="review"]',
+  reviewCount: 'div.F7nice span[aria-label*="review"], span[aria-label*="review" i], button[jsaction*="review"] span',
   address:         'button[data-item-id="address"] .Io6YTe, [data-item-id="address"] div.Io6YTe',
   phone:           'button[data-item-id^="phone"] .Io6YTe, [data-tooltip="Copy phone number"] .Io6YTe',
   website:         'a[data-item-id="authority"]',
@@ -336,13 +336,41 @@ async function scrapeListingByUrl(context, url) {
       if (!name) throw new Error("No business name found");
 
       const [ratingText, reviewLabel, address, rawPhone, category, openedText] = await Promise.all([
-        page.$eval(SEL.rating,     el => el.textContent.trim()).catch(() => null),
-        page.$eval(SEL.reviewCount, el => el.getAttribute("aria-label")).catch(() => null),
-        page.$eval(SEL.address,    el => el.textContent.trim()).catch(() => null),
-        page.$eval(SEL.phone,      el => el.textContent.trim()).catch(() => null),
-        page.$eval(SEL.category,   el => el.textContent.trim()).catch(() => null),
-        page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
-      ]);
+  page.$eval(SEL.rating,     el => el.textContent.trim()).catch(() => null),
+  // Try aria-label first, then fall back to broader text extraction
+  page.$eval(SEL.reviewCount, el => el.getAttribute("aria-label")).catch(() => null),
+  page.$eval(SEL.address,    el => el.textContent.trim()).catch(() => null),
+  page.$eval(SEL.phone,      el => el.textContent.trim()).catch(() => null),
+  page.$eval(SEL.category,   el => el.textContent.trim()).catch(() => null),
+  page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
+]);
+
+// Fallback: if reviewLabel is null, try extracting review count from nearby text
+let finalReviewLabel = reviewLabel;
+if (!finalReviewLabel) {
+  finalReviewLabel = await page.$eval('div.F7nice', el => {
+    const text = el.textContent || "";
+    // Matches patterns like "(312)" or "(1,234)"
+    const m = text.match(/\(([\d,]+)\)/);
+    return m ? m[1] + " reviews" : null;
+  }).catch(() => null);
+}
+if (!finalReviewLabel) {
+  finalReviewLabel = await page.$eval('span[aria-label*="review"], span[aria-label*="Review"]',
+    el => el.getAttribute("aria-label")
+  ).catch(() => null);
+}
+if (!finalReviewLabel) {
+  // Last resort: grab any aria-label with a number + "review" anywhere on page
+  finalReviewLabel = await page.evaluate(() => {
+    const spans = document.querySelectorAll('[aria-label]');
+    for (const s of spans) {
+      const label = s.getAttribute('aria-label') || '';
+      if (/\d+\s*review/i.test(label)) return label;
+    }
+    return null;
+  }).catch(() => null);
+}
 
       const websiteEl = await page.$(SEL.website);
       const rawWebsite = websiteEl ? await websiteEl.getAttribute("href") : null;
@@ -361,7 +389,7 @@ async function scrapeListingByUrl(context, url) {
         emailQuality: null,
         emailQualityLabel: null,
         rating: parseRating(ratingText),
-        reviews: parseReviewCount(reviewLabel),
+        reviews: parseReviewCount(finalReviewLabel),
         category: category || null,
         yearOpened: parseYearOpened(openedText),
         techStack: [],
