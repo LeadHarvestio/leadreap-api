@@ -345,44 +345,52 @@ async function scrapeListingByUrl(context, url) {
   page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
 ]);
 
-// Fallback: if reviewLabel is null, try extracting review count from nearby text
+// Extract review count — Google puts it OUTSIDE div.F7nice now
 let finalReviewLabel = reviewLabel;
 if (!finalReviewLabel) {
-  finalReviewLabel = await page.$eval('div.F7nice', el => {
-    const text = el.textContent || "";
-    // Matches patterns like "(312)" or "(1,234)"
-    const m = text.match(/\(([\d,]+)\)/);
-    return m ? m[1] + " reviews" : null;
-  }).catch(() => null);
-}
-if (!finalReviewLabel) {
-  finalReviewLabel = await page.$eval('span[aria-label*="review"], span[aria-label*="Review"]',
-    el => el.getAttribute("aria-label")
-  ).catch(() => null);
-}
-if (!finalReviewLabel) {
-  // Last resort: grab any aria-label with a number + "review" anywhere on page
   finalReviewLabel = await page.evaluate(() => {
-    const spans = document.querySelectorAll('[aria-label]');
-    for (const s of spans) {
-      const label = s.getAttribute('aria-label') || '';
-      if (/\d+\s*review/i.test(label)) return label;
+    // Strategy 1: Look for parent of F7nice and find review count as sibling text
+    const nice = document.querySelector('div.F7nice');
+    if (nice) {
+      const parent = nice.parentElement;
+      if (parent) {
+        // Look for text like "(123)" or "123 reviews" in siblings
+        const siblings = parent.querySelectorAll('span, button, a');
+        for (const el of siblings) {
+          if (nice.contains(el)) continue; // skip the rating itself
+          const text = el.textContent.trim();
+          if (/\([\d,]+\)/.test(text)) return text.match(/([\d,]+)/)[1] + " reviews";
+          if (/[\d,]+\s*review/i.test(text)) return text;
+        }
+        // Also check parent's text for pattern like "(312)"
+        const parentText = parent.textContent || "";
+        const m = parentText.match(/\(([\d,]+)\)/);
+        if (m) return m[1] + " reviews";
+      }
     }
+
+    // Strategy 2: Find any button/link that navigates to reviews tab
+    const reviewBtns = document.querySelectorAll('button[jsaction*="review"], button[aria-label*="review" i], a[aria-label*="review" i]');
+    for (const btn of reviewBtns) {
+      const label = btn.getAttribute('aria-label') || btn.textContent || '';
+      const m = label.match(/([\d,]+)\s*review/i);
+      if (m) return m[0];
+    }
+
+    // Strategy 3: Broader search for review count text anywhere in the header area
+    const headerArea = document.querySelector('div[role="main"]');
+    if (headerArea) {
+      const allSpans = headerArea.querySelectorAll('span, button');
+      for (const el of allSpans) {
+        const text = el.textContent.trim();
+        if (/^\([\d,]+\)$/.test(text)) return text.match(/([\d,]+)/)[1] + " reviews";
+        if (/^[\d,]+\s*reviews?$/i.test(text)) return text;
+      }
+    }
+
     return null;
   }).catch(() => null);
 }
-      // DEBUG — log what Google is actually rendering for the rating area
-const debugRating = await page.evaluate(() => {
-  const nice = document.querySelector('div.F7nice');
-  if (!nice) return { found: false };
-  return {
-    found: true,
-    textContent: nice.textContent,
-    innerHTML: nice.innerHTML.substring(0, 500),
-    childAriaLabels: Array.from(nice.querySelectorAll('[aria-label]')).map(el => ({
-      tag: el.tagName,
-      ariaLabel: el.getAttribute('aria-label'),
-      text: el.textContent,
     })),
   };
 }).catch(() => ({ found: false, error: 'evaluate failed' }));
