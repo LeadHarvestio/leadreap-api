@@ -272,6 +272,22 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+app.post("/api/admin/clear-cache", (req, res) => {
+  const { clearCache } = await import("./scraper/cache.js");
+  const cleared = clearCache();
+  res.json({ cleared });
+});
+```
+
+Then hit it with: `curl -X POST https://leadreap.com/api/admin/clear-cache`
+
+(You'd want to protect that with an auth check before going live, but for now it works.)
+
+**Option 3: Delete the file**
+
+In Railway shell:
+```
+rm data/cache.db
 
 // ─────────────────────────────────────────────────────────────
 // STARTUP
