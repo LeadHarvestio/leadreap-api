@@ -377,6 +377,8 @@ const STYLE = `
     .nav-actions { gap: 8px; }
     .nav-actions .btn-sm { padding: 6px 10px; font-size: 12px; }
     .nav-email { display: none; }
+    .nav-beta { display: none; }
+    .nav-cta { display: none; }
     .badge { padding: 3px 8px; font-size: 10px; }
 
     /* HERO: tighter, less fluff */
@@ -702,7 +704,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             Lead<span>Reap</span>
           </div>
           <div className="nav-actions">
-            <span className="badge mono">BETA</span>
+            <span className="badge mono nav-beta">BETA</span>
             {user ? (
               <>
                 <span className="badge mono" style={{ background: isPro ? "rgba(34,197,94,0.12)" : undefined, color: isPro ? "#22c55e" : undefined, borderColor: isPro ? "rgba(34,197,94,0.3)" : undefined }}>
@@ -714,7 +716,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             ) : (
               <>
                 <button className="btn btn-outline btn-sm" onClick={onLoginClick}>Log In</button>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowPricing(true)}>Get Full Access →</button>
+                <button className="btn btn-primary btn-sm nav-cta" onClick={() => setShowPricing(true)}>Get Full Access →</button>
               </>
             )}
           </div>
