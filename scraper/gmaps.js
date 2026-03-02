@@ -32,7 +32,7 @@ const SEL = {
   scrollContainer: 'div[role="feed"]',
   businessName:    'h1.DUwDvf, h1[class*="fontHeadlineLarge"]',
   rating:          'div.F7nice span[aria-hidden="true"]',
-  reviewCount: 'div.F7nice span[aria-label*="review"], span[aria-label*="review" i], button[jsaction*="review"] span',
+  reviewCount:     'div.F7nice span[aria-label*="review"], span[aria-label*="review" i], button[jsaction*="review"] span',
   address:         'button[data-item-id="address"] .Io6YTe, [data-item-id="address"] div.Io6YTe',
   phone:           'button[data-item-id^="phone"] .Io6YTe, [data-tooltip="Copy phone number"] .Io6YTe',
   website:         'a[data-item-id="authority"]',
@@ -44,11 +44,10 @@ const SEL = {
 // US CITY → APPROXIMATE COORDINATES (for geolocation spoofing)
 // ─────────────────────────────────────────────────────────────
 const US_COORDS = {
-  default: { latitude: 37.7749, longitude: -122.4194 }, // San Francisco
+  default: { latitude: 37.7749, longitude: -122.4194 },
 };
 
 function guessCoords(locationStr) {
-  // Extract state abbreviation to pick a regional center
   const stateCoords = {
     AL: { latitude: 32.3182, longitude: -86.9023 },
     AK: { latitude: 64.2008, longitude: -149.4937 },
@@ -108,7 +107,6 @@ function guessCoords(locationStr) {
       return coords;
     }
   }
-  // Also check full state names
   const stateNames = {
     CALIFORNIA: "CA", TEXAS: "TX", FLORIDA: "FL", "NEW YORK": "NY",
     ILLINOIS: "IL", PENNSYLVANIA: "PA", OHIO: "OH", GEORGIA: "GA",
@@ -132,7 +130,7 @@ function guessCoords(locationStr) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GOOGLE CONSENT BYPASS — inject cookies to skip EU consent wall
+// GOOGLE CONSENT BYPASS
 // ─────────────────────────────────────────────────────────────
 async function setGoogleConsentCookies(context) {
   const cookies = [
@@ -161,7 +159,6 @@ async function setGoogleConsentCookies(context) {
 // HELPERS
 // ─────────────────────────────────────────────────────────────
 function buildSearchUrl(niche, location) {
-  // hl=en forces English, gl=us forces US-region results
   return `https://www.google.com/maps/search/${encodeURIComponent(`${niche} near ${location}`)}?hl=en&gl=us`;
 }
 
@@ -297,7 +294,6 @@ async function collectListingUrls(page, limit) {
     }
     if (urls.length >= limit) break;
 
-    // If no new URLs found for 3 consecutive scrolls, stop
     if (urls.length === prevCount) {
       noNewCount++;
       if (noNewCount >= 3) {
@@ -308,7 +304,6 @@ async function collectListingUrls(page, limit) {
       noNewCount = 0;
     }
 
-    // Scroll the results feed
     await page.evaluate(sel => {
       const el = document.querySelector(sel);
       if (el) el.scrollTop += 1500;
@@ -336,68 +331,78 @@ async function scrapeListingByUrl(context, url) {
       if (!name) throw new Error("No business name found");
 
       const [ratingText, reviewLabel, address, rawPhone, category, openedText] = await Promise.all([
-  page.$eval(SEL.rating,     el => el.textContent.trim()).catch(() => null),
-  // Try aria-label first, then fall back to broader text extraction
-  page.$eval(SEL.reviewCount, el => el.getAttribute("aria-label")).catch(() => null),
-  page.$eval(SEL.address,    el => el.textContent.trim()).catch(() => null),
-  page.$eval(SEL.phone,      el => el.textContent.trim()).catch(() => null),
-  page.$eval(SEL.category,   el => el.textContent.trim()).catch(() => null),
-  page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
-]);
+        page.$eval(SEL.rating, el => el.textContent.trim()).catch(() => null),
+        page.$eval(SEL.reviewCount, el => el.getAttribute("aria-label")).catch(() => null),
+        page.$eval(SEL.address, el => el.textContent.trim()).catch(() => null),
+        page.$eval(SEL.phone, el => el.textContent.trim()).catch(() => null),
+        page.$eval(SEL.category, el => el.textContent.trim()).catch(() => null),
+        page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
+      ]);
 
-// Extract review count — Google puts it OUTSIDE div.F7nice now
-let finalReviewLabel = reviewLabel;
-if (!finalReviewLabel) {
-  const debugHtml = await page.evaluate(() => {
-    const nice = document.querySelector('div.F7nice');
-    return nice ? nice.parentElement?.innerHTML?.slice(0, 500) : 'NO F7nice FOUND';
-  }).catch(() => 'debug failed');
-  console.log('🔍 DEBUG HTML:', debugHtml);
-}
-if (!finalReviewLabel) {
-  finalReviewLabel = await page.evaluate(() => {
-    // Strategy 1: Look for parent of F7nice and find review count as sibling text
-    const nice = document.querySelector('div.F7nice');
-    if (nice) {
-      const parent = nice.parentElement;
-      if (parent) {
-        // Look for text like "(123)" or "123 reviews" in siblings
-        const siblings = parent.querySelectorAll('span, button, a');
-        for (const el of siblings) {
-          if (nice.contains(el)) continue; // skip the rating itself
-          const text = el.textContent.trim();
-          if (/\([\d,]+\)/.test(text)) return text.match(/([\d,]+)/)[1] + " reviews";
-          if (/[\d,]+\s*review/i.test(text)) return text;
-        }
-        // Also check parent's text for pattern like "(312)"
-        const parentText = parent.textContent || "";
-        const m = parentText.match(/\(([\d,]+)\)/);
-        if (m) return m[1] + " reviews";
+      // Extract review count — Google moves this around frequently
+      let finalReviewLabel = reviewLabel;
+
+      // DEBUG: Search entire page for anything matching review count patterns
+      if (!finalReviewLabel) {
+        const debugReview = await page.evaluate(() => {
+          const body = document.querySelector('div[role="main"]');
+          if (!body) return 'NO MAIN FOUND';
+          const all = body.querySelectorAll('span, button, a');
+          const matches = [];
+          for (const el of all) {
+            const text = el.textContent.trim();
+            if (/\([\d,]+\)/.test(text) || /[\d,]+\s*review/i.test(text)) {
+              matches.push({ tag: el.tagName, class: el.className?.slice(0, 30), text: text.slice(0, 60) });
+            }
+          }
+          return JSON.stringify(matches);
+        }).catch(() => 'debug failed');
+        console.log('🔍 REVIEW MATCHES:', debugReview);
       }
-    }
 
-    // Strategy 2: Find any button/link that navigates to reviews tab
-    const reviewBtns = document.querySelectorAll('button[jsaction*="review"], button[aria-label*="review" i], a[aria-label*="review" i]');
-    for (const btn of reviewBtns) {
-      const label = btn.getAttribute('aria-label') || btn.textContent || '';
-      const m = label.match(/([\d,]+)\s*review/i);
-      if (m) return m[0];
-    }
+      // Fallback extraction strategies
+      if (!finalReviewLabel) {
+        finalReviewLabel = await page.evaluate(() => {
+          // Strategy 1: Look for parent of F7nice and find review count as sibling text
+          const nice = document.querySelector('div.F7nice');
+          if (nice) {
+            const parent = nice.parentElement;
+            if (parent) {
+              const siblings = parent.querySelectorAll('span, button, a');
+              for (const el of siblings) {
+                if (nice.contains(el)) continue;
+                const text = el.textContent.trim();
+                if (/\([\d,]+\)/.test(text)) return text.match(/([\d,]+)/)[1] + " reviews";
+                if (/[\d,]+\s*review/i.test(text)) return text;
+              }
+              const parentText = parent.textContent || "";
+              const m = parentText.match(/\(([\d,]+)\)/);
+              if (m) return m[1] + " reviews";
+            }
+          }
 
-    // Strategy 3: Broader search for review count text anywhere in the header area
-    const headerArea = document.querySelector('div[role="main"]');
-    if (headerArea) {
-      const allSpans = headerArea.querySelectorAll('span, button');
-      for (const el of allSpans) {
-        const text = el.textContent.trim();
-        if (/^\([\d,]+\)$/.test(text)) return text.match(/([\d,]+)/)[1] + " reviews";
-        if (/^[\d,]+\s*reviews?$/i.test(text)) return text;
+          // Strategy 2: Find any button/link that navigates to reviews tab
+          const reviewBtns = document.querySelectorAll('button[jsaction*="review"], button[aria-label*="review" i], a[aria-label*="review" i]');
+          for (const btn of reviewBtns) {
+            const label = btn.getAttribute('aria-label') || btn.textContent || '';
+            const m = label.match(/([\d,]+)\s*review/i);
+            if (m) return m[0];
+          }
+
+          // Strategy 3: Broader search for review count text anywhere in the header area
+          const headerArea = document.querySelector('div[role="main"]');
+          if (headerArea) {
+            const allSpans = headerArea.querySelectorAll('span, button');
+            for (const el of allSpans) {
+              const text = el.textContent.trim();
+              if (/^\([\d,]+\)$/.test(text)) return text.match(/([\d,]+)/)[1] + " reviews";
+              if (/^[\d,]+\s*reviews?$/i.test(text)) return text;
+            }
+          }
+
+          return null;
+        }).catch(() => null);
       }
-    }
-
-    return null;
-  }).catch(() => null);
-}
 
       const websiteEl = await page.$(SEL.website);
       const rawWebsite = websiteEl ? await websiteEl.getAttribute("href") : null;
@@ -526,7 +531,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
   const startTime = Date.now();
   console.log(`\n🔍 [${new Date().toISOString()}] "${niche}" in "${location}" (limit: ${limit})`);
 
-  // ── Cache check ──────────────────────────────────────────
   if (!forceRefresh) {
     const cached = getCached(niche, location);
     if (cached) {
@@ -535,7 +539,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     }
   }
 
-  // ── Guess geolocation for the searched area ──────────────
   const geo = guessCoords(location);
   console.log(`  → Geolocation: ${geo.latitude.toFixed(2)}, ${geo.longitude.toFixed(2)}`);
 
@@ -553,13 +556,10 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       permissions: ["geolocation"],
     });
 
-    // ── Inject Google consent cookies BEFORE any navigation ──
     await setGoogleConsentCookies(context);
 
     const searchPage = await context.newPage();
     searchPage.setDefaultNavigationTimeout(CONFIG.navigationTimeout);
-
-    // Force English + US locale
     await searchPage.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
     // ── Phase 1: URL collection ──────────────────────────────
@@ -567,7 +567,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     await searchPage.goto(buildSearchUrl(niche, location), { waitUntil: "domcontentloaded" });
     await sleep(3000);
 
-    // Check if consent wall still appeared despite cookies
     const consentStillShowing = await searchPage.$('button[jsname="higCR"], button[jsname="b3VHJd"]').catch(() => null);
     if (consentStillShowing) {
       console.log("  → Consent wall still showing — clicking through...");
@@ -577,7 +576,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       await sleep(3000);
     }
 
-    // Also try clicking any remaining consent via text
     const consentClicked = await searchPage.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll("button"));
       for (const btn of buttons) {
@@ -600,7 +598,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       }
     }
 
-    // Wait for result links
     await searchPage.waitForSelector(SEL.resultLinks, { timeout: 15000 }).catch(() => {
       console.log("  ⚠ No result links found after all consent attempts");
     });
@@ -683,7 +680,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
 
   leads.sort((a, b) => b.score - a.score);
 
-  // ── Cache + metrics ──────────────────────────────────────
   if (leads.length > 0) setCached(niche, location, leads);
 
   const durationMs = Date.now() - startTime;
