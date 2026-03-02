@@ -19,7 +19,7 @@ const CONFIG = {
   concurrency:       parseInt(process.env.SCRAPER_CONCURRENCY   || "5"),
   emailConcurrency:  parseInt(process.env.EMAIL_CONCURRENCY     || "8"),
   linkedInEnabled:   process.env.LINKEDIN_ENRICHMENT !== "false",
-  scrollPause:       800,
+  scrollPause:       1000,
   navigationTimeout: 20000,
   detailWait:        3000,
 };
@@ -39,6 +39,97 @@ const SEL = {
   category:        'button.DkEaL',
   openedDate:      'button[data-item-id*="oh"] .Io6YTe, [data-item-id*="opened"] .Io6YTe',
 };
+
+// ─────────────────────────────────────────────────────────────
+// US CITY → APPROXIMATE COORDINATES (for geolocation spoofing)
+// ─────────────────────────────────────────────────────────────
+const US_COORDS = {
+  default: { latitude: 37.7749, longitude: -122.4194 }, // San Francisco
+};
+
+function guessCoords(locationStr) {
+  // Extract state abbreviation to pick a regional center
+  const stateCoords = {
+    AL: { latitude: 32.3182, longitude: -86.9023 },
+    AK: { latitude: 64.2008, longitude: -149.4937 },
+    AZ: { latitude: 33.4484, longitude: -112.0740 },
+    AR: { latitude: 34.7465, longitude: -92.2896 },
+    CA: { latitude: 36.7783, longitude: -119.4179 },
+    CO: { latitude: 39.7392, longitude: -104.9903 },
+    CT: { latitude: 41.7658, longitude: -72.6734 },
+    DE: { latitude: 39.1582, longitude: -75.5244 },
+    FL: { latitude: 27.6648, longitude: -81.5158 },
+    GA: { latitude: 33.7490, longitude: -84.3880 },
+    HI: { latitude: 19.8968, longitude: -155.5828 },
+    ID: { latitude: 43.6150, longitude: -116.2023 },
+    IL: { latitude: 41.8781, longitude: -87.6298 },
+    IN: { latitude: 39.7684, longitude: -86.1581 },
+    IA: { latitude: 41.5868, longitude: -93.6250 },
+    KS: { latitude: 39.0119, longitude: -98.4842 },
+    KY: { latitude: 38.2009, longitude: -84.8733 },
+    LA: { latitude: 30.9843, longitude: -91.9623 },
+    ME: { latitude: 44.3106, longitude: -69.7795 },
+    MD: { latitude: 39.2904, longitude: -76.6122 },
+    MA: { latitude: 42.3601, longitude: -71.0589 },
+    MI: { latitude: 42.3314, longitude: -83.0458 },
+    MN: { latitude: 44.9778, longitude: -93.2650 },
+    MS: { latitude: 32.2988, longitude: -90.1848 },
+    MO: { latitude: 38.6270, longitude: -90.1994 },
+    MT: { latitude: 46.8797, longitude: -110.3626 },
+    NE: { latitude: 41.2565, longitude: -95.9345 },
+    NV: { latitude: 36.1699, longitude: -115.1398 },
+    NH: { latitude: 43.2081, longitude: -71.5376 },
+    NJ: { latitude: 40.0583, longitude: -74.4057 },
+    NM: { latitude: 35.0844, longitude: -106.6504 },
+    NY: { latitude: 40.7128, longitude: -74.0060 },
+    NC: { latitude: 35.7796, longitude: -78.6382 },
+    ND: { latitude: 46.8772, longitude: -96.7898 },
+    OH: { latitude: 39.9612, longitude: -82.9988 },
+    OK: { latitude: 35.4676, longitude: -97.5164 },
+    OR: { latitude: 45.5152, longitude: -122.6784 },
+    PA: { latitude: 39.9526, longitude: -75.1652 },
+    RI: { latitude: 41.8240, longitude: -71.4128 },
+    SC: { latitude: 34.0007, longitude: -81.0348 },
+    SD: { latitude: 43.5460, longitude: -96.7313 },
+    TN: { latitude: 36.1627, longitude: -86.7816 },
+    TX: { latitude: 30.2672, longitude: -97.7431 },
+    UT: { latitude: 40.7608, longitude: -111.8910 },
+    VT: { latitude: 44.2601, longitude: -72.5754 },
+    VA: { latitude: 37.5407, longitude: -77.4360 },
+    WA: { latitude: 47.6062, longitude: -122.3321 },
+    WV: { latitude: 38.3498, longitude: -81.6326 },
+    WI: { latitude: 43.0389, longitude: -87.9065 },
+    WY: { latitude: 42.8666, longitude: -106.3131 },
+  };
+
+  const upper = locationStr.toUpperCase();
+  for (const [abbr, coords] of Object.entries(stateCoords)) {
+    if (upper.includes(abbr) && (upper.includes(`, ${abbr}`) || upper.includes(` ${abbr}`))) {
+      return coords;
+    }
+  }
+  // Also check full state names
+  const stateNames = {
+    CALIFORNIA: "CA", TEXAS: "TX", FLORIDA: "FL", "NEW YORK": "NY",
+    ILLINOIS: "IL", PENNSYLVANIA: "PA", OHIO: "OH", GEORGIA: "GA",
+    MICHIGAN: "MI", "NORTH CAROLINA": "NC", VIRGINIA: "VA", WASHINGTON: "WA",
+    ARIZONA: "AZ", MASSACHUSETTS: "MA", TENNESSEE: "TN", INDIANA: "IN",
+    MISSOURI: "MO", MARYLAND: "MD", WISCONSIN: "WI", COLORADO: "CO",
+    MINNESOTA: "MN", "SOUTH CAROLINA": "SC", ALABAMA: "AL", LOUISIANA: "LA",
+    KENTUCKY: "KY", OREGON: "OR", OKLAHOMA: "OK", CONNECTICUT: "CT",
+    UTAH: "UT", IOWA: "IA", NEVADA: "NV", ARKANSAS: "AR", MISSISSIPPI: "MS",
+    KANSAS: "KS", "NEW MEXICO": "NM", NEBRASKA: "NE", IDAHO: "ID",
+    "WEST VIRGINIA": "WV", HAWAII: "HI", MAINE: "ME", MONTANA: "MT",
+    "RHODE ISLAND": "RI", DELAWARE: "DE", "SOUTH DAKOTA": "SD",
+    "NORTH DAKOTA": "ND", ALASKA: "AK", VERMONT: "VT", WYOMING: "WY",
+    "NEW HAMPSHIRE": "NH", "NEW JERSEY": "NJ",
+  };
+  for (const [name, abbr] of Object.entries(stateNames)) {
+    if (upper.includes(name)) return stateCoords[abbr];
+  }
+
+  return US_COORDS.default;
+}
 
 // ─────────────────────────────────────────────────────────────
 // GOOGLE CONSENT BYPASS — inject cookies to skip EU consent wall
@@ -70,8 +161,8 @@ async function setGoogleConsentCookies(context) {
 // HELPERS
 // ─────────────────────────────────────────────────────────────
 function buildSearchUrl(niche, location) {
-  // Add hl=en to force English UI regardless of datacenter location
-  return `https://www.google.com/maps/search/${encodeURIComponent(`${niche} near ${location}`)}?hl=en`;
+  // hl=en forces English, gl=us forces US-region results
+  return `https://www.google.com/maps/search/${encodeURIComponent(`${niche} near ${location}`)}?hl=en&gl=us`;
 }
 
 function parseRating(text) {
@@ -86,28 +177,21 @@ function parseReviewCount(label) {
 
 function calculateLeadScore({ rating, reviews, hasWebsite, hasPhone, emailQuality, techStack }) {
   let score = 50;
-
-  // Rating
   if (rating >= 4.5) score += 15;
   else if (rating >= 4.0) score += 10;
   else if (rating >= 3.5) score += 5;
   else if (rating) score -= 10;
 
-  // Review volume
   if (reviews >= 200) score += 15;
   else if (reviews >= 100) score += 12;
   else if (reviews >= 50) score += 8;
   else if (reviews >= 20) score += 4;
   else score -= 5;
 
-  // Presence signals
   if (hasWebsite) score += 8;
   if (hasPhone) score += 4;
-
-  // Email quality (replaces binary email bonus)
   if (emailQuality) score += (EMAIL_QUALITY_SCORES[emailQuality] || 0);
 
-  // Tech stack signals
   if (techStack?.length > 0) {
     const hasAds = techStack.some(t => t.category === "Paid Ads");
     if (hasAds) score += 8;
@@ -169,7 +253,7 @@ async function sendBlockAlert({ reason, niche, location }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// METRICS (in-memory + persisted via cache.js recordStat)
+// METRICS
 // ─────────────────────────────────────────────────────────────
 export const metrics = {
   totalScrapes: 0, totalLeads: 0, totalBlocks: 0, totalCacheHits: 0,
@@ -193,17 +277,19 @@ export const metrics = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// PHASE 1: Collect listing URLs
+// PHASE 1: Collect listing URLs (with aggressive scrolling)
 // ─────────────────────────────────────────────────────────────
 async function collectListingUrls(page, limit) {
   const seen = new Set();
   const urls = [];
+  let noNewCount = 0;
 
-  for (let attempt = 0; attempt < 20 && urls.length < limit; attempt++) {
+  for (let attempt = 0; attempt < 35 && urls.length < limit; attempt++) {
     const hrefs = await page.$$eval(SEL.resultLinks, els =>
       els.map(el => el.href).filter(h => h.includes("/maps/place/"))
     ).catch(() => []);
 
+    const prevCount = urls.length;
     for (const href of hrefs) {
       const base = href.split("?")[0];
       if (!seen.has(base)) { seen.add(base); urls.push(href); }
@@ -211,9 +297,21 @@ async function collectListingUrls(page, limit) {
     }
     if (urls.length >= limit) break;
 
+    // If no new URLs found for 3 consecutive scrolls, stop
+    if (urls.length === prevCount) {
+      noNewCount++;
+      if (noNewCount >= 3) {
+        console.log(`  → Scroll exhausted at ${urls.length} URLs after ${attempt + 1} scrolls`);
+        break;
+      }
+    } else {
+      noNewCount = 0;
+    }
+
+    // Scroll the results feed
     await page.evaluate(sel => {
       const el = document.querySelector(sel);
-      if (el) el.scrollTop += 1200;
+      if (el) el.scrollTop += 1500;
     }, SEL.scrollContainer);
 
     await sleep(CONFIG.scrollPause);
@@ -287,7 +385,7 @@ function parseYearOpened(text) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PHASE 3A: Email + tech stack (parallel, per-lead)
+// PHASE 3A: Email + tech stack
 // ─────────────────────────────────────────────────────────────
 async function enrichWebsite(context, lead) {
   if (!lead.website) return lead;
@@ -333,7 +431,7 @@ async function enrichWebsite(context, lead) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PHASE 3B: LinkedIn enrichment (parallel, capped lower)
+// PHASE 3B: LinkedIn enrichment
 // ─────────────────────────────────────────────────────────────
 async function enrichAllWebsites(context, leads, scrapeEmails) {
   if (!scrapeEmails) return leads;
@@ -382,6 +480,10 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     }
   }
 
+  // ── Guess geolocation for the searched area ──────────────
+  const geo = guessCoords(location);
+  console.log(`  → Geolocation: ${geo.latitude.toFixed(2)}, ${geo.longitude.toFixed(2)}`);
+
   const browser = await chromium.launch({
     headless: CONFIG.headless,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage"],
@@ -391,7 +493,10 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
   let blocked = false;
 
   try {
-    const context = await createStealthContext(browser);
+    const context = await createStealthContext(browser, {
+      geolocation: { ...geo, accuracy: 100 },
+      permissions: ["geolocation"],
+    });
 
     // ── Inject Google consent cookies BEFORE any navigation ──
     await setGoogleConsentCookies(context);
@@ -399,7 +504,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     const searchPage = await context.newPage();
     searchPage.setDefaultNavigationTimeout(CONFIG.navigationTimeout);
 
-    // Force English locale
+    // Force English + US locale
     await searchPage.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
     // ── Phase 1: URL collection ──────────────────────────────
@@ -413,7 +518,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       console.log("  → Consent wall still showing — clicking through...");
       await consentStillShowing.click({ noWaitAfter: true }).catch(() => null);
       await sleep(2000);
-      // Reload to get actual Maps results
       await searchPage.goto(buildSearchUrl(niche, location), { waitUntil: "domcontentloaded" });
       await sleep(3000);
     }
@@ -434,7 +538,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     if (consentClicked) {
       console.log("  → Clicked remaining consent button via text match");
       await sleep(2000);
-      // Check if we need to reload
       const hasLinks = await searchPage.$(SEL.resultLinks).catch(() => null);
       if (!hasLinks) {
         await searchPage.goto(buildSearchUrl(niche, location), { waitUntil: "domcontentloaded" });
@@ -442,7 +545,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       }
     }
 
-    // Wait for result links to appear
+    // Wait for result links
     await searchPage.waitForSelector(SEL.resultLinks, { timeout: 15000 }).catch(() => {
       console.log("  ⚠ No result links found after all consent attempts");
     });
