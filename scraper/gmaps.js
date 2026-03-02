@@ -371,6 +371,22 @@ if (!finalReviewLabel) {
     return null;
   }).catch(() => null);
 }
+      // DEBUG — log what Google is actually rendering for the rating area
+const debugRating = await page.evaluate(() => {
+  const nice = document.querySelector('div.F7nice');
+  if (!nice) return { found: false };
+  return {
+    found: true,
+    textContent: nice.textContent,
+    innerHTML: nice.innerHTML.substring(0, 500),
+    childAriaLabels: Array.from(nice.querySelectorAll('[aria-label]')).map(el => ({
+      tag: el.tagName,
+      ariaLabel: el.getAttribute('aria-label'),
+      text: el.textContent,
+    })),
+  };
+}).catch(() => ({ found: false, error: 'evaluate failed' }));
+console.log('  🔍 DEBUG rating area:', JSON.stringify(debugRating, null, 2));
 
       const websiteEl = await page.$(SEL.website);
       const rawWebsite = websiteEl ? await websiteEl.getAttribute("href") : null;
