@@ -18,6 +18,7 @@
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "playwright": "^1.44.0"
+    "stripe": "^17.5.0"
   },
   "optionalDependencies": {
     "resend": "^4.0.0"
