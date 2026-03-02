@@ -348,6 +348,13 @@ async function scrapeListingByUrl(context, url) {
 // Extract review count — Google puts it OUTSIDE div.F7nice now
 let finalReviewLabel = reviewLabel;
 if (!finalReviewLabel) {
+  const debugHtml = await page.evaluate(() => {
+    const nice = document.querySelector('div.F7nice');
+    return nice ? nice.parentElement?.innerHTML?.slice(0, 500) : 'NO F7nice FOUND';
+  }).catch(() => 'debug failed');
+  console.log('🔍 DEBUG HTML:', debugHtml);
+}
+if (!finalReviewLabel) {
   finalReviewLabel = await page.evaluate(() => {
     // Strategy 1: Look for parent of F7nice and find review count as sibling text
     const nice = document.querySelector('div.F7nice');
