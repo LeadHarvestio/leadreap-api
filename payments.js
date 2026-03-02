@@ -50,7 +50,7 @@ export async function createCheckout(plan, email) {
             },
           },
           product_options: {
-            redirect_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/success?plan=${plan}`,
+            redirect_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/?upgraded=${plan}`,
             receipt_button_text: "Go to LeadReap →",
             receipt_thank_you_note: "Your LeadReap license is now active! Head back to the app to start scraping.",
           },
