@@ -372,37 +372,37 @@ const STYLE = `
 
   /* ─── MOBILE ─────────────────────────────────── */
   @media (max-width: 768px) {
-    /* NAV: compact, no overflow */
+    /* NAV: just logo + action */
     .nav { padding: 12px 16px; gap: 8px; }
     .nav-actions { gap: 8px; }
-    .nav-actions .btn-sm { padding: 6px 10px; font-size: 12px; }
+    .nav-actions .btn-sm { padding: 6px 12px; font-size: 12px; }
     .nav-email { display: none; }
     .nav-beta { display: none; }
     .nav-cta { display: none; }
     .badge { padding: 3px 8px; font-size: 10px; }
 
-    /* HERO: tighter, less fluff */
-    .hero { padding: 40px 20px 32px; }
-    .hero-tag { font-size: 10px; padding: 5px 12px; margin-bottom: 20px; }
-    .hero h1 { font-size: 28px; letter-spacing: -1px; margin-bottom: 14px; line-height: 1.15; }
+    /* HERO: ultra-minimal — get to the tool fast */
+    .hero { padding: 32px 20px 24px; }
+    .hero-tag { display: none; }
+    .hero h1 { font-size: 26px; letter-spacing: -0.8px; margin-bottom: 10px; line-height: 1.2; }
     .hero h1 br { display: none; }
-    .hero p { font-size: 14px; margin-bottom: 28px; line-height: 1.5; }
-    .hero-stats {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 16px; margin-top: 28px; padding-top: 24px;
-    }
-    .stat-num { font-size: 22px; }
-    .stat-label { font-size: 11px; }
+    .hero-desktop { display: none; }
+    .hero-mobile { display: block; }
+    .hero p { font-size: 13px; margin-bottom: 0; line-height: 1.5; max-width: 100%; }
+    .hero-stats { display: none; }
+    .hero::before { display: none; }
 
-    /* SEARCH CARD */
+    /* SEARCH CARD — the star of the show */
     .tool-section { padding: 0 16px 48px; }
-    .search-card { padding: 20px 16px; border-radius: 12px; margin-bottom: 20px; }
+    .search-card { padding: 20px 16px; border-radius: 12px; margin-bottom: 16px; }
     .search-label { font-size: 10px; margin-bottom: 14px; }
     .search-row { grid-template-columns: 1fr; gap: 10px; }
-    .field input, .field select { padding: 11px 14px; font-size: 13px; border-radius: 8px; }
-    .btn-primary { width: 100%; justify-content: center; }
+    .field input, .field select {
+      padding: 13px 14px; font-size: 14px; border-radius: 10px;
+    }
+    .btn-primary { width: 100%; justify-content: center; height: 48px !important; font-size: 15px; }
 
-    /* OPTIONS ROW: wrap nicely */
+    /* OPTIONS ROW */
     .options-row { gap: 8px; margin-top: 12px; }
     .toggle-chip { padding: 6px 10px; font-size: 12px; }
     .options-hint { display: none; }
@@ -413,14 +413,14 @@ const STYLE = `
     .results-actions { width: 100%; display: flex; gap: 8px; }
     .results-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 12px; }
 
-    /* TABLE: horizontal scroll with momentum */
+    /* TABLE: horizontal scroll */
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { min-width: 700px; }
     th { padding: 10px 12px; font-size: 10px; }
     td { padding: 10px 12px; font-size: 12px; }
     .name-cell { font-size: 13px; }
 
-    /* UPSELL BANNERS: stack vertically */
+    /* UPSELL BANNERS */
     .upsell-banner {
       flex-direction: column !important; gap: 12px !important;
       text-align: center; padding: 14px 16px !important;
@@ -453,11 +453,12 @@ const STYLE = `
     .footer { flex-direction: column; gap: 10px; padding: 20px 16px; text-align: center; }
   }
 
+  /* Desktop: hide mobile headline */
+  .hero-mobile { display: none; }
+
   /* Small phones */
   @media (max-width: 380px) {
-    .hero h1 { font-size: 24px; }
-    .hero-stats { gap: 12px; }
-    .stat-num { font-size: 20px; }
+    .hero h1 { font-size: 23px; }
     .logo { font-size: 17px; }
     .logo-mark { width: 28px; height: 28px; }
     .logo-mark svg { width: 28px; height: 28px; }
@@ -725,7 +726,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         {/* HERO */}
         <div className="hero">
           <div className="hero-tag"><div className="dot" /> AI-POWERED LEAD INTELLIGENCE</div>
-          <h1>Find <em>any</em> local business lead<br />in under 30 seconds</h1>
+          <h1 className="hero-desktop">Find <em>any</em> local business lead<br />in under 30 seconds</h1>
+          <h1 className="hero-mobile">Find <em>verified</em> local leads in seconds</h1>
           <p>Pull verified contact data from any local business niche. Search unlimited leads by location — filter, score, and export to CSV in seconds.</p>
           <div className="hero-stats">
             <div className="stat"><div className="stat-num">2.1M+</div><div className="stat-label">Businesses indexed</div></div>
