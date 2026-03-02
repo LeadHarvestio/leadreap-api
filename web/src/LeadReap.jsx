@@ -76,7 +76,7 @@ const STYLE = `
 
   /* HERO */
   .hero {
-    padding: 80px 40px 60px;
+    padding: 48px 40px 0;
     text-align: center;
     position: relative;
     overflow: hidden;
@@ -91,30 +91,31 @@ const STYLE = `
     display: inline-flex; align-items: center; gap: 8px;
     font-family: 'IBM Plex Mono', monospace; font-size: 11px;
     color: var(--accent); border: 1px solid rgba(240,180,41,0.2);
-    padding: 6px 16px; border-radius: 20px; margin-bottom: 28px;
+    padding: 6px 16px; border-radius: 20px; margin-bottom: 20px;
     letter-spacing: 0.08em; background: rgba(240,180,41,0.04);
   }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{ opacity:1; transform: scale(1); } 50%{ opacity:0.4; transform: scale(0.8); } }
 
   .hero h1 {
-    font-size: clamp(36px, 5vw, 64px); font-weight: 800; line-height: 1.05;
-    letter-spacing: -2px; margin-bottom: 20px;
-    max-width: 800px; margin-left: auto; margin-right: auto;
+    font-size: clamp(30px, 4vw, 48px); font-weight: 800; line-height: 1.1;
+    letter-spacing: -1.5px; margin-bottom: 14px;
+    max-width: 700px; margin-left: auto; margin-right: auto;
   }
   .hero h1 em { font-style: normal; color: var(--accent); }
   .hero p {
-    font-size: 17px; color: var(--muted); max-width: 520px;
-    margin: 0 auto 40px; line-height: 1.7; font-weight: 400;
+    font-size: 15px; color: var(--muted); max-width: 500px;
+    margin: 0 auto; line-height: 1.6; font-weight: 400;
   }
   .hero-stats {
-    display: flex; gap: 40px; justify-content: center;
-    margin-top: 48px; padding-top: 40px;
+    display: flex; gap: 32px; justify-content: center;
+    margin-top: 28px; padding-top: 24px;
     border-top: 1px solid var(--border);
+    padding-bottom: 32px;
   }
   .stat { text-align: center; }
-  .stat-num { font-size: 28px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
-  .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .stat-num { font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   /* MAIN TOOL */
   .tool-section { padding: 0 40px 80px; max-width: 1100px; margin: 0 auto; width: 100%; }
@@ -370,6 +371,35 @@ const STYLE = `
   .footer-link { font-size: 13px; color: var(--muted); cursor: pointer; transition: color 0.15s; }
   .footer-link:hover { color: var(--text); }
 
+  /* DEMO PREVIEW */
+  .demo-section { position: relative; }
+  .demo-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .demo-label {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .demo-wrap { position: relative; overflow: hidden; border-radius: 12px; }
+  .demo-wrap::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 10%, var(--bg) 85%);
+    pointer-events: none; z-index: 2;
+  }
+  .demo-cta {
+    position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
+    z-index: 3; text-align: center;
+  }
+  .demo-cta p {
+    font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px;
+  }
+  .demo-cta .sub {
+    font-size: 12px; color: var(--muted); margin-top: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
   /* ─── MOBILE ─────────────────────────────────── */
   @media (max-width: 768px) {
     /* NAV: just logo + action */
@@ -449,6 +479,11 @@ const STYLE = `
     .empty-title { font-size: 17px; }
     .empty-sub { font-size: 13px; }
 
+    /* DEMO on mobile */
+    .demo-header { flex-direction: column; gap: 6px; align-items: flex-start; }
+    .demo-cta p { font-size: 14px; }
+    .demo-cta .btn { font-size: 14px; }
+
     /* FOOTER */
     .footer { flex-direction: column; gap: 10px; padding: 20px 16px; text-align: center; }
   }
@@ -484,6 +519,15 @@ const INDUSTRIES = [
   "Restaurant", "Hair Salon", "Auto Repair Shop", "Law Firm", "Gym / Fitness Studio",
   "Roofing Contractor", "HVAC Company", "Wedding Photographer", "Accountant / CPA",
   "Landscaping Company", "Personal Trainer", "Marketing Agency", "Insurance Agent"
+];
+
+// ─── Demo Data (shown before first search) ──────────────────
+const DEMO_LEADS = [
+  { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, reviews: 312, score: 94, notes: "High review count, active website, email verified" },
+  { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, reviews: 189, score: 87, notes: "Strong Google presence, recently updated listing" },
+  { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, reviews: 245, score: 82, notes: "Multiple locations, good engagement" },
+  { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, reviews: 97, score: 71, notes: "Premium area, newer practice" },
+  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "—", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, reviews: 64, score: 65, notes: "No email found, phone verified" },
 ];
 
 function scoreToClass(score) {
@@ -924,19 +968,59 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             </>
           )}
 
-          {/* EMPTY STATE */}
+          {/* DEMO PREVIEW — shows before first search */}
           {!loading && !searchDone && (
-            <div className="search-card">
-              <div className="empty-state">
-                <div className="empty-icon">
-                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{opacity:0.6}}>
-                    <circle cx="24" cy="24" r="20" stroke="#f0b429" strokeWidth="2" fill="none" opacity="0.3"/>
-                    <circle cx="24" cy="24" r="12" stroke="#f0b429" strokeWidth="1.5" fill="none" opacity="0.5"/>
-                    <circle cx="24" cy="24" r="4" fill="#f0b429" opacity="0.7"/>
-                  </svg>
+            <div className="demo-section">
+              <div className="demo-header">
+                <span className="demo-label">Example: "Dentist" in Austin, TX</span>
+                <span className="count-tag" style={{opacity:0.5}}>✓ 20 leads found</span>
+              </div>
+              <div className="demo-wrap">
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Business Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Website</th>
+                        <th>Rating</th>
+                        <th>Lead Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DEMO_LEADS.map((lead, i) => (
+                        <tr key={i} style={{opacity: 1 - (i * 0.08)}}>
+                          <td style={{color:"var(--muted)",fontSize:12,fontFamily:"IBM Plex Mono"}}>{String(i+1).padStart(2,"0")}</td>
+                          <td>
+                            <div className="name-cell">{lead.name}</div>
+                            <div style={{fontSize:11,color:"var(--muted)",marginTop:2,fontFamily:"IBM Plex Mono"}}>{lead.address}</div>
+                          </td>
+                          <td className="email-cell">{lead.email}</td>
+                          <td className="phone-cell">{lead.phone}</td>
+                          <td className="site-cell">{lead.website}</td>
+                          <td>
+                            <div className="rating-cell">
+                              <span className="star">★</span> {lead.rating}
+                              <span style={{color:"var(--muted)"}}> ({lead.reviews})</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="empty-title">Ready when you are</div>
-                <div className="empty-sub">Select a niche and location above to find verified business leads in seconds.</div>
+                <div className="demo-cta">
+                  <p>Try it free — search any niche, any city</p>
+                  <button className="btn btn-primary" onClick={() => document.querySelector('.field select')?.focus()}>
+                    Start Your First Search →
+                  </button>
+                  <div className="sub">No credit card required · 5 leads free</div>
+                </div>
               </div>
             </div>
           )}
