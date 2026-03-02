@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// LeadReap API — v3.1 (Revenue-Ready)
+// LeadReap API — v3.2 (Production)
 // Express server with auth, payments, rate limiting, + scraper
 // ─────────────────────────────────────────────────────────────
 
@@ -268,77 +268,6 @@ app.post("/api/cache/clear", (req, res) => {
   res.json({ cleared, message: `Cleared ${cleared} cache entries` });
 });
 
-// ── DEBUG: Screenshot what the scraper sees (with consent bypass) ──
-app.get("/api/debug/screenshot", async (req, res) => {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"],
-  });
-  try {
-    const context = await browser.newContext({
-      locale: "en-US",
-      extraHTTPHeaders: { "Accept-Language": "en-US,en;q=0.9" },
-    });
-
-    // Inject consent cookies to bypass EU wall
-    await context.addCookies([
-      {
-        name: "SOCS",
-        value: "CAISHAgBEhJnd3NfMjAyNDAzMTAtMF9SQzIaAmVuIAEaBgiA_ZS2Bg",
-        domain: ".google.com",
-        path: "/",
-        secure: true,
-        sameSite: "Lax",
-      },
-      {
-        name: "CONSENT",
-        value: "PENDING+987",
-        domain: ".google.com",
-        path: "/",
-        secure: true,
-        sameSite: "Lax",
-      },
-    ]);
-
-    const page = await context.newPage();
-    const query = req.query.q || "Electrician near Folsom CA";
-    await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(query)}?hl=en`, {
-      waitUntil: "domcontentloaded",
-    });
-    await new Promise(r => setTimeout(r, 5000));
-
-    // If consent wall still shows, try clicking through
-    const stillConsent = await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll("button"));
-      for (const btn of buttons) {
-        const t = btn.textContent.trim().toLowerCase();
-        if (t.includes("accept") || t.includes("accepteren") || t.includes("akzeptieren")) {
-          btn.click();
-          return "clicked";
-        }
-      }
-      return "none";
-    }).catch(() => "error");
-
-    if (stillConsent === "clicked") {
-      await new Promise(r => setTimeout(r, 3000));
-      // Reload after consent
-      await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(query)}?hl=en`, {
-        waitUntil: "domcontentloaded",
-      });
-      await new Promise(r => setTimeout(r, 5000));
-    }
-
-    const screenshot = await page.screenshot({ fullPage: true });
-    res.setHeader("Content-Type", "image/png");
-    res.setHeader("X-Consent-Status", stillConsent);
-    res.send(screenshot);
-  } finally {
-    await browser.close();
-  }
-});
-
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
@@ -353,27 +282,18 @@ cleanupAuth();
 
 app.listen(PORT, () => {
   console.log(`
-🎯 LeadReap API v3.1 — port ${PORT}
-────────────────────────────────────────
-  AUTH
-   POST /api/auth/magic          → send magic login link
-   POST /api/auth/verify         → verify code → session token
-   GET  /api/auth/me             → current user + plan
-   POST /api/auth/logout         → destroy session
-
-  PAYMENTS
-   POST /api/checkout            → create LemonSqueezy checkout
-   POST /api/webhook/lemonsqueezy → payment webhook (auto)
-
-  LEADS
-   POST /api/leads/search        → queue scrape job
-   GET  /api/leads/job/:id       → poll results
-   GET  /api/leads/export/:id    → download XLSX (paid only)
-
-  SYSTEM
-   GET  /api/metrics             → scraper health
-   GET  /api/debug/screenshot    → see what Google Maps looks like
-   GET  /health                  → uptime check
-────────────────────────────────────────
+  LeadReap API v3.2 — port ${PORT}
+  ────────────────────────────────
+  POST /api/auth/magic
+  POST /api/auth/verify
+  GET  /api/auth/me
+  POST /api/checkout
+  POST /api/webhook/lemonsqueezy
+  POST /api/leads/search
+  GET  /api/leads/job/:id
+  GET  /api/leads/export/:id
+  GET  /api/metrics
+  GET  /health
+  ────────────────────────────────
   `);
 });
