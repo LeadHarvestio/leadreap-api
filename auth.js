@@ -178,5 +178,12 @@ export function cleanupAuth() {
   stmts.cleanMagicLinks.run();
 }
 
+/** Upgrade a user's plan (called from Stripe webhook) */
+export function upgradeUser(email, plan) {
+  getOrCreateUser(email);
+  stmts.upgradePlan.run(plan, null, null, email.toLowerCase().trim());
+  console.log(`[Auth] Upgraded ${email} to ${plan} via Stripe`);
+}
+
 // Run cleanup every hour
 setInterval(cleanupAuth, 60 * 60 * 1000);
