@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
-// LeadReap API — v3.2 (Production)
-// Express server with auth, payments, rate limiting, + scraper
+// LeadReap API — v3.3 (Production)
+// Express server with auth, Stripe payments, rate limiting, + scraper
 // ─────────────────────────────────────────────────────────────
 
 import express from "express";
@@ -20,7 +20,7 @@ import {
   createMagicLink, verifyMagicLink, validateSession,
   destroySession, recordSearch, cleanupAuth,
 } from "./auth.js";
-import { createCheckout, verifyWebhookSignature, handleWebhookEvent } from "./payments.js";
+import { createCheckout, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail } from "./email.js";
 import { attachUser, requireAuth, requireSearchQuota, ipRateLimit } from "./middleware.js";
 
@@ -44,7 +44,7 @@ app.use(cors({
 
 // Parse JSON for all routes EXCEPT webhook (needs raw body for sig verification)
 app.use((req, res, next) => {
-  if (req.path === "/api/webhook/lemonsqueezy") return next();
+  if (req.path === "/api/webhook/stripe") return next();
   express.json()(req, res, next);
 });
 
@@ -122,7 +122,7 @@ app.post("/api/auth/logout", (req, res) => {
 // PAYMENT ROUTES
 // ═════════════════════════════════════════════════════════════
 
-// ── POST /api/checkout — Create LemonSqueezy checkout URL ────
+// ── POST /api/checkout — Create Stripe Checkout Session URL ──
 app.post("/api/checkout", async (req, res) => {
   const { plan } = req.body;
   const validPlans = ["starter", "pro", "agency"];
@@ -144,20 +144,18 @@ app.post("/api/checkout", async (req, res) => {
   }
 });
 
-// ── POST /api/webhook/lemonsqueezy — Handle payment webhooks ─
-app.post("/api/webhook/lemonsqueezy",
+// ── POST /api/webhook/stripe — Handle Stripe webhooks ────────
+app.post("/api/webhook/stripe",
   express.raw({ type: "application/json" }),
   (req, res) => {
-    const signature = req.headers["x-signature"];
-    const rawBody = req.body.toString();
+    const signature = req.headers["stripe-signature"];
 
-    if (!verifyWebhookSignature(rawBody, signature)) {
-      console.error("[Payments] Invalid webhook signature");
-      return res.status(401).json({ error: "Invalid signature" });
+    const event = constructWebhookEvent(req.body, signature);
+    if (!event) {
+      return res.status(400).json({ error: "Invalid signature" });
     }
 
     try {
-      const event = JSON.parse(rawBody);
       const result = handleWebhookEvent(event);
       return res.json(result);
     } catch (e) {
@@ -282,13 +280,13 @@ cleanupAuth();
 
 app.listen(PORT, () => {
   console.log(`
-  LeadReap API v3.2 — port ${PORT}
+  LeadReap API v3.3 — port ${PORT}
   ────────────────────────────────
   POST /api/auth/magic
   POST /api/auth/verify
   GET  /api/auth/me
   POST /api/checkout
-  POST /api/webhook/lemonsqueezy
+  POST /api/webhook/stripe
   POST /api/leads/search
   GET  /api/leads/job/:id
   GET  /api/leads/export/:id
