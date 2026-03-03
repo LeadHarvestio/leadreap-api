@@ -406,6 +406,22 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
   }, { attempts: 3, baseMs: 1500, label: `detail:${url.split("/maps/place/")[1]?.slice(0, 20)}` });
 }
 
+const EMAIL_BLACKLIST = ["example.com", "sentry.io", "wix.com", "squarespace.com",
+  "wordpress.com", "godaddy.com", "schema.org", "w3.org", "jquery.com",
+  "cloudflare.com", "googleapis.com", "gstatic.com", "gravatar.com",
+  "wp.com", "creativecommons.org", "mozilla.org", "apache.org",
+  "bootstrapcdn.com", "fontawesome.com", "google.com", "facebook.com",
+  "twitter.com", "instagram.com", "youtube.com", "linkedin.com"];
+
+function extractEmailFromText(text) {
+  if (!text) return null;
+  const matches = (text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [])
+    .filter(e => !EMAIL_BLACKLIST.some(b => e.toLowerCase().includes(b)))
+    .filter(e => !e.endsWith(".png") && !e.endsWith(".jpg") && !e.endsWith(".svg") && !e.endsWith(".gif"))
+    .filter(e => !e.startsWith("0") && !e.startsWith("1"));
+  return matches[0] || null;
+}
+
 function parseYearOpened(text) {
   if (!text) return null;
   const m = text.match(/\b(19|20)\d{2}\b/);
@@ -423,20 +439,57 @@ async function enrichWebsite(context, lead) {
       const html = await page.content().catch(() => "");
       const techStack = detectTechStack(html);
 
+      // Strategy 1: mailto: links on homepage
       const mailtoEmails = await page.$$eval('a[href^="mailto:"]', els =>
         els.map(l => l.href.replace("mailto:", "").split("?")[0].trim().toLowerCase())
       ).catch(() => []);
 
       let email = mailtoEmails[0] || null;
 
+      // Strategy 2: Regex scan homepage body text
       if (!email) {
         const bodyText = await page.evaluate(() => document.body?.innerText || "").catch(() => "");
-        const blacklist = ["example.com", "sentry.io", "wix.com", "squarespace.com",
-                           "wordpress.com", "godaddy.com", "schema.org", "w3.org",
-                           "jquery.com", "cloudflare.com"];
-        const matches = (bodyText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [])
-          .filter(e => !blacklist.some(b => e.includes(b)));
-        email = matches[0] || null;
+        email = extractEmailFromText(bodyText);
+      }
+
+      // Strategy 3: Scan HTML source for emails (catches hidden/encoded ones)
+      if (!email) {
+        email = extractEmailFromText(html);
+      }
+
+      // Strategy 4: Check contact/about pages if homepage had no email
+      if (!email) {
+        const contactHref = await page.evaluate(() => {
+          const links = Array.from(document.querySelectorAll("a[href]"));
+          const patterns = [/contact/i, /about/i, /get.in.touch/i, /reach.us/i, /connect/i];
+          for (const link of links) {
+            const text = (link.textContent || "").trim().toLowerCase();
+            const href = (link.href || "").toLowerCase();
+            for (const p of patterns) {
+              if (p.test(text) || p.test(href)) return link.href;
+            }
+          }
+          return null;
+        }).catch(() => null);
+
+        if (contactHref) {
+          try {
+            await page.goto(contactHref, { timeout: 8000, waitUntil: "domcontentloaded" });
+            const contactMailtos = await page.$$eval('a[href^="mailto:"]', els =>
+              els.map(l => l.href.replace("mailto:", "").split("?")[0].trim().toLowerCase())
+            ).catch(() => []);
+            email = contactMailtos[0] || null;
+
+            if (!email) {
+              const contactText = await page.evaluate(() => document.body?.innerText || "").catch(() => "");
+              email = extractEmailFromText(contactText);
+            }
+            if (!email) {
+              const contactHtml = await page.content().catch(() => "");
+              email = extractEmailFromText(contactHtml);
+            }
+          } catch (_) { /* contact page timed out, move on */ }
+        }
       }
 
       const emailAssessment = assessEmail(email);
@@ -633,6 +686,9 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, offset = 0
     leads = await enrichAllWebsites(context, leads, scrapeEmails);
     leads = await enrichAllLinkedIn(context, leads);
     console.log(`  ✓ Phase 3: Enrichment done in ${Date.now() - t3}ms`);
+    const emailCount = leads.filter(l => l.email).length;
+    const socialCount = leads.filter(l => l.facebook || l.instagram || l.linkedinCompany || l.twitter).length;
+    console.log(`  📧 Emails: ${emailCount}/${leads.length} | 🔗 Social: ${socialCount}/${leads.length}`);
 
   } finally {
     await browser.close();
