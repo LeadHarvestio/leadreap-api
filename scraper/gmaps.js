@@ -507,11 +507,11 @@ async function enrichAllLinkedIn(context, leads) {
   return leads;
 }
 
-export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmails = true, forceRefresh = false }) {
+export async function scrapeGoogleMaps({ niche, location, limit = 20, offset = 0, scrapeEmails = true, forceRefresh = false }) {
   const startTime = Date.now();
-  console.log(`\n🔍 [${new Date().toISOString()}] "${niche}" in "${location}" (limit: ${limit})`);
+  console.log(`\n🔍 [${new Date().toISOString()}] "${niche}" in "${location}" (limit: ${limit}, offset: ${offset})`);
 
-  if (!forceRefresh) {
+  if (!forceRefresh && offset === 0) {
     const cached = getCached(niche, location);
     if (cached) {
       metrics.totalCacheHits++;
@@ -589,7 +589,8 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       return [];
     }
 
-    const listings = await collectListingUrls(searchPage, limit);
+    const totalNeeded = offset + limit;
+    const listings = await collectListingUrls(searchPage, totalNeeded);
 
     const check2 = await detectBlock(searchPage);
     if (check2.blocked) {
@@ -600,14 +601,21 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     }
 
     await searchPage.close();
-    console.log(`  ✓ Phase 1: ${listings.length} URLs in ${Date.now() - t1}ms`);
+    console.log(`  ✓ Phase 1: ${listings.length} URLs collected in ${Date.now() - t1}ms`);
+
+    // Only scrape the new batch (skip already-scraped offset)
+    const newListings = listings.slice(offset);
+    if (newListings.length === 0) {
+      console.log(`  ⚠ No new listings beyond offset ${offset}`);
+      return [];
+    }
 
     const t2 = Date.now();
-    console.log(`  → Phase 2: Scraping ${listings.length} listings (${CONFIG.concurrency} parallel)...`);
+    console.log(`  → Phase 2: Scraping ${newListings.length} new listings (offset: ${offset}, ${CONFIG.concurrency} parallel)...`);
 
-    const detailTasks = listings.map((listing, i) => async () => {
+    const detailTasks = newListings.map((listing, i) => async () => {
       const data = await scrapeListingByUrl(context, listing.url, listing);
-      process.stdout.write(`  [${i+1}/${listings.length}] ${data ? `✓ ${data.name} (${data.reviews} reviews)` : "✗ failed"}\n`);
+      process.stdout.write(`  [${i+1}/${newListings.length}] ${data ? `✓ ${data.name}` : "✗ failed"}\n`);
       return data;
     });
 
@@ -659,7 +667,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
 
   leads.sort((a, b) => b.score - a.score);
 
-  if (leads.length > 0) setCached(niche, location, leads);
+  if (leads.length > 0 && offset === 0) setCached(niche, location, leads);
 
   const durationMs = Date.now() - startTime;
   metrics.recordScrape({ niche, location, leads: leads.length, blocked, reason: null, durationMs });
