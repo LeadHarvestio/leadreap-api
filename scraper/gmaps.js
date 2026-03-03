@@ -11,9 +11,6 @@ import { detectTechStack, summarizeTechStack } from "./techstack.js";
 import { enrichLinkedIn } from "./linkedin.js";
 import { getCached, setCached, recordStat } from "./cache.js";
 
-// ─────────────────────────────────────────────────────────────
-// CONFIG
-// ─────────────────────────────────────────────────────────────
 const CONFIG = {
   headless:          true,
   concurrency:       parseInt(process.env.SCRAPER_CONCURRENCY   || "5"),
@@ -24,9 +21,6 @@ const CONFIG = {
   detailWait:        3000,
 };
 
-// ─────────────────────────────────────────────────────────────
-// SELECTORS
-// ─────────────────────────────────────────────────────────────
 const SEL = {
   resultLinks:     'a[href*="/maps/place/"]',
   scrollContainer: 'div[role="feed"]',
@@ -40,9 +34,6 @@ const SEL = {
   openedDate:      'button[data-item-id*="oh"] .Io6YTe, [data-item-id*="opened"] .Io6YTe',
 };
 
-// ─────────────────────────────────────────────────────────────
-// US CITY → APPROXIMATE COORDINATES (for geolocation spoofing)
-// ─────────────────────────────────────────────────────────────
 const US_COORDS = {
   default: { latitude: 37.7749, longitude: -122.4194 },
 };
@@ -129,9 +120,6 @@ function guessCoords(locationStr) {
   return US_COORDS.default;
 }
 
-// ─────────────────────────────────────────────────────────────
-// GOOGLE CONSENT BYPASS
-// ─────────────────────────────────────────────────────────────
 async function setGoogleConsentCookies(context) {
   const cookies = [
     {
@@ -155,9 +143,6 @@ async function setGoogleConsentCookies(context) {
   console.log("  → Google consent cookies injected (EU bypass)");
 }
 
-// ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
 function buildSearchUrl(niche, location) {
   return `https://www.google.com/maps/search/${encodeURIComponent(`${niche} near ${location}`)}?hl=en&gl=us`;
 }
@@ -213,9 +198,6 @@ function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, sc
   return "Solid mid-tier lead with good local presence.";
 }
 
-// ─────────────────────────────────────────────────────────────
-// CAPTCHA / BLOCK DETECTION
-// ─────────────────────────────────────────────────────────────
 const CAPTCHA_SIGNALS = [
   'form#captcha-form', 'div.g-recaptcha',
   'iframe[src*="recaptcha"]', 'iframe[src*="captcha"]', '#recaptcha',
@@ -249,9 +231,6 @@ async function sendBlockAlert({ reason, niche, location }) {
   }).catch(() => null);
 }
 
-// ─────────────────────────────────────────────────────────────
-// METRICS
-// ─────────────────────────────────────────────────────────────
 export const metrics = {
   totalScrapes: 0, totalLeads: 0, totalBlocks: 0, totalCacheHits: 0,
   recentBlocks: [], recentScrapes: [],
@@ -273,9 +252,6 @@ export const metrics = {
   },
 };
 
-// ─────────────────────────────────────────────────────────────
-// PHASE 1: Collect listing URLs (with aggressive scrolling)
-// ─────────────────────────────────────────────────────────────
 async function collectListingUrls(page, limit) {
   const seen = new Set();
   const urls = [];
@@ -315,9 +291,6 @@ async function collectListingUrls(page, limit) {
   return urls.slice(0, limit);
 }
 
-// ─────────────────────────────────────────────────────────────
-// PHASE 2: Scrape one listing (with retry)
-// ─────────────────────────────────────────────────────────────
 async function scrapeListingByUrl(context, url) {
   return withRetry(async () => {
     const page = await context.newPage();
@@ -330,6 +303,15 @@ async function scrapeListingByUrl(context, url) {
       const name = await page.$eval(SEL.businessName, el => el.textContent.trim()).catch(() => null);
       if (!name) throw new Error("No business name found");
 
+      // KEY FIX: Wait for review count to lazy-load into the page
+      // Google renders the rating first, then injects the review count shortly after
+      await page.waitForFunction(() => {
+        const main = document.querySelector('div[role="main"]');
+        if (!main) return false;
+        const text = main.innerText || '';
+        return /\(\d[\d,]*\)/.test(text) || /\d[\d,]*\s*reviews?/i.test(text);
+      }, { timeout: 3000 }).catch(() => null);
+
       const [ratingText, reviewLabel, address, rawPhone, category, openedText] = await Promise.all([
         page.$eval(SEL.rating, el => el.textContent.trim()).catch(() => null),
         page.$eval(SEL.reviewCount, el => el.getAttribute("aria-label")).catch(() => null),
@@ -339,74 +321,64 @@ async function scrapeListingByUrl(context, url) {
         page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
       ]);
 
-      // Extract review count — Google moves this around frequently
       let finalReviewLabel = reviewLabel;
 
-      // DEBUG: Search entire page for anything matching review count patterns
-      if (!finalReviewLabel) {
-        const debugReview = await page.evaluate(() => {
-          const body = document.querySelector('div[role="main"]');
-          if (!body) return 'NO MAIN FOUND';
-          const all = body.querySelectorAll('span, button, a');
-          const matches = [];
-          for (const el of all) {
-            const text = el.textContent.trim();
-            if (/\([\d,]+\)/.test(text) || /[\d,]+\s*review/i.test(text)) {
-              matches.push({ tag: el.tagName, class: el.className?.slice(0, 30), text: text.slice(0, 60) });
-            }
-          }
-          return JSON.stringify(matches);
-        }).catch(() => 'debug failed');
-       if (!finalReviewLabel) {
-        const debugDump = await page.evaluate(() => {
-          const nice = document.querySelector('div.F7nice');
-          if (!nice) return 'NO F7nice';
-          // Walk up 3 levels and dump all text
-          let el = nice;
-          for (let i = 0; i < 3; i++) { if (el.parentElement) el = el.parentElement; }
-          return el.innerText?.slice(0, 300) || 'empty';
-        }).catch(() => 'debug failed');
-        console.log('🔍 ANCESTOR TEXT:', debugDump);
-      }
-      }
-
-      // Fallback extraction strategies
+      // Fallback: comprehensive page-wide extraction
       if (!finalReviewLabel) {
         finalReviewLabel = await page.evaluate(() => {
-          // Strategy 1: Look for parent of F7nice and find review count as sibling text
+          // Strategy 1: Walk up from F7nice to find review count in ancestor text
           const nice = document.querySelector('div.F7nice');
           if (nice) {
-            const parent = nice.parentElement;
-            if (parent) {
-              const siblings = parent.querySelectorAll('span, button, a');
-              for (const el of siblings) {
-                if (nice.contains(el)) continue;
-                const text = el.textContent.trim();
-                if (/\([\d,]+\)/.test(text)) return text.match(/([\d,]+)/)[1] + " reviews";
-                if (/[\d,]+\s*review/i.test(text)) return text;
-              }
-              const parentText = parent.textContent || "";
-              const m = parentText.match(/\(([\d,]+)\)/);
+            let ancestor = nice;
+            for (let i = 0; i < 5; i++) {
+              if (!ancestor.parentElement) break;
+              ancestor = ancestor.parentElement;
+              const text = ancestor.innerText || '';
+              const m = text.match(/\(([\d,]+)\)/);
               if (m) return m[1] + " reviews";
+              const m2 = text.match(/([\d,]+)\s*reviews?/i);
+              if (m2) return m2[0];
             }
           }
 
-          // Strategy 2: Find any button/link that navigates to reviews tab
-          const reviewBtns = document.querySelectorAll('button[jsaction*="review"], button[aria-label*="review" i], a[aria-label*="review" i]');
+          // Strategy 2: aria-label on any element containing "reviews"
+          const allWithAria = document.querySelectorAll('[aria-label*="review" i]');
+          for (const el of allWithAria) {
+            const label = el.getAttribute('aria-label') || '';
+            const m = label.match(/([\d,]+)\s*review/i);
+            if (m) return m[0];
+          }
+
+          // Strategy 3: Find any button/link related to reviews
+          const reviewBtns = document.querySelectorAll('button[jsaction*="review"], button[data-tab-id]');
           for (const btn of reviewBtns) {
             const label = btn.getAttribute('aria-label') || btn.textContent || '';
             const m = label.match(/([\d,]+)\s*review/i);
             if (m) return m[0];
           }
 
-          // Strategy 3: Broader search for review count text anywhere in the header area
-          const headerArea = document.querySelector('div[role="main"]');
-          if (headerArea) {
-            const allSpans = headerArea.querySelectorAll('span, button');
-            for (const el of allSpans) {
-              const text = el.textContent.trim();
-              if (/^\([\d,]+\)$/.test(text)) return text.match(/([\d,]+)/)[1] + " reviews";
-              if (/^[\d,]+\s*reviews?$/i.test(text)) return text;
+          // Strategy 4: Scan entire main area for standalone "(N)" patterns
+          const mainArea = document.querySelector('div[role="main"]');
+          if (mainArea) {
+            const candidates = mainArea.querySelectorAll('span, button, a, div');
+            for (const el of candidates) {
+              // Check elements with no children (leaf nodes) for "(123)" pattern
+              if (el.children.length === 0) {
+                const text = el.textContent.trim();
+                if (/^\([\d,]+\)$/.test(text)) {
+                  return text.match(/([\d,]+)/)[1] + " reviews";
+                }
+              }
+            }
+            // Check own text nodes (not inherited from children)
+            for (const el of candidates) {
+              const ownText = Array.from(el.childNodes)
+                .filter(n => n.nodeType === 3)
+                .map(n => n.textContent.trim())
+                .join('');
+              if (/^\([\d,]+\)$/.test(ownText)) {
+                return ownText.match(/([\d,]+)/)[1] + " reviews";
+              }
             }
           }
 
@@ -454,9 +426,6 @@ function parseYearOpened(text) {
   return m ? parseInt(m[0]) : null;
 }
 
-// ─────────────────────────────────────────────────────────────
-// PHASE 3A: Email + tech stack
-// ─────────────────────────────────────────────────────────────
 async function enrichWebsite(context, lead) {
   if (!lead.website) return lead;
 
@@ -500,9 +469,6 @@ async function enrichWebsite(context, lead) {
   }, { attempts: 2, baseMs: 1000, label: `email:${lead.domain}` }) || lead;
 }
 
-// ─────────────────────────────────────────────────────────────
-// PHASE 3B: LinkedIn enrichment
-// ─────────────────────────────────────────────────────────────
 async function enrichAllWebsites(context, leads, scrapeEmails) {
   if (!scrapeEmails) return leads;
   const withWebsites = leads.filter(l => l.website);
@@ -534,9 +500,6 @@ async function enrichAllLinkedIn(context, leads) {
   return leads;
 }
 
-// ─────────────────────────────────────────────────────────────
-// MAIN EXPORT
-// ─────────────────────────────────────────────────────────────
 export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmails = true, forceRefresh = false }) {
   const startTime = Date.now();
   console.log(`\n🔍 [${new Date().toISOString()}] "${niche}" in "${location}" (limit: ${limit})`);
@@ -572,7 +535,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     searchPage.setDefaultNavigationTimeout(CONFIG.navigationTimeout);
     await searchPage.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
-    // ── Phase 1: URL collection ──────────────────────────────
     const t1 = Date.now();
     await searchPage.goto(buildSearchUrl(niche, location), { waitUntil: "domcontentloaded" });
     await sleep(3000);
@@ -633,7 +595,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     await searchPage.close();
     console.log(`  ✓ Phase 1: ${listingUrls.length} URLs in ${Date.now() - t1}ms`);
 
-    // ── Phase 2: Parallel detail scraping ───────────────────
     const t2 = Date.now();
     console.log(`  → Phase 2: Scraping ${listingUrls.length} listings (${CONFIG.concurrency} parallel)...`);
 
@@ -653,7 +614,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     }
     console.log(`  ✓ Phase 2: ${leads.length} listings in ${Date.now() - t2}ms`);
 
-    // ── Phase 3: Enrichment ──────────────────────────────────
     const t3 = Date.now();
     leads = await enrichAllWebsites(context, leads, scrapeEmails);
     leads = await enrichAllLinkedIn(context, leads);
@@ -663,7 +623,6 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     await browser.close();
   }
 
-  // ── Final scoring & sorting ──────────────────────────────
   leads = leads.map(lead => {
     const score = calculateLeadScore({
       rating: lead.rating,
