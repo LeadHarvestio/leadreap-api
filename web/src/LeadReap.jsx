@@ -462,6 +462,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [batchNum, setBatchNum] = useState(1);
   const [searchError, setSearchError] = useState("");
   const [currentTip, setCurrentTip] = useState(0);
+  const [pollAttempts, setPollAttempts] = useState(0);
   const stepRef = useRef(null);
   const pollRef = useRef(null);
   const tipRef = useRef(null);
@@ -492,7 +493,10 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
           const job = await res.json();
-          setLoadStep(s => Math.min(s + 1, LOADING_STEPS.length - 1));
+          // Advance steps gradually (~1 step per 25s to span full scrape duration)
+          const nextStep = Math.min(Math.floor(attempts / 25), LOADING_STEPS.length - 1);
+          setLoadStep(nextStep);
+          setPollAttempts(attempts);
 
           if (job.status === "done") {
             clearInterval(pollRef.current);
@@ -521,6 +525,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     setSearchDone(false);
     setSearchError("");
     setLoadStep(0);
+    setPollAttempts(0);
     setBatchNum(1);
     clearInterval(pollRef.current);
 
@@ -614,7 +619,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   }
 
   const visibleLeads = isPro ? leads : leads.slice(0, 5);
-  const progressPercent = Math.min(100, (loadStep / LOADING_STEPS.length) * 100);
+  const progressPercent = loading ? Math.min(92, (pollAttempts / 150) * 92) : (searchDone ? 100 : 0);
   const displayTotal = totalLeads > leads.length ? totalLeads : leads.length;
 
   return (
