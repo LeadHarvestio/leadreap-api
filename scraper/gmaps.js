@@ -157,7 +157,7 @@ function parseReviewCount(label) {
   return m ? parseInt(m[1].replace(/,/g, ""), 10) : 0;
 }
 
-function calculateLeadScore({ rating, reviews, hasWebsite, hasPhone, emailQuality, techStack }) {
+function calculateLeadScore({ rating, reviews, hasWebsite, hasPhone, emailQuality, techStack, unclaimed }) {
   let score = 50;
   if (rating >= 4.5) score += 15;
   else if (rating >= 4.0) score += 10;
@@ -173,6 +173,7 @@ function calculateLeadScore({ rating, reviews, hasWebsite, hasPhone, emailQualit
   if (hasWebsite) score += 8;
   if (hasPhone) score += 4;
   if (emailQuality) score += (EMAIL_QUALITY_SCORES[emailQuality] || 0);
+  if (unclaimed) score += 10; // Unclaimed = big opportunity for agencies
 
   if (techStack?.length > 0) {
     const hasAds = techStack.some(t => t.category === "Paid Ads");
@@ -184,7 +185,8 @@ function calculateLeadScore({ rating, reviews, hasWebsite, hasPhone, emailQualit
   return Math.min(99, Math.max(20, score));
 }
 
-function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, score, ownerName }) {
+function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, score, ownerName, unclaimed }) {
+  if (unclaimed) return "Unclaimed Google listing — owner hasn't claimed it, prime opportunity to pitch GMB management.";
   if (ownerName) return `Contact ${ownerName} directly — owner identified.`;
   const adsTech = techStack?.find(t => t.category === "Paid Ads");
   if (adsTech) return `Running ${adsTech.name} — active ad spend, good agency target.`;
@@ -280,28 +282,12 @@ async function collectListingUrls(page, limit) {
         const ratingMatch = cardText.match(/(\d\.\d)/);
         if (ratingMatch) rating = parseFloat(ratingMatch[1]);
 
-        // Extract review count from search card
-        // Key: review counts appear as "(123)" RIGHT AFTER the rating, e.g. "4.9(316)"
-        // Phone area codes like "(916)" are followed by more digits: "(916) 555-1234"
+        // Review counts: only match if rating+count directly adjacent "4.9(316)"
+        // Avoids confusing phone area codes like "(916)" with review counts
         let reviews = 0;
-
-        // Strategy 1: Match "RATING(COUNT)" pattern — most reliable
-        const ratingReviewMatch = cardText.match(/\d\.\d\s*\((\d[\d,]*)\)/);
+        const ratingReviewMatch = cardText.match(/\d\.\d\((\d[\d,]*)\)/);
         if (ratingReviewMatch) {
           reviews = parseInt(ratingReviewMatch[1].replace(/,/g, ''), 10);
-        }
-
-        // Strategy 2: Find "(N)" NOT followed by a dash or more digits (rules out phone area codes)
-        if (!reviews) {
-          const allParens = [...cardText.matchAll(/\((\d[\d,]*)\)/g)];
-          for (const m of allParens) {
-            const afterIdx = m.index + m[0].length;
-            const after = cardText.substring(afterIdx, afterIdx + 3).trim();
-            // Phone area codes are followed by digits or dash: "(916) 555" or "(916)-555"
-            if (/^[\d\-]/.test(after)) continue;
-            reviews = parseInt(m[1].replace(/,/g, ''), 10);
-            break;
-          }
         }
 
         return { href, rating, reviews };
@@ -368,77 +354,18 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
         page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
       ]);
 
-      let finalReviewLabel = reviewLabel;
-
-      // Fallback: comprehensive page-wide extraction
-      if (!finalReviewLabel) {
-        finalReviewLabel = await page.evaluate(() => {
-          // Strategy 1: Walk up from F7nice to find review count in ancestor text
-          const nice = document.querySelector('div.F7nice');
-          if (nice) {
-            let ancestor = nice;
-            for (let i = 0; i < 5; i++) {
-              if (!ancestor.parentElement) break;
-              ancestor = ancestor.parentElement;
-              const text = ancestor.innerText || '';
-              const m = text.match(/\(([\d,]+)\)/);
-              if (m) return m[1] + " reviews";
-              const m2 = text.match(/([\d,]+)\s*reviews?/i);
-              if (m2) return m2[0];
-            }
-          }
-
-          // Strategy 2: aria-label on any element containing "reviews"
-          const allWithAria = document.querySelectorAll('[aria-label*="review" i]');
-          for (const el of allWithAria) {
-            const label = el.getAttribute('aria-label') || '';
-            const m = label.match(/([\d,]+)\s*review/i);
-            if (m) return m[0];
-          }
-
-          // Strategy 3: Find any button/link related to reviews
-          const reviewBtns = document.querySelectorAll('button[jsaction*="review"], button[data-tab-id]');
-          for (const btn of reviewBtns) {
-            const label = btn.getAttribute('aria-label') || btn.textContent || '';
-            const m = label.match(/([\d,]+)\s*review/i);
-            if (m) return m[0];
-          }
-
-          // Strategy 4: Scan entire main area for standalone "(N)" patterns
-          const mainArea = document.querySelector('div[role="main"]');
-          if (mainArea) {
-            const candidates = mainArea.querySelectorAll('span, button, a, div');
-            for (const el of candidates) {
-              // Check elements with no children (leaf nodes) for "(123)" pattern
-              if (el.children.length === 0) {
-                const text = el.textContent.trim();
-                if (/^\([\d,]+\)$/.test(text)) {
-                  return text.match(/([\d,]+)/)[1] + " reviews";
-                }
-              }
-            }
-            // Check own text nodes (not inherited from children)
-            for (const el of candidates) {
-              const ownText = Array.from(el.childNodes)
-                .filter(n => n.nodeType === 3)
-                .map(n => n.textContent.trim())
-                .join('');
-              if (/^\([\d,]+\)$/.test(ownText)) {
-                return ownText.match(/([\d,]+)/)[1] + " reviews";
-              }
-            }
-          }
-
-          return null;
-        }).catch(() => null);
-      }
-
-      // Use search-page data as fallback when detail page doesn't have reviews
-      // (Google serves stripped pages to headless browsers)
-      const detailReviews = parseReviewCount(finalReviewLabel);
+      // Review counts from detail page are unreliable (Google strips them for headless browsers)
+      // Use search-page data as primary source
+      const detailReviews = parseReviewCount(reviewLabel);
       const finalReviews = detailReviews > 0 ? detailReviews : (searchData.searchReviews || 0);
       const detailRating = parseRating(ratingText);
       const finalRating = detailRating || searchData.searchRating || null;
+
+      // Detect unclaimed Google listing — huge opportunity signal
+      const unclaimed = await page.evaluate(() => {
+        const text = (document.body?.innerText || '').toLowerCase();
+        return text.includes('claim this business') || text.includes('own this business');
+      }).catch(() => false);
 
       const websiteEl = await page.$(SEL.website);
       const rawWebsite = websiteEl ? await websiteEl.getAttribute("href") : null;
@@ -466,6 +393,7 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
         linkedinPerson: null,
         ownerName: null,
         ownerTitle: null,
+        unclaimed: unclaimed || false,
         mapsUrl: url,
       };
     } finally {
@@ -685,6 +613,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       hasPhone: !!lead.phone,
       emailQuality: lead.emailQuality,
       techStack: lead.techStack,
+      unclaimed: lead.unclaimed,
     });
     return {
       ...lead,
@@ -696,6 +625,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
         emailQuality: lead.emailQuality,
         techStack: lead.techStack,
         ownerName: lead.ownerName,
+        unclaimed: lead.unclaimed,
         score,
       }),
     };
