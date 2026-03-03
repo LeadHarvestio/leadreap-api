@@ -107,7 +107,7 @@ const STYLE = `
   .stat-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   /* MAIN TOOL */
-  .tool-section { padding: 0 40px 80px; max-width: 1100px; margin: 0 auto; width: 100%; }
+  .tool-section { padding: 0 40px 80px; max-width: 1200px; margin: 0 auto; width: 100%; }
   .search-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 16px; padding: 32px; margin-bottom: 28px;
@@ -153,7 +153,7 @@ const STYLE = `
     background: rgba(34,197,94,0.1); color: var(--green);
     border: 1px solid rgba(34,197,94,0.2); padding: 4px 12px; border-radius: 4px;
   }
-  .table-wrap { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .table-wrap { border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
   thead { background: var(--surface2); }
   th {
@@ -313,6 +313,25 @@ const STYLE = `
   .demo-cta p { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
   .demo-cta .sub { font-size: 12px; color: var(--muted); margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
 
+  /* Niche ticker */
+  .niche-ticker { overflow: hidden; padding: 14px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: -8px 0 24px; position: relative; }
+  .niche-ticker::before, .niche-ticker::after { content: ''; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2; pointer-events: none; }
+  .niche-ticker::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
+  .niche-ticker::after { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+  .ticker-track { display: flex; gap: 12px; animation: ticker 45s linear infinite; width: max-content; }
+  .ticker-track:hover { animation-play-state: paused; }
+  .ticker-item { white-space: nowrap; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); padding: 5px 14px; border: 1px solid var(--border); border-radius: 100px; background: rgba(240,180,41,0.04); transition: all 0.2s; }
+  .ticker-item:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.08); }
+  @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+  /* Legal modal */
+  .legal-modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; max-width: 640px; width: 90vw; max-height: 80vh; overflow-y: auto; padding: 40px; position: relative; }
+  .legal-modal h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .legal-modal .legal-updated { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 24px; }
+  .legal-modal h3 { font-size: 15px; font-weight: 600; margin: 24px 0 8px; color: var(--accent); }
+  .legal-modal p { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 12px; }
+  .legal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 4px 8px; }
+
   /* MOBILE */
   @media (max-width: 768px) {
     .nav { padding: 12px 16px; gap: 8px; }
@@ -394,10 +413,31 @@ function LogoMark() {
 }
 
 const INDUSTRIES = [
-  "Dentist", "Chiropractor", "Real Estate Agent", "Plumber", "Electrician",
-  "Restaurant", "Hair Salon", "Auto Repair Shop", "Law Firm", "Gym / Fitness Studio",
-  "Roofing Contractor", "HVAC Company", "Wedding Photographer", "Accountant / CPA",
-  "Landscaping Company", "Personal Trainer", "Marketing Agency", "Insurance Agent"
+  // Health & Wellness
+  "Dentist", "Chiropractor", "Veterinarian", "Optometrist", "Physical Therapist",
+  "Med Spa / Aesthetics", "Mental Health Therapist", "Dermatologist", "Orthodontist",
+  "Urgent Care Clinic", "Pharmacy", "Gym / Fitness Studio", "Personal Trainer", "Yoga Studio",
+  // Home Services
+  "Plumber", "Electrician", "HVAC Company", "Roofing Contractor", "Landscaping Company",
+  "Pest Control", "Painting Contractor", "Flooring Company", "Garage Door Repair",
+  "Pool Service", "Cleaning Service", "Handyman", "Solar Installer", "Fence Company",
+  // Professional Services
+  "Law Firm", "Accountant / CPA", "Insurance Agent", "Real Estate Agent", "Mortgage Broker",
+  "Financial Advisor", "Tax Preparer", "Notary Public",
+  // Auto
+  "Auto Repair Shop", "Auto Detailing", "Car Dealership", "Tire Shop", "Body Shop",
+  // Beauty & Personal Care
+  "Hair Salon", "Barber Shop", "Nail Salon", "Tattoo Parlor", "Lash & Brow Studio",
+  // Food & Hospitality
+  "Restaurant", "Catering Company", "Bakery", "Food Truck", "Coffee Shop", "Bar / Brewery",
+  // Events & Creative
+  "Wedding Photographer", "Event Planner", "Florist", "DJ / Entertainment",
+  "Videographer", "Graphic Designer",
+  // Education & Childcare
+  "Tutoring Service", "Daycare / Preschool", "Driving School", "Music Lessons",
+  // Other
+  "Marketing Agency", "IT Support / MSP", "Storage Facility", "Dry Cleaner",
+  "Print Shop", "Pet Groomer", "Locksmith", "Moving Company", "Towing Service",
 ];
 
 const DEMO_LEADS = [
@@ -447,8 +487,60 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const API_BASE = apiBase;
   const [niche, setNiche] = useState("");
   const [location, setLocation] = useState("");
+  const locationRef = useRef(null);
+
+  // Google Places Autocomplete for location input
+  useEffect(() => {
+    const GMAPS_KEY = typeof window !== "undefined" && window.__LEADREAP_GMAPS_KEY;
+    if (!GMAPS_KEY || document.getElementById("gmaps-script")) return;
+    const script = document.createElement("script");
+    script.id = "gmaps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=places`;
+    script.async = true;
+    script.onload = () => {
+      if (!locationRef.current || !window.google?.maps?.places) return;
+      const autocomplete = new window.google.maps.places.Autocomplete(locationRef.current, {
+        types: ["(cities)"],
+        componentRestrictions: { country: "us" },
+      });
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place?.formatted_address) {
+          setLocation(place.formatted_address);
+        } else if (place?.name) {
+          setLocation(place.name);
+        }
+      });
+    };
+    document.head.appendChild(script);
+  }, []);
   const [customNiche, setCustomNiche] = useState("");
   const [includeEmail, setIncludeEmail] = useState(true);
+
+  // Animated niche cycling for demo preview
+  const DEMO_CYCLES = [
+    { niche: "Dentist", city: "Austin, TX" },
+    { niche: "Roofing Contractor", city: "Denver, CO" },
+    { niche: "Hair Salon", city: "Rancho Cordova, CA" },
+    { niche: "Law Firm", city: "Chicago, IL" },
+    { niche: "HVAC Company", city: "Phoenix, AZ" },
+    { niche: "Restaurant", city: "Nashville, TN" },
+    { niche: "Med Spa / Aesthetics", city: "Miami, FL" },
+    { niche: "Auto Repair Shop", city: "Dallas, TX" },
+  ];
+  const [demoIndex, setDemoIndex] = useState(0);
+  const [demoFade, setDemoFade] = useState(true);
+  useEffect(() => {
+    if (loading || searchDone) return;
+    const iv = setInterval(() => {
+      setDemoFade(false);
+      setTimeout(() => {
+        setDemoIndex(i => (i + 1) % DEMO_CYCLES.length);
+        setDemoFade(true);
+      }, 400);
+    }, 3500);
+    return () => clearInterval(iv);
+  }, [loading, searchDone]);
   const [includePhone, setIncludePhone] = useState(true);
   const [includeSocial, setIncludeSocial] = useState(false);
   const [leads, setLeads] = useState([]);
@@ -457,6 +549,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadStep, setLoadStep] = useState(0);
   const [showPricing, setShowPricing] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [toast, setToast] = useState(false);
   const isPro = user && user.plan !== "free";
   const [searchDone, setSearchDone] = useState(false);
@@ -666,9 +760,17 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           <p>Pull verified contact data from any local business niche. Search unlimited leads by location &mdash; filter, score, and export to CSV in seconds.</p>
           <div className="hero-stats">
             <div className="stat"><div className="stat-num">2.1M+</div><div className="stat-label">Businesses indexed</div></div>
-            <div className="stat"><div className="stat-num">47</div><div className="stat-label">Supported niches</div></div>
+            <div className="stat"><div className="stat-num">71+</div><div className="stat-label">Built-in niches</div></div>
             <div className="stat"><div className="stat-num">94%</div><div className="stat-label">Email accuracy</div></div>
             <div className="stat"><div className="stat-num">30s</div><div className="stat-label">Avg search time</div></div>
+          </div>
+        </div>
+
+        <div className="niche-ticker">
+          <div className="ticker-track">
+            {[...INDUSTRIES, ...INDUSTRIES].map((n, i) => (
+              <span key={i} className="ticker-item">{n}</span>
+            ))}
           </div>
         </div>
 
@@ -692,7 +794,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               )}
               <div className="field">
                 <label>Location</label>
-                <input value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State &mdash; e.g. Austin, TX" />
+                <input ref={locationRef} value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State &mdash; e.g. Austin, TX" />
               </div>
               <button className="btn btn-primary" onClick={handleSearch} disabled={loading || !targetNiche || !location} style={{ height: 46 }}>
                 {loading ? "Searching..." : "Find Leads"}
@@ -833,7 +935,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td>
                             <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
                           </td>
-                          <td style={{maxWidth:200,fontSize:12,color:"var(--muted)"}}>{lead.notes}</td>
+                          <td style={{minWidth:180,maxWidth:260,fontSize:12,color:"var(--muted)",lineHeight:"1.5"}}>{lead.notes}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -860,7 +962,9 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           {!loading && !searchDone && (
             <div className="demo-section">
               <div className="demo-header">
-                <span className="demo-label">Example: &quot;Dentist&quot; in Austin, TX</span>
+                <span className="demo-label" style={{transition:"opacity 0.4s ease", opacity: demoFade ? 1 : 0}}>
+                  Example: &quot;{DEMO_CYCLES[demoIndex].niche}&quot; in {DEMO_CYCLES[demoIndex].city}
+                </span>
                 <span className="count-tag" style={{opacity:0.5}}>{"\u2713"} 20 leads found</span>
               </div>
               <div className="demo-wrap">
@@ -919,8 +1023,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         <footer className="footer">
           <div className="footer-left">&copy; 2026 LeadReap</div>
           <div className="footer-right">
-            <span className="footer-link">Privacy</span>
-            <span className="footer-link">Terms</span>
+            <span className="footer-link" onClick={() => setShowPrivacy(true)}>Privacy</span>
+            <span className="footer-link" onClick={() => setShowTerms(true)}>Terms</span>
             <span className="footer-link" onClick={() => setShowPricing(true)}>Pricing</span>
           </div>
         </footer>
@@ -981,6 +1085,52 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
       {toast && (
         <div className="toast">{"\u2713"} {isPro && !leads ? "Upgraded to PRO!" : isPro ? "CSV downloaded!" : "Welcome to PRO!"}</div>
+      )}
+
+      {showPrivacy && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowPrivacy(false)}>
+          <div className="legal-modal">
+            <button className="legal-close" onClick={() => setShowPrivacy(false)}>&times;</button>
+            <h2>Privacy Policy</h2>
+            <div className="legal-updated">Last updated: March 1, 2026</div>
+            <h3>Information We Collect</h3>
+            <p>LeadReap collects your email address when you create an account, payment information processed securely through our payment provider (LemonSqueezy), and search queries you perform within the platform. We do not sell, share, or distribute your personal information to third parties.</p>
+            <h3>How We Use Your Data</h3>
+            <p>Your email is used solely for account authentication (magic link login) and important service communications. Search data is used to deliver results and improve our scraping accuracy. We do not send marketing emails unless you explicitly opt in.</p>
+            <h3>Data from Searches</h3>
+            <p>Business information returned by LeadReap (names, phone numbers, emails, websites) is sourced from publicly available data on Google Maps and business websites. LeadReap does not create or fabricate contact data. Users are responsible for complying with applicable laws (including CAN-SPAM and GDPR) when using scraped data for outreach.</p>
+            <h3>Data Security</h3>
+            <p>Sessions are secured with encrypted tokens. Payment processing is handled entirely by LemonSqueezy — we never store your credit card information. Search result caches are stored temporarily in memory and automatically purged.</p>
+            <h3>Your Rights</h3>
+            <p>You may request deletion of your account and all associated data at any time by contacting us. Upon deletion, all personal data including search history will be permanently removed.</p>
+            <h3>Contact</h3>
+            <p>For privacy-related questions, reach out to us at privacy@leadreap.com.</p>
+          </div>
+        </div>
+      )}
+
+      {showTerms && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowTerms(false)}>
+          <div className="legal-modal">
+            <button className="legal-close" onClick={() => setShowTerms(false)}>&times;</button>
+            <h2>Terms of Service</h2>
+            <div className="legal-updated">Last updated: March 1, 2026</div>
+            <h3>Service Description</h3>
+            <p>LeadReap is a lead generation tool that searches publicly available business information from Google Maps and business websites. We provide data aggregation and scoring — we do not guarantee the accuracy, completeness, or deliverability of any contact information returned.</p>
+            <h3>Acceptable Use</h3>
+            <p>You agree to use LeadReap for lawful business purposes only. You are solely responsible for how you use the data obtained through our service, including compliance with CAN-SPAM, GDPR, CCPA, and any other applicable regulations. Automated mass scraping beyond normal usage, reselling raw data, or using the service for harassment is prohibited.</p>
+            <h3>Accounts &amp; Billing</h3>
+            <p>Free accounts include limited searches per day with capped results. Paid plans are billed monthly through LemonSqueezy. You may cancel at any time — access continues through the end of your billing period. Refunds are available within 30 days of purchase if you are unsatisfied.</p>
+            <h3>Intellectual Property</h3>
+            <p>The LeadReap platform, scoring algorithms, and interface are proprietary. Data returned by searches is sourced from public information and is not owned by LeadReap. You may use search results for your own business purposes.</p>
+            <h3>Limitation of Liability</h3>
+            <p>LeadReap is provided "as is" without warranties of any kind. We are not liable for any damages arising from the use of our service, including but not limited to lost revenue, bounced emails, or inaccurate data. Our total liability shall not exceed the amount you paid in the preceding 12 months.</p>
+            <h3>Changes</h3>
+            <p>We may update these terms at any time. Continued use of the service after changes constitutes acceptance. Material changes will be communicated via email.</p>
+            <h3>Contact</h3>
+            <p>For questions about these terms, contact us at support@leadreap.com.</p>
+          </div>
+        </div>
       )}
     </>
   );
