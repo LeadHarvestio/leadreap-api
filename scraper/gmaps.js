@@ -275,15 +275,34 @@ async function collectListingUrls(page, limit) {
 
         const cardText = card?.innerText || '';
 
-        // Extract rating: look for patterns like "4.9" near stars
+        // Extract rating: look for "4.9" pattern
         let rating = null;
-        const ratingMatch = cardText.match(/^[\s\S]*?(\d\.\d)\s*(?:\(\d|star)/m) || cardText.match(/(\d\.\d)/);
+        const ratingMatch = cardText.match(/(\d\.\d)/);
         if (ratingMatch) rating = parseFloat(ratingMatch[1]);
 
-        // Extract review count: "(123)" or "(1,234)"
+        // Extract review count from search card
+        // Key: review counts appear as "(123)" RIGHT AFTER the rating, e.g. "4.9(316)"
+        // Phone area codes like "(916)" are followed by more digits: "(916) 555-1234"
         let reviews = 0;
-        const reviewMatch = cardText.match(/\(([\d,]+)\)/);
-        if (reviewMatch) reviews = parseInt(reviewMatch[1].replace(/,/g, ''), 10);
+
+        // Strategy 1: Match "RATING(COUNT)" pattern — most reliable
+        const ratingReviewMatch = cardText.match(/\d\.\d\s*\((\d[\d,]*)\)/);
+        if (ratingReviewMatch) {
+          reviews = parseInt(ratingReviewMatch[1].replace(/,/g, ''), 10);
+        }
+
+        // Strategy 2: Find "(N)" NOT followed by a dash or more digits (rules out phone area codes)
+        if (!reviews) {
+          const allParens = [...cardText.matchAll(/\((\d[\d,]*)\)/g)];
+          for (const m of allParens) {
+            const afterIdx = m.index + m[0].length;
+            const after = cardText.substring(afterIdx, afterIdx + 3).trim();
+            // Phone area codes are followed by digits or dash: "(916) 555" or "(916)-555"
+            if (/^[\d\-]/.test(after)) continue;
+            reviews = parseInt(m[1].replace(/,/g, ''), 10);
+            break;
+          }
+        }
 
         return { href, rating, reviews };
       }).filter(Boolean)
@@ -321,6 +340,7 @@ async function collectListingUrls(page, limit) {
   const result = listings.slice(0, limit);
   const withReviews = result.filter(l => l.searchReviews > 0).length;
   console.log(`  → Search page extracted ${withReviews}/${result.length} review counts`);
+  console.log(`  → Sample reviews: ${result.slice(0, 5).map(l => l.searchReviews).join(', ')}`);
   return result;
 }
 
