@@ -18,11 +18,7 @@ const STYLE = `
     --red: #ef4444;
   }
 
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Syne', sans-serif; min-height: 100vh;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
-  }
+  body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; }
   .mono { font-family: 'IBM Plex Mono', monospace; }
 
   .app { min-height: 100vh; display: flex; flex-direction: column; }
@@ -31,16 +27,16 @@ const STYLE = `
   .nav {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 40px; border-bottom: 1px solid var(--border);
-    background: rgba(10,10,11,0.85); backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    position: sticky; top: 0; z-index: 100;
+    background: var(--bg); position: sticky; top: 0; z-index: 100;
   }
   .logo {
     display: flex; align-items: center; gap: 10px;
     font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
   }
-  .logo-mark {
-    width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  .logo-icon {
+    width: 32px; height: 32px; background: var(--accent);
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
   }
   .logo span { color: var(--accent); }
   .nav-actions { display: flex; align-items: center; gap: 12px; }
@@ -55,14 +51,14 @@ const STYLE = `
   .btn {
     font-family: 'Syne', sans-serif; font-weight: 600; font-size: 14px;
     padding: 10px 22px; border-radius: 8px; cursor: pointer;
-    border: none; transition: all 0.2s ease; display: inline-flex;
+    border: none; transition: all 0.15s ease; display: inline-flex;
     align-items: center; gap: 8px;
   }
   .btn-primary {
     background: var(--accent); color: #000;
   }
-  .btn-primary:hover { background: #f5c842; transform: translateY(-1px); box-shadow: 0 4px 24px rgba(240,180,41,0.25); }
-  .btn-primary:disabled { background: #333; color: #666; transform: none; box-shadow: none; cursor: not-allowed; }
+  .btn-primary:hover { background: #f5c842; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(240,180,41,0.3); }
+  .btn-primary:disabled { background: #555; color: #888; transform: none; box-shadow: none; cursor: not-allowed; }
   .btn-outline {
     background: transparent; color: var(--text);
     border: 1px solid var(--border);
@@ -76,7 +72,7 @@ const STYLE = `
 
   /* HERO */
   .hero {
-    padding: 48px 40px 0;
+    padding: 80px 40px 60px;
     text-align: center;
     position: relative;
     overflow: hidden;
@@ -84,38 +80,37 @@ const STYLE = `
   .hero::before {
     content: '';
     position: absolute; inset: 0;
-    background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(240,180,41,0.06) 0%, transparent 70%);
+    background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(240,180,41,0.08) 0%, transparent 70%);
     pointer-events: none;
   }
   .hero-tag {
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center; gap: 6px;
     font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-    color: var(--accent); border: 1px solid rgba(240,180,41,0.2);
-    padding: 6px 16px; border-radius: 20px; margin-bottom: 20px;
-    letter-spacing: 0.08em; background: rgba(240,180,41,0.04);
+    color: var(--accent); border: 1px solid rgba(240,180,41,0.3);
+    padding: 5px 14px; border-radius: 20px; margin-bottom: 28px;
+    letter-spacing: 0.08em;
   }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{ opacity:1; transform: scale(1); } 50%{ opacity:0.4; transform: scale(0.8); } }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
 
   .hero h1 {
-    font-size: clamp(30px, 4vw, 48px); font-weight: 800; line-height: 1.1;
-    letter-spacing: -1.5px; margin-bottom: 14px;
-    max-width: 700px; margin-left: auto; margin-right: auto;
+    font-size: clamp(36px, 5vw, 64px); font-weight: 800; line-height: 1.05;
+    letter-spacing: -2px; margin-bottom: 20px;
+    max-width: 800px; margin-left: auto; margin-right: auto;
   }
   .hero h1 em { font-style: normal; color: var(--accent); }
   .hero p {
-    font-size: 15px; color: var(--muted); max-width: 500px;
-    margin: 0 auto; line-height: 1.6; font-weight: 400;
+    font-size: 18px; color: var(--muted); max-width: 520px;
+    margin: 0 auto 40px; line-height: 1.6; font-weight: 400;
   }
   .hero-stats {
-    display: flex; gap: 32px; justify-content: center;
-    margin-top: 28px; padding-top: 24px;
+    display: flex; gap: 40px; justify-content: center;
+    margin-top: 48px; padding-top: 40px;
     border-top: 1px solid var(--border);
-    padding-bottom: 32px;
   }
   .stat { text-align: center; }
-  .stat-num { font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
-  .stat-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .stat-num { font-size: 28px; font-weight: 800; color: var(--accent); }
+  .stat-label { font-size: 13px; color: var(--muted); margin-top: 2px; }
 
   /* MAIN TOOL */
   .tool-section { padding: 0 40px 80px; max-width: 1100px; margin: 0 auto; width: 100%; }
@@ -142,10 +137,10 @@ const STYLE = `
     background: var(--surface2); border: 1px solid var(--border);
     border-radius: 10px; padding: 12px 16px;
     font-family: 'IBM Plex Mono', monospace; font-size: 14px;
-    color: var(--text); outline: none; transition: border-color 0.2s;
+    color: var(--text); outline: none; transition: border-color 0.15s;
     width: 100%;
   }
-  .field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(240,180,41,0.08); }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
   .field input::placeholder { color: var(--muted); }
 
   .options-row {
@@ -156,9 +151,9 @@ const STYLE = `
     padding: 8px 14px; border-radius: 8px;
     border: 1px solid var(--border); background: var(--surface2);
     cursor: pointer; font-size: 13px; color: var(--muted);
-    transition: all 0.2s; user-select: none;
+    transition: all 0.15s; user-select: none;
   }
-  .toggle-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.06); }
+  .toggle-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.08); }
   .toggle-chip input { display: none; }
   .check { width: 14px; height: 14px; border-radius: 3px; border: 1px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 10px; }
 
@@ -191,108 +186,56 @@ const STYLE = `
     vertical-align: middle;
   }
   tr:last-child td { border-bottom: none; }
-  tr { transition: background 0.15s; }
-  tr:hover td { background: rgba(240,180,41,0.02); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
   .name-cell { font-weight: 600; color: var(--text); }
   .email-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); }
   .phone-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
   .site-cell { color: #60a5fa; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .site-cell a { color: #60a5fa; text-decoration: none; }
-  .site-cell a:hover { text-decoration: underline; }
   .rating-cell { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
   .star { color: var(--accent); }
   .score-pill {
-    display: inline-block; padding: 3px 10px; border-radius: 4px;
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
     font-size: 11px; font-family: 'IBM Plex Mono', monospace; font-weight: 600;
   }
-  .score-high { background: rgba(34,197,94,0.12); color: var(--green); }
-  .score-med { background: rgba(240,180,41,0.12); color: var(--accent); }
-  .score-low { background: rgba(239,68,68,0.08); color: #f87171; }
+  .score-high { background: rgba(34,197,94,0.15); color: var(--green); }
+  .score-med { background: rgba(240,180,41,0.15); color: var(--accent); }
+  .score-low { background: rgba(239,68,68,0.1); color: #f87171; }
 
-  /* LOADING — Premium experience */
+  /* LOADING */
   .loading-state { text-align: center; padding: 60px 20px; }
-
-  .loading-orb {
-    width: 64px; height: 64px; margin: 0 auto 28px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, var(--accent), var(--accent2));
-    animation: orbPulse 2s ease-in-out infinite;
-    position: relative;
-    box-shadow: 0 0 40px rgba(240,180,41,0.15), 0 0 80px rgba(240,180,41,0.05);
+  .spinner {
+    width: 40px; height: 40px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 20px;
   }
-  .loading-orb::after {
-    content: '';
-    position: absolute; inset: -4px;
-    border-radius: 50%;
-    border: 1px solid rgba(240,180,41,0.2);
-    animation: orbRing 3s linear infinite;
-  }
-  @keyframes orbPulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(240,180,41,0.15); }
-    50% { transform: scale(1.08); box-shadow: 0 0 60px rgba(240,180,41,0.25); }
-  }
-  @keyframes orbRing {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  .loading-title {
-    font-size: 18px; font-weight: 700; margin-bottom: 6px;
-    letter-spacing: -0.5px;
-  }
-  .loading-sub {
-    font-size: 13px; color: var(--muted); margin-bottom: 32px;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-
-  .progress-track {
-    width: 280px; height: 3px; background: var(--border);
-    border-radius: 4px; margin: 0 auto 32px; overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%; border-radius: 4px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    transition: width 1s ease;
-  }
-
-  .loading-steps { display: flex; flex-direction: column; gap: 6px; align-items: center; margin-bottom: 32px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); }
+  .loading-steps { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
   .loading-step {
     font-family: 'IBM Plex Mono', monospace; font-size: 12px;
     color: var(--muted); display: flex; align-items: center; gap: 8px;
-    transition: all 0.3s ease;
   }
   .loading-step.done { color: var(--green); }
   .loading-step.active { color: var(--accent); }
 
-  .loading-tip {
-    max-width: 380px; margin: 0 auto;
-    padding: 16px 20px; border-radius: 10px;
-    background: rgba(240,180,41,0.04); border: 1px solid rgba(240,180,41,0.1);
-    font-size: 13px; color: var(--muted); line-height: 1.5;
-    animation: tipFade 0.4s ease;
-  }
-  .loading-tip strong { color: var(--accent); font-weight: 600; }
-  @keyframes tipFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-
   /* EMPTY */
   .empty-state { text-align: center; padding: 80px 20px; }
-  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.8; }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; }
   .empty-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
-  .empty-sub { color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .empty-sub { color: var(--muted); font-size: 14px; }
 
   /* PRICING MODAL */
   .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
     display: flex; align-items: center; justify-content: center;
     z-index: 200; padding: 20px;
     animation: fadeIn 0.15s ease;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
   .modal {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 20px; padding: 48px; max-width: 900px; width: 100%;
-    position: relative; animation: slideUp 0.25s ease;
+    position: relative; animation: slideUp 0.2s ease;
   }
   @keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform:none; opacity:1; } }
   .modal-close {
@@ -304,15 +247,15 @@ const STYLE = `
   }
   .modal-close:hover { color: var(--text); border-color: var(--text); }
   .modal h2 { font-size: 32px; font-weight: 800; margin-bottom: 8px; letter-spacing: -1px; }
-  .modal > p { color: var(--muted); margin-bottom: 40px; }
+  .modal p { color: var(--muted); margin-bottom: 40px; }
 
   .pricing-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
   .plan-card {
     background: var(--surface2); border: 1px solid var(--border);
     border-radius: 14px; padding: 28px; position: relative;
-    transition: all 0.2s;
+    transition: border-color 0.15s;
   }
-  .plan-card:hover { border-color: var(--muted); transform: translateY(-2px); }
+  .plan-card:hover { border-color: var(--muted); }
   .plan-card.featured {
     border-color: var(--accent);
     background: rgba(240,180,41,0.04);
@@ -331,7 +274,7 @@ const STYLE = `
   .plan-feature { display: flex; align-items: center; gap: 10px; font-size: 14px; }
   .plan-feature .check-icon { color: var(--green); font-size: 16px; }
 
-  /* TOAST */
+  /* EXPORT TOAST */
   .toast {
     position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
     background: var(--green); color: #000; font-weight: 700; font-size: 14px;
@@ -342,7 +285,7 @@ const STYLE = `
   }
   @keyframes fadeOut { to { opacity: 0; transform: translateX(-50%) translateY(10px); } }
 
-  /* LOCK OVERLAY */
+  /* WATERMARK ROW */
   .lock-overlay {
     position: relative; overflow: hidden;
   }
@@ -371,163 +314,24 @@ const STYLE = `
   .footer-link { font-size: 13px; color: var(--muted); cursor: pointer; transition: color 0.15s; }
   .footer-link:hover { color: var(--text); }
 
-  /* DEMO PREVIEW */
-  .demo-section { position: relative; }
-  .demo-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px;
-  }
-  .demo-label {
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-    color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
-  }
-  .demo-wrap { position: relative; overflow: hidden; border-radius: 12px; }
-  .demo-wrap::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(to bottom, transparent 10%, var(--bg) 85%);
-    pointer-events: none; z-index: 2;
-  }
-  .demo-cta {
-    position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
-    z-index: 3; text-align: center;
-  }
-  .demo-cta p {
-    font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px;
-  }
-  .demo-cta .sub {
-    font-size: 12px; color: var(--muted); margin-top: 8px;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-
-  /* ─── MOBILE ─────────────────────────────────── */
   @media (max-width: 768px) {
-    /* NAV: just logo + action */
-    .nav { padding: 12px 16px; gap: 8px; }
-    .nav-actions { gap: 8px; }
-    .nav-actions .btn-sm { padding: 6px 12px; font-size: 12px; }
-    .nav-email { display: none; }
-    .nav-beta { display: none; }
-    .nav-cta { display: none; }
-    .badge { padding: 3px 8px; font-size: 10px; }
-
-    /* HERO: ultra-minimal — get to the tool fast */
-    .hero { padding: 32px 20px 24px; }
-    .hero-tag { display: none; }
-    .hero h1 { font-size: 26px; letter-spacing: -0.8px; margin-bottom: 10px; line-height: 1.2; }
-    .hero h1 br { display: none; }
-    .hero-desktop { display: none; }
-    .hero-mobile { display: block; }
-    .hero p { font-size: 13px; margin-bottom: 0; line-height: 1.5; max-width: 100%; }
-    .hero-stats { display: none; }
-    .hero::before { display: none; }
-
-    /* SEARCH CARD — the star of the show */
-    .tool-section { padding: 0 16px 48px; }
-    .search-card { padding: 20px 16px; border-radius: 12px; margin-bottom: 16px; }
-    .search-label { font-size: 10px; margin-bottom: 14px; }
-    .search-row { grid-template-columns: 1fr; gap: 10px; }
-    .field input, .field select {
-      padding: 13px 14px; font-size: 14px; border-radius: 10px;
-    }
-    .btn-primary { width: 100%; justify-content: center; height: 48px !important; font-size: 15px; }
-
-    /* OPTIONS ROW */
-    .options-row { gap: 8px; margin-top: 12px; }
-    .toggle-chip { padding: 6px 10px; font-size: 12px; }
-    .options-hint { display: none; }
-
-    /* RESULTS */
-    .results-header { flex-direction: column; gap: 12px; align-items: flex-start; }
-    .results-meta { flex-wrap: wrap; gap: 8px; }
-    .results-actions { width: 100%; display: flex; gap: 8px; }
-    .results-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 12px; }
-
-    /* TABLE: horizontal scroll */
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { min-width: 700px; }
-    th { padding: 10px 12px; font-size: 10px; }
-    td { padding: 10px 12px; font-size: 12px; }
-    .name-cell { font-size: 13px; }
-
-    /* UPSELL BANNERS */
-    .upsell-banner {
-      flex-direction: column !important; gap: 12px !important;
-      text-align: center; padding: 14px 16px !important;
-    }
-    .upsell-banner .btn { width: 100%; justify-content: center; }
-    .upgrade-bar { flex-direction: column; gap: 12px; padding: 18px 16px; }
-    .upgrade-bar .btn { width: 100%; justify-content: center; }
-
-    /* LOADING */
-    .loading-title { font-size: 16px; }
-    .loading-sub { font-size: 12px; }
-    .loading-tip { font-size: 12px; padding: 12px 16px; max-width: 100%; }
-
-    /* PRICING MODAL */
-    .modal-overlay { padding: 12px; align-items: flex-start; overflow-y: auto; }
-    .modal { padding: 24px 18px; border-radius: 14px; margin-top: 40px; }
-    .modal h2 { font-size: 22px; }
-    .modal > p { font-size: 13px; margin-bottom: 24px; }
-    .pricing-grid { grid-template-columns: 1fr; gap: 12px; }
-    .plan-card { padding: 20px; }
-    .plan-price { font-size: 32px; }
-    .plan-feature { font-size: 13px; }
-
-    /* EMPTY STATE */
-    .empty-state { padding: 48px 16px; }
-    .empty-title { font-size: 17px; }
-    .empty-sub { font-size: 13px; }
-
-    /* DEMO on mobile */
-    .demo-header { flex-direction: column; gap: 6px; align-items: flex-start; }
-    .demo-cta p { font-size: 14px; }
-    .demo-cta .btn { font-size: 14px; }
-
-    /* FOOTER */
-    .footer { flex-direction: column; gap: 10px; padding: 20px 16px; text-align: center; }
-  }
-
-  /* Desktop: hide mobile headline */
-  .hero-mobile { display: none; }
-
-  /* Small phones */
-  @media (max-width: 380px) {
-    .hero h1 { font-size: 23px; }
-    .logo { font-size: 17px; }
-    .logo-mark { width: 28px; height: 28px; }
-    .logo-mark svg { width: 28px; height: 28px; }
+    .nav { padding: 14px 20px; }
+    .hero { padding: 50px 20px 40px; }
+    .tool-section { padding: 0 20px 60px; }
+    .search-row { grid-template-columns: 1fr; }
+    .pricing-grid { grid-template-columns: 1fr; }
+    .hero-stats { flex-wrap: wrap; gap: 20px; }
+    .footer { flex-direction: column; gap: 12px; }
   }
 `;
 
-// ─── SVG Logo Mark ───────────────────────────────────────────
-function LogoMark() {
-  return (
-    <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="34" height="34" rx="8" fill="#f0b429"/>
-      <circle cx="17" cy="17" r="10" stroke="#0a0a0b" strokeWidth="2.5" fill="none"/>
-      <circle cx="17" cy="17" r="5" stroke="#0a0a0b" strokeWidth="2" fill="none"/>
-      <circle cx="17" cy="17" r="1.5" fill="#0a0a0b"/>
-      <line x1="17" y1="2" x2="17" y2="7" stroke="#0a0a0b" strokeWidth="2" strokeLinecap="round"/>
-    </svg>
-  );
-}
+// API_BASE is passed as a prop from App.jsx
 
-// ─── Config ──────────────────────────────────────────────────
 const INDUSTRIES = [
   "Dentist", "Chiropractor", "Real Estate Agent", "Plumber", "Electrician",
   "Restaurant", "Hair Salon", "Auto Repair Shop", "Law Firm", "Gym / Fitness Studio",
   "Roofing Contractor", "HVAC Company", "Wedding Photographer", "Accountant / CPA",
   "Landscaping Company", "Personal Trainer", "Marketing Agency", "Insurance Agent"
-];
-
-// ─── Demo Data (shown before first search) ──────────────────
-const DEMO_LEADS = [
-  { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, reviews: 312, score: 94, notes: "High review count, active website, email verified" },
-  { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, reviews: 189, score: 87, notes: "Strong Google presence, recently updated listing" },
-  { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, reviews: 245, score: 82, notes: "Multiple locations, good engagement" },
-  { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, reviews: 97, score: 71, notes: "Premium area, newer practice" },
-  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "—", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, reviews: 64, score: 65, notes: "No email found, phone verified" },
 ];
 
 function scoreToClass(score) {
@@ -544,26 +348,13 @@ function generateCSV(leads) {
   return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
 }
 
-// User-friendly loading steps (no technical jargon)
 const LOADING_STEPS = [
-  "Searching your area...",
-  "Finding local businesses...",
-  "Pulling contact details...",
-  "Verifying emails...",
-  "Scoring lead quality...",
-  "Preparing your results...",
-];
-
-// Rotating tips shown during loading
-const LOADING_TIPS = [
-  { text: "Leads with a 4.5+ star rating tend to convert 3x better for outreach.", label: "Insight" },
-  { text: "Export your results to CSV for easy import into any CRM platform.", label: "Pro tip" },
-  { text: "Businesses without websites are prime targets for web design services.", label: "Sales angle" },
-  { text: "The Lead Score factors in rating, reviews, email quality, and tech stack.", label: "How it works" },
-  { text: "Leads running Facebook Pixel are already spending on ads — warm prospects.", label: "Insight" },
-  { text: "Try narrowing your location to a zip code for more targeted results.", label: "Pro tip" },
-  { text: "Low review count businesses often need reputation management services.", label: "Sales angle" },
-  { text: "Businesses on Wix or Squarespace are often open to a website redesign.", label: "Insight" },
+  "Initializing scraper engine...",
+  "Scanning Google Maps listings...",
+  "Extracting contact data...",
+  "Verifying email addresses...",
+  "Scoring leads by quality...",
+  "Compiling results...",
 ];
 
 export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLogout, onCheckout, onRefreshAuth }) {
@@ -575,7 +366,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [includePhone, setIncludePhone] = useState(true);
   const [includeSocial, setIncludeSocial] = useState(false);
   const [leads, setLeads] = useState([]);
-  const [totalLeads, setTotalLeads] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadStep, setLoadStep] = useState(0);
@@ -585,31 +375,17 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [searchDone, setSearchDone] = useState(false);
   const [batchNum, setBatchNum] = useState(1);
   const [searchError, setSearchError] = useState("");
-  const [currentTip, setCurrentTip] = useState(0);
   const stepRef = useRef(null);
-  const pollRef = useRef(null);
-  const tipRef = useRef(null);
 
   const targetNiche = niche === "custom" ? customNiche : niche;
 
-  // Rotate tips every 5 seconds during loading
-  useEffect(() => {
-    if (loading) {
-      setCurrentTip(Math.floor(Math.random() * LOADING_TIPS.length));
-      tipRef.current = setInterval(() => {
-        setCurrentTip(prev => (prev + 1) % LOADING_TIPS.length);
-      }, 5000);
-    } else {
-      clearInterval(tipRef.current);
-    }
-    return () => clearInterval(tipRef.current);
-  }, [loading]);
+  const pollRef = useRef(null);
 
-  // Poll job — resolves with full job object (includes .leads, .total, .gated)
+  // Poll job until done, updating loading step along the way
   async function pollJob(jobId) {
     return new Promise((resolve, reject) => {
       let attempts = 0;
-      const MAX_ATTEMPTS = 120;
+      const MAX_ATTEMPTS = 300; // 5 min max (300 × 1s)
 
       pollRef.current = setInterval(async () => {
         attempts++;
@@ -618,6 +394,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
           const job = await res.json();
+
+          // Advance loading step animation while waiting
           setLoadStep(s => Math.min(s + 1, LOADING_STEPS.length - 1));
 
           if (job.status === "done") {
@@ -626,7 +404,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             resolve(job);
           } else if (job.status === "error") {
             clearInterval(pollRef.current);
-            reject(new Error(job.error || "Search failed"));
+            reject(new Error(job.error || "Scrape failed"));
           } else if (attempts >= MAX_ATTEMPTS) {
             clearInterval(pollRef.current);
             reject(new Error("Search timed out — try a more specific location"));
@@ -651,6 +429,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     clearInterval(pollRef.current);
 
     try {
+      // Submit job
       const res = await fetch(`${API_BASE}/api/leads/search`, {
         method: "POST",
         headers: {
@@ -662,11 +441,13 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         if (errData.code === "RATE_LIMIT" || errData.code === "IP_RATE_LIMIT") {
-          throw new Error(errData.error || "Search limit reached — upgrade for unlimited searches");
+          throw new Error(errData.error || "Rate limit reached — upgrade for more searches");
         }
-        throw new Error(`Something went wrong (${res.status}). Please try again.`);
+        throw new Error(`Server error ${res.status}`);
       }
       const { jobId } = await res.json();
+
+      // Poll until done
       const job = await pollJob(jobId);
       setLeads(job.leads || []);
       setTotalLeads(job.total || job.leads?.length || 0);
@@ -674,7 +455,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     } catch (e) {
       console.error(e);
       setSearchDone(true);
-      setSearchError(e.message || "Search failed — please try again");
+      setSearchError(e.message || "Search failed — try again");
     }
     setLoading(false);
   }
@@ -682,6 +463,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   async function handleLoadMore() {
     if (!isPro) { setShowPricing(true); return; }
     setLoadingMore(true);
+    setSearchError("");
     try {
       const newLimit = (batchNum + 1) * 20;
       const res = await fetch(`${API_BASE}/api/leads/search`, {
@@ -704,7 +486,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             });
             const job = await r.json();
             if (job.status === "done") { clearInterval(iv); resolve(job.leads || []); }
-            else if (job.status === "error" || attempts > 180) { clearInterval(iv); reject(new Error(job.error || "Timed out")); }
+            else if (job.status === "error" || attempts > 300) { clearInterval(iv); reject(new Error(job.error || "Timed out")); }
           } catch (e) { clearInterval(iv); reject(e); }
         }, 1000);
       });
@@ -720,34 +502,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     }
     setLoadingMore(false);
   }
-        },
-        body: JSON.stringify({ niche: targetNiche, location, limit: 20, scrapeEmails: includeEmail })
-      });
-      const { jobId } = await res.json();
-
-      const moreLeads = await new Promise((resolve, reject) => {
-        let attempts = 0;
-        const iv = setInterval(async () => {
-          attempts++;
-          const r = await fetch(`${API_BASE}/api/leads/job/${jobId}`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          });
-          const job = await r.json();
-          if (job.status === "done") { clearInterval(iv); resolve(job.leads || []); }
-          else if (job.status === "error" || attempts > 120) { clearInterval(iv); reject(new Error(job.error)); }
-        }, 1000);
-      });
-
-      const existingNames = new Set(leads.map(l => l.name));
-      const fresh = moreLeads.filter(l => !existingNames.has(l.name));
-      setLeads(prev => [...prev, ...fresh]);
-      setTotalLeads(prev => prev + fresh.length);
-      setBatchNum(b => b + 1);
-    } catch (e) {
-      console.error(e);
-    }
-    setLoadingMore(false);
-  }
 
   function handleExport() {
     if (!isPro) { setShowPricing(true); return; }
@@ -755,20 +509,23 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `leadreap-${targetNiche}-${location}.csv`;
+    a.href = url; a.download = `${targetNiche}-${location}-leads.csv`;
     a.click(); URL.revokeObjectURL(url);
     setToast(true);
     setTimeout(() => setToast(false), 3000);
   }
 
   function handleUnlock(plan = "pro") {
-    if (!user) { onLoginClick?.(); return; }
+    if (!user) {
+      // Not logged in — show login first
+      onLoginClick?.();
+      return;
+    }
+    // Redirect to Stripe checkout
     onCheckout?.(plan);
   }
 
   const visibleLeads = isPro ? leads : leads.slice(0, 5);
-  const progressPercent = Math.min(100, (loadStep / LOADING_STEPS.length) * 100);
-  const displayTotal = totalLeads > leads.length ? totalLeads : leads.length;
 
   return (
     <>
@@ -777,23 +534,23 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         {/* NAV */}
         <nav className="nav">
           <div className="logo">
-            <div className="logo-mark"><LogoMark /></div>
-            Lead<span>Reap</span>
+            <div className="logo-icon">🎯</div>
+            Lead<span>Harvest</span>
           </div>
           <div className="nav-actions">
-            <span className="badge mono nav-beta">BETA</span>
+            <span className="badge mono">BETA</span>
             {user ? (
               <>
                 <span className="badge mono" style={{ background: isPro ? "rgba(34,197,94,0.12)" : undefined, color: isPro ? "#22c55e" : undefined, borderColor: isPro ? "rgba(34,197,94,0.3)" : undefined }}>
                   {user.plan.toUpperCase()}
                 </span>
-                <span className="nav-email" style={{ fontSize: 13, color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace" }}>{user.email}</span>
+                <span style={{ fontSize: 13, color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace" }}>{user.email}</span>
                 <button className="btn btn-ghost btn-sm" onClick={onLogout}>Log out</button>
               </>
             ) : (
               <>
                 <button className="btn btn-outline btn-sm" onClick={onLoginClick}>Log In</button>
-                <button className="btn btn-primary btn-sm nav-cta" onClick={() => setShowPricing(true)}>Get Full Access →</button>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowPricing(true)}>Get Full Access →</button>
               </>
             )}
           </div>
@@ -802,8 +559,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         {/* HERO */}
         <div className="hero">
           <div className="hero-tag"><div className="dot" /> AI-POWERED LEAD INTELLIGENCE</div>
-          <h1 className="hero-desktop">Find <em>any</em> local business lead<br />in under 30 seconds</h1>
-          <h1 className="hero-mobile">Find <em>verified</em> local leads in seconds</h1>
+          <h1>Find <em>any</em> local business lead<br />in under 30 seconds</h1>
           <p>Pull verified contact data from any local business niche. Search unlimited leads by location — filter, score, and export to CSV in seconds.</p>
           <div className="hero-stats">
             <div className="stat"><div className="stat-num">2.1M+</div><div className="stat-label">Businesses indexed</div></div>
@@ -842,96 +598,67 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 disabled={loading || !targetNiche || !location}
                 style={{ height: 46 }}
               >
-                {loading ? "Searching..." : "Find Leads"}
+                {loading ? "Scanning..." : "🔍 Find Leads"}
               </button>
             </div>
             <div className="options-row">
               {[
-                { key: "email", label: "Emails", icon: "✉", val: includeEmail, set: setIncludeEmail },
-                { key: "phone", label: "Phone Numbers", icon: "☎", val: includePhone, set: setIncludePhone },
-                { key: "social", label: "Social Profiles", icon: "⊕", val: includeSocial, set: setIncludeSocial },
+                { key: "email", label: "📧 Emails", val: includeEmail, set: setIncludeEmail },
+                { key: "phone", label: "📞 Phone Numbers", val: includePhone, set: setIncludePhone },
+                { key: "social", label: "📱 Social Profiles", val: includeSocial, set: setIncludeSocial },
               ].map(opt => (
                 <label key={opt.key} className={`toggle-chip ${opt.val ? "active" : ""}`} onClick={() => opt.set(!opt.val)}>
                   <span className="check">{opt.val ? "✓" : ""}</span>
                   {opt.label}
                 </label>
               ))}
-              <span className="options-hint" style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>
+              <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>
                 FREE: 5 leads preview · PRO: unlimited exports
               </span>
             </div>
           </div>
 
-          {/* LOADING — Premium experience */}
+          {/* LOADING */}
           {loading && (
             <div className="search-card">
               <div className="loading-state">
-                <div className="loading-orb" />
-                <div className="loading-title">
-                  Finding <span style={{ color: "var(--accent)" }}>{targetNiche}</span> leads in <span style={{ color: "var(--accent)" }}>{location}</span>
-                </div>
-                <div className="loading-sub">This typically takes 30–60 seconds</div>
-
-                <div className="progress-track">
-                  <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
-                </div>
-
+                <div className="spinner" />
+                <div className="loading-text">🤖 Playwright is scraping Google Maps for <strong style={{color:"var(--accent)"}}>{targetNiche}</strong> in <strong style={{color:"var(--accent)"}}>{location}</strong><br/><span style={{fontSize:11,color:"var(--muted)"}}>Real browser scraping takes 30–90 seconds</span></div>
                 <div className="loading-steps">
                   {LOADING_STEPS.map((s, i) => (
                     <div key={i} className={`loading-step ${i < loadStep ? "done" : i === loadStep ? "active" : ""}`}>
-                      <span>{i < loadStep ? "✓" : i === loadStep ? "›" : "·"}</span> {s}
+                      <span>{i < loadStep ? "✓" : i === loadStep ? "▶" : "○"}</span> {s}
                     </div>
                   ))}
-                </div>
-
-                <div className="loading-tip" key={currentTip}>
-                  <strong>{LOADING_TIPS[currentTip].label}:</strong> {LOADING_TIPS[currentTip].text}
                 </div>
               </div>
             </div>
           )}
 
-          {/* PRICING UPSELL (in results) */}
-          {!loading && searchDone && !searchError && leads.length > 0 && !isPro && (
-            <div className="upsell-banner" style={{
-              display: "flex", gap: 16, marginBottom: 20,
-              padding: "14px 20px", borderRadius: 10,
-              background: "rgba(240,180,41,0.04)", border: "1px solid rgba(240,180,41,0.12)",
-              alignItems: "center", justifyContent: "space-between",
-            }}>
-              <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                Showing <strong style={{ color: "var(--text)" }}>{visibleLeads.length} of {displayTotal}</strong> leads — upgrade to unlock all results, CSV export, and unlimited searches.
-              </span>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowPricing(true)}>Unlock Full Access →</button>
-            </div>
-          )}
-
-          {/* ERROR */}
+          {/* RESULTS */}
           {!loading && searchDone && searchError && (
             <div className="search-card" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
               <div className="empty-state" style={{ padding: "40px 20px" }}>
                 <div className="empty-icon">⚠️</div>
                 <div className="empty-title" style={{ color: "#f87171" }}>{searchError}</div>
                 <div className="empty-sub">
-                  {searchError.includes("limit") || searchError.includes("Rate")
-                    ? <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setShowPricing(true)}>Upgrade for Unlimited Searches →</button>
+                  {searchError.includes("Rate limit") || searchError.includes("limit reached")
+                    ? <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setShowPricing(true)}>Upgrade for More Searches →</button>
                     : <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={handleSearch}>Try Again</button>
                   }
                 </div>
               </div>
             </div>
           )}
-
-          {/* RESULTS TABLE */}
           {!loading && searchDone && !searchError && leads.length > 0 && (
             <>
               <div className="results-header">
                 <div className="results-meta">
                   <span style={{fontWeight:700, fontSize:15}}>Results</span>
-                  <span className="count-tag">✓ {displayTotal} leads found</span>
+                  <span className="count-tag">✓ {leads.length} leads found</span>
                   <span style={{fontSize:13, color:"var(--muted)", fontFamily:"IBM Plex Mono"}}>{targetNiche} · {location}</span>
                 </div>
-                <div className="results-actions" style={{display:"flex",gap:10}}>
+                <div style={{display:"flex",gap:10}}>
                   <button className="btn btn-outline btn-sm" onClick={handleSearch}>↻ Refresh</button>
                   <button className="btn btn-green btn-sm" onClick={handleExport}>
                     ⬇ Export CSV {!isPro && "🔒"}
@@ -962,15 +689,13 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                             <div className="name-cell">{lead.name}</div>
                             <div style={{fontSize:11,color:"var(--muted)",marginTop:2,fontFamily:"IBM Plex Mono"}}>{lead.address}</div>
                           </td>
-                          {includeEmail && <td className="email-cell">{lead.email || "—"}</td>}
-                          {includePhone && <td className="phone-cell">{lead.phoneDisplay || lead.phone || "—"}</td>}
-                          <td className="site-cell">
-                            {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "—"}
-                          </td>
+                          {includeEmail && <td className="email-cell">{lead.email}</td>}
+                          {includePhone && <td className="phone-cell">{lead.phone}</td>}
+                          <td className="site-cell">{lead.website}</td>
                           <td>
                             <div className="rating-cell">
-                              <span className="star">★</span> {lead.rating || "—"}
-                              <span style={{color:"var(--muted)"}}> ({lead.reviews || 0})</span>
+                              <span className="star">★</span> {lead.rating}
+                              <span style={{color:"var(--muted)"}}> ({lead.reviews})</span>
                             </div>
                           </td>
                           <td>
@@ -986,73 +711,27 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
               {!isPro ? (
                 <div className="upgrade-bar">
-                  <p>🔒 Showing <strong style={{color:"var(--text)"}}>{visibleLeads.length} of {displayTotal}</strong> leads — unlock all results + CSV export</p>
+                  <p>🔒 Showing <strong style={{color:"var(--text)"}}>5 of {leads.length}</strong> leads — unlock unlimited leads, load more batches &amp; CSV export</p>
                   <button className="btn btn-primary" onClick={() => setShowPricing(true)}>Unlock Full Access →</button>
                 </div>
               ) : (
                 <div className="upgrade-bar">
-                  <p style={{color:"var(--muted)"}}>Showing <strong style={{color:"var(--text)"}}>{leads.length} leads</strong> · Batch {batchNum}</p>
+                  <p style={{color:"var(--muted)"}}>Showing <strong style={{color:"var(--text)"}}>{leads.length} leads</strong> · Batch {batchNum} · Each load fetches 25 more</p>
                   <button className="btn btn-outline btn-sm" onClick={handleLoadMore} disabled={loadingMore}>
-                    {loadingMore ? "Loading more..." : "Load More Results"}
+                    {loadingMore ? "⏳ Scraping more..." : "⬇ Load 20 More"}
                   </button>
                 </div>
               )}
             </>
           )}
 
-          {/* DEMO PREVIEW — shows before first search */}
+          {/* EMPTY */}
           {!loading && !searchDone && (
-            <div className="demo-section">
-              <div className="demo-header">
-                <span className="demo-label">Example: "Dentist" in Austin, TX</span>
-                <span className="count-tag" style={{opacity:0.5}}>✓ 20 leads found</span>
-              </div>
-              <div className="demo-wrap">
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Business Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Website</th>
-                        <th>Rating</th>
-                        <th>Lead Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {DEMO_LEADS.map((lead, i) => (
-                        <tr key={i} style={{opacity: 1 - (i * 0.08)}}>
-                          <td style={{color:"var(--muted)",fontSize:12,fontFamily:"IBM Plex Mono"}}>{String(i+1).padStart(2,"0")}</td>
-                          <td>
-                            <div className="name-cell">{lead.name}</div>
-                            <div style={{fontSize:11,color:"var(--muted)",marginTop:2,fontFamily:"IBM Plex Mono"}}>{lead.address}</div>
-                          </td>
-                          <td className="email-cell">{lead.email}</td>
-                          <td className="phone-cell">{lead.phone}</td>
-                          <td className="site-cell">{lead.website}</td>
-                          <td>
-                            <div className="rating-cell">
-                              <span className="star">★</span> {lead.rating}
-                              <span style={{color:"var(--muted)"}}> ({lead.reviews})</span>
-                            </div>
-                          </td>
-                          <td>
-                            <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="demo-cta">
-                  <p>Try it free — search any niche, any city</p>
-                  <button className="btn btn-primary" onClick={() => document.querySelector('.field select')?.focus()}>
-                    Start Your First Search →
-                  </button>
-                  <div className="sub">No credit card required · 5 leads free</div>
-                </div>
+            <div className="search-card">
+              <div className="empty-state">
+                <div className="empty-icon">🎯</div>
+                <div className="empty-title">Ready to harvest leads</div>
+                <div className="empty-sub">Select a niche and location above, then hit Find Leads to get started.</div>
               </div>
             </div>
           )}
@@ -1060,7 +739,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
         {/* FOOTER */}
         <footer className="footer">
-          <div className="footer-left">© 2026 LeadReap</div>
+          <div className="footer-left">© 2026 LeadReap · Built for closers.</div>
           <div className="footer-right">
             <span className="footer-link">Privacy</span>
             <span className="footer-link">Terms</span>
@@ -1117,7 +796,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               ))}
             </div>
             <p style={{textAlign:"center", marginTop:28, color:"var(--muted)", fontSize:13}}>
-              Secure checkout · 30-day money-back guarantee · Instant access
+              💳 Secure checkout · 30-day money-back guarantee · Instant access
             </p>
           </div>
         </div>
