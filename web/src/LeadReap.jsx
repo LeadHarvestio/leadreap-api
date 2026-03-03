@@ -24,7 +24,6 @@ const STYLE = `
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
   }
   .mono { font-family: 'IBM Plex Mono', monospace; }
-
   .app { min-height: 100vh; display: flex; flex-direction: column; }
 
   /* NAV */
@@ -58,15 +57,10 @@ const STYLE = `
     border: none; transition: all 0.2s ease; display: inline-flex;
     align-items: center; gap: 8px;
   }
-  .btn-primary {
-    background: var(--accent); color: #000;
-  }
+  .btn-primary { background: var(--accent); color: #000; }
   .btn-primary:hover { background: #f5c842; transform: translateY(-1px); box-shadow: 0 4px 24px rgba(240,180,41,0.25); }
   .btn-primary:disabled { background: #333; color: #666; transform: none; box-shadow: none; cursor: not-allowed; }
-  .btn-outline {
-    background: transparent; color: var(--text);
-    border: 1px solid var(--border);
-  }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
   .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
   .btn-ghost { background: transparent; color: var(--muted); border: none; }
   .btn-ghost:hover { color: var(--text); }
@@ -76,14 +70,11 @@ const STYLE = `
 
   /* HERO */
   .hero {
-    padding: 48px 40px 0;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
+    padding: 48px 40px 0; text-align: center;
+    position: relative; overflow: hidden;
   }
   .hero::before {
-    content: '';
-    position: absolute; inset: 0;
+    content: ''; position: absolute; inset: 0;
     background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(240,180,41,0.06) 0%, transparent 70%);
     pointer-events: none;
   }
@@ -96,7 +87,6 @@ const STYLE = `
   }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{ opacity:1; transform: scale(1); } 50%{ opacity:0.4; transform: scale(0.8); } }
-
   .hero h1 {
     font-size: clamp(30px, 4vw, 48px); font-weight: 800; line-height: 1.1;
     letter-spacing: -1.5px; margin-bottom: 14px;
@@ -110,8 +100,7 @@ const STYLE = `
   .hero-stats {
     display: flex; gap: 32px; justify-content: center;
     margin-top: 28px; padding-top: 24px;
-    border-top: 1px solid var(--border);
-    padding-bottom: 32px;
+    border-top: 1px solid var(--border); padding-bottom: 32px;
   }
   .stat { text-align: center; }
   .stat-num { font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
@@ -119,15 +108,13 @@ const STYLE = `
 
   /* MAIN TOOL */
   .tool-section { padding: 0 40px 80px; max-width: 1100px; margin: 0 auto; width: 100%; }
-
   .search-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 16px; padding: 32px; margin-bottom: 28px;
     position: relative; overflow: hidden;
   }
   .search-card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
     background: linear-gradient(90deg, var(--accent), var(--accent2), transparent);
   }
   .search-label {
@@ -142,15 +129,11 @@ const STYLE = `
     background: var(--surface2); border: 1px solid var(--border);
     border-radius: 10px; padding: 12px 16px;
     font-family: 'IBM Plex Mono', monospace; font-size: 14px;
-    color: var(--text); outline: none; transition: border-color 0.2s;
-    width: 100%;
+    color: var(--text); outline: none; transition: border-color 0.2s; width: 100%;
   }
   .field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(240,180,41,0.08); }
   .field input::placeholder { color: var(--muted); }
-
-  .options-row {
-    display: flex; gap: 16px; margin-top: 16px; align-items: center; flex-wrap: wrap;
-  }
+  .options-row { display: flex; gap: 16px; margin-top: 16px; align-items: center; flex-wrap: wrap; }
   .toggle-chip {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 14px; border-radius: 8px;
@@ -163,18 +146,13 @@ const STYLE = `
   .check { width: 14px; height: 14px; border-radius: 3px; border: 1px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 10px; }
 
   /* RESULTS */
-  .results-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px;
-  }
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .results-meta { display: flex; align-items: center; gap: 12px; }
   .count-tag {
     font-family: 'IBM Plex Mono', monospace; font-size: 12px;
     background: rgba(34,197,94,0.1); color: var(--green);
-    border: 1px solid rgba(34,197,94,0.2); padding: 4px 12px;
-    border-radius: 4px;
+    border: 1px solid rgba(34,197,94,0.2); padding: 4px 12px; border-radius: 4px;
   }
-
   .table-wrap { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   table { width: 100%; border-collapse: collapse; }
   thead { background: var(--surface2); }
@@ -182,14 +160,9 @@ const STYLE = `
     font-family: 'IBM Plex Mono', monospace; font-size: 11px;
     text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--muted); padding: 14px 16px;
-    text-align: left; font-weight: 500;
-    border-bottom: 1px solid var(--border);
+    text-align: left; font-weight: 500; border-bottom: 1px solid var(--border);
   }
-  td {
-    padding: 14px 16px; font-size: 13px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
+  td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr { transition: background 0.15s; }
   tr:hover td { background: rgba(240,180,41,0.02); }
@@ -201,75 +174,43 @@ const STYLE = `
   .site-cell a:hover { text-decoration: underline; }
   .rating-cell { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
   .star { color: var(--accent); }
-  .score-pill {
-    display: inline-block; padding: 3px 10px; border-radius: 4px;
-    font-size: 11px; font-family: 'IBM Plex Mono', monospace; font-weight: 600;
-  }
+  .score-pill { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
   .score-high { background: rgba(34,197,94,0.12); color: var(--green); }
   .score-med { background: rgba(240,180,41,0.12); color: var(--accent); }
   .score-low { background: rgba(239,68,68,0.08); color: #f87171; }
 
-  /* LOADING — Premium experience */
+  /* LOADING */
   .loading-state { text-align: center; padding: 60px 20px; }
-
   .loading-orb {
-    width: 64px; height: 64px; margin: 0 auto 28px;
-    border-radius: 50%;
+    width: 64px; height: 64px; margin: 0 auto 28px; border-radius: 50%;
     background: radial-gradient(circle at 30% 30%, var(--accent), var(--accent2));
-    animation: orbPulse 2s ease-in-out infinite;
-    position: relative;
+    animation: orbPulse 2s ease-in-out infinite; position: relative;
     box-shadow: 0 0 40px rgba(240,180,41,0.15), 0 0 80px rgba(240,180,41,0.05);
   }
   .loading-orb::after {
-    content: '';
-    position: absolute; inset: -4px;
-    border-radius: 50%;
-    border: 1px solid rgba(240,180,41,0.2);
-    animation: orbRing 3s linear infinite;
+    content: ''; position: absolute; inset: -4px; border-radius: 50%;
+    border: 1px solid rgba(240,180,41,0.2); animation: orbRing 3s linear infinite;
   }
   @keyframes orbPulse {
     0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(240,180,41,0.15); }
     50% { transform: scale(1.08); box-shadow: 0 0 60px rgba(240,180,41,0.25); }
   }
-  @keyframes orbRing {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  .loading-title {
-    font-size: 18px; font-weight: 700; margin-bottom: 6px;
-    letter-spacing: -0.5px;
-  }
-  .loading-sub {
-    font-size: 13px; color: var(--muted); margin-bottom: 32px;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-
-  .progress-track {
-    width: 280px; height: 3px; background: var(--border);
-    border-radius: 4px; margin: 0 auto 32px; overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%; border-radius: 4px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    transition: width 1s ease;
-  }
-
+  @keyframes orbRing { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  .loading-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.5px; }
+  .loading-sub { font-size: 13px; color: var(--muted); margin-bottom: 32px; font-family: 'IBM Plex Mono', monospace; }
+  .progress-track { width: 280px; height: 3px; background: var(--border); border-radius: 4px; margin: 0 auto 32px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 1s ease; }
   .loading-steps { display: flex; flex-direction: column; gap: 6px; align-items: center; margin-bottom: 32px; }
   .loading-step {
     font-family: 'IBM Plex Mono', monospace; font-size: 12px;
-    color: var(--muted); display: flex; align-items: center; gap: 8px;
-    transition: all 0.3s ease;
+    color: var(--muted); display: flex; align-items: center; gap: 8px; transition: all 0.3s ease;
   }
   .loading-step.done { color: var(--green); }
   .loading-step.active { color: var(--accent); }
-
   .loading-tip {
-    max-width: 380px; margin: 0 auto;
-    padding: 16px 20px; border-radius: 10px;
+    max-width: 380px; margin: 0 auto; padding: 16px 20px; border-radius: 10px;
     background: rgba(240,180,41,0.04); border: 1px solid rgba(240,180,41,0.1);
-    font-size: 13px; color: var(--muted); line-height: 1.5;
-    animation: tipFade 0.4s ease;
+    font-size: 13px; color: var(--muted); line-height: 1.5; animation: tipFade 0.4s ease;
   }
   .loading-tip strong { color: var(--accent); font-weight: 600; }
   @keyframes tipFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -284,8 +225,7 @@ const STYLE = `
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.85);
     display: flex; align-items: center; justify-content: center;
-    z-index: 200; padding: 20px;
-    animation: fadeIn 0.15s ease;
+    z-index: 200; padding: 20px; animation: fadeIn 0.15s ease;
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
@@ -299,29 +239,22 @@ const STYLE = `
     position: absolute; top: 20px; right: 20px;
     background: var(--surface2); border: 1px solid var(--border);
     color: var(--muted); width: 32px; height: 32px; border-radius: 8px;
-    cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
+    cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.15s;
   }
   .modal-close:hover { color: var(--text); border-color: var(--text); }
   .modal h2 { font-size: 32px; font-weight: 800; margin-bottom: 8px; letter-spacing: -1px; }
   .modal > p { color: var(--muted); margin-bottom: 40px; }
-
   .pricing-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
   .plan-card {
     background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 14px; padding: 28px; position: relative;
-    transition: all 0.2s;
+    border-radius: 14px; padding: 28px; position: relative; transition: all 0.2s;
   }
   .plan-card:hover { border-color: var(--muted); transform: translateY(-2px); }
-  .plan-card.featured {
-    border-color: var(--accent);
-    background: rgba(240,180,41,0.04);
-  }
+  .plan-card.featured { border-color: var(--accent); background: rgba(240,180,41,0.04); }
   .plan-badge {
     position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
     background: var(--accent); color: #000; font-size: 11px; font-weight: 700;
-    padding: 3px 12px; border-radius: 20px; letter-spacing: 0.05em;
-    white-space: nowrap;
+    padding: 3px 12px; border-radius: 20px; letter-spacing: 0.05em; white-space: nowrap;
   }
   .plan-name { font-size: 14px; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
   .plan-price { font-size: 40px; font-weight: 800; letter-spacing: -2px; margin-bottom: 4px; }
@@ -343,14 +276,10 @@ const STYLE = `
   @keyframes fadeOut { to { opacity: 0; transform: translateX(-50%) translateY(10px); } }
 
   /* LOCK OVERLAY */
-  .lock-overlay {
-    position: relative; overflow: hidden;
-  }
+  .lock-overlay { position: relative; overflow: hidden; }
   .lock-overlay::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(to bottom, transparent 20%, var(--bg) 100%);
-    pointer-events: none;
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 20%, var(--bg) 100%); pointer-events: none;
   }
   .upgrade-bar {
     text-align: center; padding: 24px;
@@ -362,8 +291,7 @@ const STYLE = `
 
   /* FOOTER */
   .footer {
-    margin-top: auto; padding: 24px 40px;
-    border-top: 1px solid var(--border);
+    margin-top: auto; padding: 24px 40px; border-top: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
   .footer-left { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
@@ -373,34 +301,19 @@ const STYLE = `
 
   /* DEMO PREVIEW */
   .demo-section { position: relative; }
-  .demo-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px;
-  }
-  .demo-label {
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-    color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
-  }
+  .demo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .demo-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
   .demo-wrap { position: relative; overflow: hidden; border-radius: 12px; }
   .demo-wrap::after {
-    content: '';
-    position: absolute; inset: 0;
+    content: ''; position: absolute; inset: 0;
     background: linear-gradient(to bottom, transparent 10%, var(--bg) 85%);
     pointer-events: none; z-index: 2;
   }
-  .demo-cta {
-    position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
-    z-index: 3; text-align: center;
-  }
-  .demo-cta p {
-    font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px;
-  }
-  .demo-cta .sub {
-    font-size: 12px; color: var(--muted); margin-top: 8px;
-    font-family: 'IBM Plex Mono', monospace;
-  }
+  .demo-cta { position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 3; text-align: center; }
+  .demo-cta p { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+  .demo-cta .sub { font-size: 12px; color: var(--muted); margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
 
-  /* ─── MOBILE ─────────────────────────────────── */
+  /* MOBILE */
   @media (max-width: 768px) {
     .nav { padding: 12px 16px; gap: 8px; }
     .nav-actions { gap: 8px; }
@@ -409,7 +322,6 @@ const STYLE = `
     .nav-beta { display: none; }
     .nav-cta { display: none; }
     .badge { padding: 3px 8px; font-size: 10px; }
-
     .hero { padding: 32px 20px 24px; }
     .hero-tag { display: none; }
     .hero h1 { font-size: 26px; letter-spacing: -0.8px; margin-bottom: 10px; line-height: 1.2; }
@@ -419,43 +331,31 @@ const STYLE = `
     .hero p { font-size: 13px; margin-bottom: 0; line-height: 1.5; max-width: 100%; }
     .hero-stats { display: none; }
     .hero::before { display: none; }
-
     .tool-section { padding: 0 16px 48px; }
     .search-card { padding: 20px 16px; border-radius: 12px; margin-bottom: 16px; }
     .search-label { font-size: 10px; margin-bottom: 14px; }
     .search-row { grid-template-columns: 1fr; gap: 10px; }
-    .field input, .field select {
-      padding: 13px 14px; font-size: 14px; border-radius: 10px;
-    }
+    .field input, .field select { padding: 13px 14px; font-size: 14px; border-radius: 10px; }
     .btn-primary { width: 100%; justify-content: center; height: 48px !important; font-size: 15px; }
-
     .options-row { gap: 8px; margin-top: 12px; }
     .toggle-chip { padding: 6px 10px; font-size: 12px; }
     .options-hint { display: none; }
-
     .results-header { flex-direction: column; gap: 12px; align-items: flex-start; }
     .results-meta { flex-wrap: wrap; gap: 8px; }
     .results-actions { width: 100%; display: flex; gap: 8px; }
     .results-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 12px; }
-
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { min-width: 700px; }
     th { padding: 10px 12px; font-size: 10px; }
     td { padding: 10px 12px; font-size: 12px; }
     .name-cell { font-size: 13px; }
-
-    .upsell-banner {
-      flex-direction: column !important; gap: 12px !important;
-      text-align: center; padding: 14px 16px !important;
-    }
+    .upsell-banner { flex-direction: column !important; gap: 12px !important; text-align: center; padding: 14px 16px !important; }
     .upsell-banner .btn { width: 100%; justify-content: center; }
     .upgrade-bar { flex-direction: column; gap: 12px; padding: 18px 16px; }
     .upgrade-bar .btn { width: 100%; justify-content: center; }
-
     .loading-title { font-size: 16px; }
     .loading-sub { font-size: 12px; }
     .loading-tip { font-size: 12px; padding: 12px 16px; max-width: 100%; }
-
     .modal-overlay { padding: 12px; align-items: flex-start; overflow-y: auto; }
     .modal { padding: 24px 18px; border-radius: 14px; margin-top: 40px; }
     .modal h2 { font-size: 22px; }
@@ -464,22 +364,15 @@ const STYLE = `
     .plan-card { padding: 20px; }
     .plan-price { font-size: 32px; }
     .plan-feature { font-size: 13px; }
-
     .empty-state { padding: 48px 16px; }
     .empty-title { font-size: 17px; }
     .empty-sub { font-size: 13px; }
-
     .demo-header { flex-direction: column; gap: 6px; align-items: flex-start; }
     .demo-cta p { font-size: 14px; }
     .demo-cta .btn { font-size: 14px; }
-
     .footer { flex-direction: column; gap: 10px; padding: 20px 16px; text-align: center; }
   }
-
-  /* Desktop: hide mobile headline */
   .hero-mobile { display: none; }
-
-  /* Small phones */
   @media (max-width: 380px) {
     .hero h1 { font-size: 23px; }
     .logo { font-size: 17px; }
@@ -488,7 +381,6 @@ const STYLE = `
   }
 `;
 
-// ─── SVG Logo Mark ───────────────────────────────────────────
 function LogoMark() {
   return (
     <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -501,7 +393,6 @@ function LogoMark() {
   );
 }
 
-// ─── Config ──────────────────────────────────────────────────
 const INDUSTRIES = [
   "Dentist", "Chiropractor", "Real Estate Agent", "Plumber", "Electrician",
   "Restaurant", "Hair Salon", "Auto Repair Shop", "Law Firm", "Gym / Fitness Studio",
@@ -509,13 +400,12 @@ const INDUSTRIES = [
   "Landscaping Company", "Personal Trainer", "Marketing Agency", "Insurance Agent"
 ];
 
-// ─── Demo Data (shown before first search) ──────────────────
 const DEMO_LEADS = [
   { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, reviews: 312, score: 94, notes: "High review count, active website, email verified" },
   { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, reviews: 189, score: 87, notes: "Strong Google presence, recently updated listing" },
   { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, reviews: 245, score: 82, notes: "Multiple locations, good engagement" },
   { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, reviews: 97, score: 71, notes: "Premium area, newer practice" },
-  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "—", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, reviews: 64, score: 65, notes: "No email found, phone verified" },
+  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "\u2014", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, reviews: 64, score: 65, notes: "No email found, phone verified" },
 ];
 
 function scoreToClass(score) {
@@ -532,7 +422,6 @@ function generateCSV(leads) {
   return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
 }
 
-// User-friendly loading steps (no technical jargon)
 const LOADING_STEPS = [
   "Searching your area...",
   "Finding local businesses...",
@@ -542,13 +431,12 @@ const LOADING_STEPS = [
   "Preparing your results...",
 ];
 
-// Rotating tips shown during loading
 const LOADING_TIPS = [
   { text: "Leads with a 4.5+ star rating tend to convert 3x better for outreach.", label: "Insight" },
   { text: "Export your results to CSV for easy import into any CRM platform.", label: "Pro tip" },
   { text: "Businesses without websites are prime targets for web design services.", label: "Sales angle" },
   { text: "The Lead Score factors in rating, reviews, email quality, and tech stack.", label: "How it works" },
-  { text: "Leads running Facebook Pixel are already spending on ads — warm prospects.", label: "Insight" },
+  { text: "Leads running Facebook Pixel are already spending on ads \u2014 warm prospects.", label: "Insight" },
   { text: "Try narrowing your location to a zip code for more targeted results.", label: "Pro tip" },
   { text: "Low review count businesses often need reputation management services.", label: "Sales angle" },
   { text: "Businesses on Wix or Squarespace are often open to a website redesign.", label: "Insight" },
@@ -580,7 +468,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
   const targetNiche = niche === "custom" ? customNiche : niche;
 
-  // Rotate tips every 5 seconds during loading
   useEffect(() => {
     if (loading) {
       setCurrentTip(Math.floor(Math.random() * LOADING_TIPS.length));
@@ -593,7 +480,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     return () => clearInterval(tipRef.current);
   }, [loading]);
 
-  // Poll job — resolves with full job object (includes .leads, .total, .gated)
   async function pollJob(jobId) {
     return new Promise((resolve, reject) => {
       let attempts = 0;
@@ -617,7 +503,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             reject(new Error(job.error || "Search failed"));
           } else if (attempts >= MAX_ATTEMPTS) {
             clearInterval(pollRef.current);
-            reject(new Error("Search timed out — try a more specific location"));
+            reject(new Error("Search timed out \u2014 try a more specific location"));
           }
         } catch (e) {
           clearInterval(pollRef.current);
@@ -650,7 +536,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         if (errData.code === "RATE_LIMIT" || errData.code === "IP_RATE_LIMIT") {
-          throw new Error(errData.error || "Search limit reached — upgrade for unlimited searches");
+          throw new Error(errData.error || "Search limit reached \u2014 upgrade for unlimited searches");
         }
         throw new Error(`Something went wrong (${res.status}). Please try again.`);
       }
@@ -662,7 +548,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     } catch (e) {
       console.error(e);
       setSearchDone(true);
-      setSearchError(e.message || "Search failed — please try again");
+      setSearchError(e.message || "Search failed \u2014 please try again");
     }
     setLoading(false);
   }
@@ -705,7 +591,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       setBatchNum(b => b + 1);
     } catch (e) {
       console.error(e);
-      setSearchError("Failed to load more results — try again");
+      setSearchError("Failed to load more results \u2014 try again");
     }
     setLoadingMore(false);
   }
@@ -735,7 +621,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     <>
       <style>{STYLE}</style>
       <div className="app">
-        {/* NAV */}
         <nav className="nav">
           <div className="logo">
             <div className="logo-mark"><LogoMark /></div>
@@ -754,18 +639,17 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             ) : (
               <>
                 <button className="btn btn-outline btn-sm" onClick={onLoginClick}>Log In</button>
-                <button className="btn btn-primary btn-sm nav-cta" onClick={() => setShowPricing(true)}>Get Full Access →</button>
+                <button className="btn btn-primary btn-sm nav-cta" onClick={() => setShowPricing(true)}>Get Full Access &rarr;</button>
               </>
             )}
           </div>
         </nav>
 
-        {/* HERO */}
         <div className="hero">
           <div className="hero-tag"><div className="dot" /> AI-POWERED LEAD INTELLIGENCE</div>
           <h1 className="hero-desktop">Find <em>any</em> local business lead<br />in under 30 seconds</h1>
           <h1 className="hero-mobile">Find <em>verified</em> local leads in seconds</h1>
-          <p>Pull verified contact data from any local business niche. Search unlimited leads by location — filter, score, and export to CSV in seconds.</p>
+          <p>Pull verified contact data from any local business niche. Search unlimited leads by location &mdash; filter, score, and export to CSV in seconds.</p>
           <div className="hero-stats">
             <div className="stat"><div className="stat-num">2.1M+</div><div className="stat-label">Businesses indexed</div></div>
             <div className="stat"><div className="stat-num">47</div><div className="stat-label">Supported niches</div></div>
@@ -774,10 +658,9 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           </div>
         </div>
 
-        {/* TOOL */}
         <div className="tool-section">
           <div className="search-card">
-            <div className="search-label">⚡ Lead Search Engine</div>
+            <div className="search-label">&#9889; Lead Search Engine</div>
             <div className="search-row">
               <div className="field">
                 <label>Business Niche</label>
@@ -795,35 +678,29 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               )}
               <div className="field">
                 <label>Location</label>
-                <input value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State — e.g. Austin, TX" />
+                <input value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State &mdash; e.g. Austin, TX" />
               </div>
-              <button
-                className="btn btn-primary"
-                onClick={handleSearch}
-                disabled={loading || !targetNiche || !location}
-                style={{ height: 46 }}
-              >
+              <button className="btn btn-primary" onClick={handleSearch} disabled={loading || !targetNiche || !location} style={{ height: 46 }}>
                 {loading ? "Searching..." : "Find Leads"}
               </button>
             </div>
             <div className="options-row">
               {[
-                { key: "email", label: "Emails", icon: "✉", val: includeEmail, set: setIncludeEmail },
-                { key: "phone", label: "Phone Numbers", icon: "☎", val: includePhone, set: setIncludePhone },
-                { key: "social", label: "Social Profiles", icon: "⊕", val: includeSocial, set: setIncludeSocial },
+                { key: "email", label: "Emails", val: includeEmail, set: setIncludeEmail },
+                { key: "phone", label: "Phone Numbers", val: includePhone, set: setIncludePhone },
+                { key: "social", label: "Social Profiles", val: includeSocial, set: setIncludeSocial },
               ].map(opt => (
                 <label key={opt.key} className={`toggle-chip ${opt.val ? "active" : ""}`} onClick={() => opt.set(!opt.val)}>
-                  <span className="check">{opt.val ? "✓" : ""}</span>
+                  <span className="check">{opt.val ? "\u2713" : ""}</span>
                   {opt.label}
                 </label>
               ))}
               <span className="options-hint" style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>
-                FREE: 5 leads preview · PRO: unlimited exports
+                FREE: 5 leads preview &middot; PRO: unlimited exports
               </span>
             </div>
           </div>
 
-          {/* LOADING — Premium experience */}
           {loading && (
             <div className="search-card">
               <div className="loading-state">
@@ -831,20 +708,17 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 <div className="loading-title">
                   Finding <span style={{ color: "var(--accent)" }}>{targetNiche}</span> leads in <span style={{ color: "var(--accent)" }}>{location}</span>
                 </div>
-                <div className="loading-sub">This typically takes 30–60 seconds</div>
-
+                <div className="loading-sub">This typically takes 30&ndash;60 seconds</div>
                 <div className="progress-track">
                   <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
                 </div>
-
                 <div className="loading-steps">
                   {LOADING_STEPS.map((s, i) => (
                     <div key={i} className={`loading-step ${i < loadStep ? "done" : i === loadStep ? "active" : ""}`}>
-                      <span>{i < loadStep ? "✓" : i === loadStep ? "›" : "·"}</span> {s}
+                      <span>{i < loadStep ? "\u2713" : i === loadStep ? "\u203A" : "\u00B7"}</span> {s}
                     </div>
                   ))}
                 </div>
-
                 <div className="loading-tip" key={currentTip}>
                   <strong>{LOADING_TIPS[currentTip].label}:</strong> {LOADING_TIPS[currentTip].text}
                 </div>
@@ -852,7 +726,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             </div>
           )}
 
-          {/* PRICING UPSELL (in results) */}
           {!loading && searchDone && !searchError && leads.length > 0 && !isPro && (
             <div className="upsell-banner" style={{
               display: "flex", gap: 16, marginBottom: 20,
@@ -861,21 +734,20 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               alignItems: "center", justifyContent: "space-between",
             }}>
               <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                Showing <strong style={{ color: "var(--text)" }}>{visibleLeads.length} of {displayTotal}</strong> leads — upgrade to unlock all results, CSV export, and unlimited searches.
+                Showing <strong style={{ color: "var(--text)" }}>{visibleLeads.length} of {displayTotal}</strong> leads &mdash; upgrade to unlock all results, CSV export, and unlimited searches.
               </span>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowPricing(true)}>Unlock Full Access →</button>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowPricing(true)}>Unlock Full Access &rarr;</button>
             </div>
           )}
 
-          {/* ERROR */}
           {!loading && searchDone && searchError && (
             <div className="search-card" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
               <div className="empty-state" style={{ padding: "40px 20px" }}>
-                <div className="empty-icon">⚠️</div>
+                <div className="empty-icon">&#9888;&#65039;</div>
                 <div className="empty-title" style={{ color: "#f87171" }}>{searchError}</div>
                 <div className="empty-sub">
                   {searchError.includes("limit") || searchError.includes("Rate")
-                    ? <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setShowPricing(true)}>Upgrade for Unlimited Searches →</button>
+                    ? <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setShowPricing(true)}>Upgrade for Unlimited Searches &rarr;</button>
                     : <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={handleSearch}>Try Again</button>
                   }
                 </div>
@@ -883,19 +755,18 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             </div>
           )}
 
-          {/* RESULTS TABLE */}
           {!loading && searchDone && !searchError && leads.length > 0 && (
             <>
               <div className="results-header">
                 <div className="results-meta">
                   <span style={{fontWeight:700, fontSize:15}}>Results</span>
-                  <span className="count-tag">✓ {displayTotal} leads found</span>
-                  <span style={{fontSize:13, color:"var(--muted)", fontFamily:"IBM Plex Mono"}}>{targetNiche} · {location}</span>
+                  <span className="count-tag">{"\u2713"} {displayTotal} leads found</span>
+                  <span style={{fontSize:13, color:"var(--muted)", fontFamily:"IBM Plex Mono"}}>{targetNiche} &middot; {location}</span>
                 </div>
                 <div className="results-actions" style={{display:"flex",gap:10}}>
-                  <button className="btn btn-outline btn-sm" onClick={handleSearch}>↻ Refresh</button>
+                  <button className="btn btn-outline btn-sm" onClick={handleSearch}>{"\u21BB"} Refresh</button>
                   <button className="btn btn-green btn-sm" onClick={handleExport}>
-                    ⬇ Export CSV {!isPro && "🔒"}
+                    {"\u2B07"} Export CSV {!isPro && "\uD83D\uDD12"}
                   </button>
                 </div>
               </div>
@@ -923,14 +794,14 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                             <div className="name-cell">{lead.name}</div>
                             <div style={{fontSize:11,color:"var(--muted)",marginTop:2,fontFamily:"IBM Plex Mono"}}>{lead.address}</div>
                           </td>
-                          {includeEmail && <td className="email-cell">{lead.email || "—"}</td>}
-                          {includePhone && <td className="phone-cell">{lead.phoneDisplay || lead.phone || "—"}</td>}
+                          {includeEmail && <td className="email-cell">{lead.email || "\u2014"}</td>}
+                          {includePhone && <td className="phone-cell">{lead.phoneDisplay || lead.phone || "\u2014"}</td>}
                           <td className="site-cell">
-                            {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "—"}
+                            {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "\u2014"}
                           </td>
                           <td>
                             <div className="rating-cell">
-                              <span className="star">★</span> {lead.rating || "—"}
+                              <span className="star">{"\u2605"}</span> {lead.rating || "\u2014"}
                               <span style={{color:"var(--muted)"}}> ({lead.reviews || 0})</span>
                             </div>
                           </td>
@@ -947,12 +818,12 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
               {!isPro ? (
                 <div className="upgrade-bar">
-                  <p>🔒 Showing <strong style={{color:"var(--text)"}}>{visibleLeads.length} of {displayTotal}</strong> leads — unlock all results + CSV export</p>
-                  <button className="btn btn-primary" onClick={() => setShowPricing(true)}>Unlock Full Access →</button>
+                  <p>{"\uD83D\uDD12"} Showing <strong style={{color:"var(--text)"}}>{visibleLeads.length} of {displayTotal}</strong> leads &mdash; unlock all results + CSV export</p>
+                  <button className="btn btn-primary" onClick={() => setShowPricing(true)}>Unlock Full Access &rarr;</button>
                 </div>
               ) : (
                 <div className="upgrade-bar">
-                  <p style={{color:"var(--muted)"}}>Showing <strong style={{color:"var(--text)"}}>{leads.length} leads</strong> · Batch {batchNum}</p>
+                  <p style={{color:"var(--muted)"}}>Showing <strong style={{color:"var(--text)"}}>{leads.length} leads</strong> &middot; Batch {batchNum}</p>
                   <button className="btn btn-outline btn-sm" onClick={handleLoadMore} disabled={loadingMore}>
                     {loadingMore ? "Loading more..." : "Load More Results"}
                   </button>
@@ -961,12 +832,11 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             </>
           )}
 
-          {/* DEMO PREVIEW — shows before first search */}
           {!loading && !searchDone && (
             <div className="demo-section">
               <div className="demo-header">
-                <span className="demo-label">Example: "Dentist" in Austin, TX</span>
-                <span className="count-tag" style={{opacity:0.5}}>✓ 20 leads found</span>
+                <span className="demo-label">Example: &quot;Dentist&quot; in Austin, TX</span>
+                <span className="count-tag" style={{opacity:0.5}}>{"\u2713"} 20 leads found</span>
               </div>
               <div className="demo-wrap">
                 <div className="table-wrap">
@@ -995,7 +865,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td className="site-cell">{lead.website}</td>
                           <td>
                             <div className="rating-cell">
-                              <span className="star">★</span> {lead.rating}
+                              <span className="star">{"\u2605"}</span> {lead.rating}
                               <span style={{color:"var(--muted)"}}> ({lead.reviews})</span>
                             </div>
                           </td>
@@ -1008,20 +878,19 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                   </table>
                 </div>
                 <div className="demo-cta">
-                  <p>Try it free — search any niche, any city</p>
+                  <p>Try it free &mdash; search any niche, any city</p>
                   <button className="btn btn-primary" onClick={() => document.querySelector('.field select')?.focus()}>
-                    Start Your First Search →
+                    Start Your First Search &rarr;
                   </button>
-                  <div className="sub">No credit card required · 5 leads free</div>
+                  <div className="sub">No credit card required &middot; 5 leads free</div>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* FOOTER */}
         <footer className="footer">
-          <div className="footer-left">© 2026 LeadReap</div>
+          <div className="footer-left">&copy; 2026 LeadReap</div>
           <div className="footer-right">
             <span className="footer-link">Privacy</span>
             <span className="footer-link">Terms</span>
@@ -1030,11 +899,10 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         </footer>
       </div>
 
-      {/* PRICING MODAL */}
       {showPricing && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowPricing(false)}>
           <div className="modal">
-            <button className="modal-close" onClick={() => setShowPricing(false)}>×</button>
+            <button className="modal-close" onClick={() => setShowPricing(false)}>&times;</button>
             <h2>One-time. No subscription.</h2>
             <p>Pay once, use forever. Every plan includes lifetime access + free updates.</p>
             <div className="pricing-grid">
@@ -1063,7 +931,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                   <div className="plan-features">
                     {plan.features.map((f, j) => (
                       <div key={j} className="plan-feature">
-                        <span className="check-icon">✓</span> {f}
+                        <span className="check-icon">{"\u2713"}</span> {f}
                       </div>
                     ))}
                   </div>
@@ -1072,21 +940,20 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                     style={{width:"100%", justifyContent:"center"}}
                     onClick={() => handleUnlock(plan.planId)}
                   >
-                    Get {plan.name} Access →
+                    Get {plan.name} Access &rarr;
                   </button>
                 </div>
               ))}
             </div>
             <p style={{textAlign:"center", marginTop:28, color:"var(--muted)", fontSize:13}}>
-              Secure checkout · 30-day money-back guarantee · Instant access
+              Secure checkout &middot; 30-day money-back guarantee &middot; Instant access
             </p>
           </div>
         </div>
       )}
 
-      {/* TOAST */}
       {toast && (
-        <div className="toast">✓ {isPro && !leads ? "Upgraded to PRO!" : isPro ? "CSV downloaded!" : "Welcome to PRO!"}</div>
+        <div className="toast">{"\u2713"} {isPro && !leads ? "Upgraded to PRO!" : isPro ? "CSV downloaded!" : "Welcome to PRO!"}</div>
       )}
     </>
   );
