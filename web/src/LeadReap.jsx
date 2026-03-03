@@ -402,7 +402,6 @@ const STYLE = `
 
   /* ─── MOBILE ─────────────────────────────────── */
   @media (max-width: 768px) {
-    /* NAV: just logo + action */
     .nav { padding: 12px 16px; gap: 8px; }
     .nav-actions { gap: 8px; }
     .nav-actions .btn-sm { padding: 6px 12px; font-size: 12px; }
@@ -411,7 +410,6 @@ const STYLE = `
     .nav-cta { display: none; }
     .badge { padding: 3px 8px; font-size: 10px; }
 
-    /* HERO: ultra-minimal — get to the tool fast */
     .hero { padding: 32px 20px 24px; }
     .hero-tag { display: none; }
     .hero h1 { font-size: 26px; letter-spacing: -0.8px; margin-bottom: 10px; line-height: 1.2; }
@@ -422,7 +420,6 @@ const STYLE = `
     .hero-stats { display: none; }
     .hero::before { display: none; }
 
-    /* SEARCH CARD — the star of the show */
     .tool-section { padding: 0 16px 48px; }
     .search-card { padding: 20px 16px; border-radius: 12px; margin-bottom: 16px; }
     .search-label { font-size: 10px; margin-bottom: 14px; }
@@ -432,25 +429,21 @@ const STYLE = `
     }
     .btn-primary { width: 100%; justify-content: center; height: 48px !important; font-size: 15px; }
 
-    /* OPTIONS ROW */
     .options-row { gap: 8px; margin-top: 12px; }
     .toggle-chip { padding: 6px 10px; font-size: 12px; }
     .options-hint { display: none; }
 
-    /* RESULTS */
     .results-header { flex-direction: column; gap: 12px; align-items: flex-start; }
     .results-meta { flex-wrap: wrap; gap: 8px; }
     .results-actions { width: 100%; display: flex; gap: 8px; }
     .results-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 12px; }
 
-    /* TABLE: horizontal scroll */
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { min-width: 700px; }
     th { padding: 10px 12px; font-size: 10px; }
     td { padding: 10px 12px; font-size: 12px; }
     .name-cell { font-size: 13px; }
 
-    /* UPSELL BANNERS */
     .upsell-banner {
       flex-direction: column !important; gap: 12px !important;
       text-align: center; padding: 14px 16px !important;
@@ -459,12 +452,10 @@ const STYLE = `
     .upgrade-bar { flex-direction: column; gap: 12px; padding: 18px 16px; }
     .upgrade-bar .btn { width: 100%; justify-content: center; }
 
-    /* LOADING */
     .loading-title { font-size: 16px; }
     .loading-sub { font-size: 12px; }
     .loading-tip { font-size: 12px; padding: 12px 16px; max-width: 100%; }
 
-    /* PRICING MODAL */
     .modal-overlay { padding: 12px; align-items: flex-start; overflow-y: auto; }
     .modal { padding: 24px 18px; border-radius: 14px; margin-top: 40px; }
     .modal h2 { font-size: 22px; }
@@ -474,17 +465,14 @@ const STYLE = `
     .plan-price { font-size: 32px; }
     .plan-feature { font-size: 13px; }
 
-    /* EMPTY STATE */
     .empty-state { padding: 48px 16px; }
     .empty-title { font-size: 17px; }
     .empty-sub { font-size: 13px; }
 
-    /* DEMO on mobile */
     .demo-header { flex-direction: column; gap: 6px; align-items: flex-start; }
     .demo-cta p { font-size: 14px; }
     .demo-cta .btn { font-size: 14px; }
 
-    /* FOOTER */
     .footer { flex-direction: column; gap: 10px; padding: 20px 16px; text-align: center; }
   }
 
@@ -609,7 +597,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   async function pollJob(jobId) {
     return new Promise((resolve, reject) => {
       let attempts = 0;
-      const MAX_ATTEMPTS = 120;
+      const MAX_ATTEMPTS = 300;
 
       pollRef.current = setInterval(async () => {
         attempts++;
@@ -682,6 +670,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   async function handleLoadMore() {
     if (!isPro) { setShowPricing(true); return; }
     setLoadingMore(true);
+    setSearchError("");
     try {
       const newLimit = (batchNum + 1) * 20;
       const res = await fetch(`${API_BASE}/api/leads/search`, {
@@ -704,7 +693,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             });
             const job = await r.json();
             if (job.status === "done") { clearInterval(iv); resolve(job.leads || []); }
-            else if (job.status === "error" || attempts > 180) { clearInterval(iv); reject(new Error(job.error || "Timed out")); }
+            else if (job.status === "error" || attempts > 300) { clearInterval(iv); reject(new Error(job.error || "Timed out")); }
           } catch (e) { clearInterval(iv); reject(e); }
         }, 1000);
       });
@@ -717,34 +706,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     } catch (e) {
       console.error(e);
       setSearchError("Failed to load more results — try again");
-    }
-    setLoadingMore(false);
-  }
-        },
-        body: JSON.stringify({ niche: targetNiche, location, limit: 20, scrapeEmails: includeEmail })
-      });
-      const { jobId } = await res.json();
-
-      const moreLeads = await new Promise((resolve, reject) => {
-        let attempts = 0;
-        const iv = setInterval(async () => {
-          attempts++;
-          const r = await fetch(`${API_BASE}/api/leads/job/${jobId}`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          });
-          const job = await r.json();
-          if (job.status === "done") { clearInterval(iv); resolve(job.leads || []); }
-          else if (job.status === "error" || attempts > 120) { clearInterval(iv); reject(new Error(job.error)); }
-        }, 1000);
-      });
-
-      const existingNames = new Set(leads.map(l => l.name));
-      const fresh = moreLeads.filter(l => !existingNames.has(l.name));
-      setLeads(prev => [...prev, ...fresh]);
-      setTotalLeads(prev => prev + fresh.length);
-      setBatchNum(b => b + 1);
-    } catch (e) {
-      console.error(e);
     }
     setLoadingMore(false);
   }
