@@ -13,12 +13,12 @@ import { getCached, setCached, recordStat } from "./cache.js";
 
 const CONFIG = {
   headless:          true,
-  concurrency:       parseInt(process.env.SCRAPER_CONCURRENCY   || "5"),
+  concurrency:       parseInt(process.env.SCRAPER_CONCURRENCY   || "8"),
   emailConcurrency:  parseInt(process.env.EMAIL_CONCURRENCY     || "8"),
   linkedInEnabled:   process.env.LINKEDIN_ENRICHMENT !== "false",
   scrollPause:       1000,
   navigationTimeout: 20000,
-  detailWait:        3000,
+  detailWait:        2000,
 };
 
 const SEL = {
@@ -310,7 +310,7 @@ async function scrapeListingByUrl(context, url) {
         if (!main) return false;
         const text = main.innerText || '';
         return /\(\d[\d,]*\)/.test(text) || /\d[\d,]*\s*reviews?/i.test(text);
-      }, { timeout: 3000 }).catch(() => null);
+      }, { timeout: 1500 }).catch(() => null);
 
       const [ratingText, reviewLabel, address, rawPhone, category, openedText] = await Promise.all([
         page.$eval(SEL.rating, el => el.textContent.trim()).catch(() => null),
