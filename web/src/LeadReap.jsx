@@ -683,11 +683,43 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     if (!isPro) { setShowPricing(true); return; }
     setLoadingMore(true);
     try {
+      const newLimit = (batchNum + 1) * 20;
       const res = await fetch(`${API_BASE}/api/leads/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ niche: targetNiche, location, limit: newLimit, scrapeEmails: includeEmail, forceRefresh: true })
+      });
+      const { jobId } = await res.json();
+
+      const moreLeads = await new Promise((resolve, reject) => {
+        let attempts = 0;
+        const iv = setInterval(async () => {
+          attempts++;
+          try {
+            const r = await fetch(`${API_BASE}/api/leads/job/${jobId}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            const job = await r.json();
+            if (job.status === "done") { clearInterval(iv); resolve(job.leads || []); }
+            else if (job.status === "error" || attempts > 180) { clearInterval(iv); reject(new Error(job.error || "Timed out")); }
+          } catch (e) { clearInterval(iv); reject(e); }
+        }, 1000);
+      });
+
+      const existingNames = new Set(leads.map(l => l.name));
+      const fresh = moreLeads.filter(l => !existingNames.has(l.name));
+      setLeads(prev => [...prev, ...fresh]);
+      setTotalLeads(prev => prev + fresh.length);
+      setBatchNum(b => b + 1);
+    } catch (e) {
+      console.error(e);
+      setSearchError("Failed to load more results — try again");
+    }
+    setLoadingMore(false);
+  }
         },
         body: JSON.stringify({ niche: targetNiche, location, limit: 20, scrapeEmails: includeEmail })
       });
