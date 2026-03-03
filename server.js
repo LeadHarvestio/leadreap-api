@@ -172,16 +172,17 @@ app.post("/api/webhook/stripe",
 
 // ── POST /api/leads/search — Queue a scrape job ──────────────
 app.post("/api/leads/search", ipRateLimit, requireSearchQuota, (req, res) => {
-  const { niche, location, limit = 20, scrapeEmails = true, forceRefresh = false } = req.body;
+  const { niche, location, limit = 20, offset = 0, scrapeEmails = true, forceRefresh = false } = req.body;
   if (!niche || !location) return res.status(400).json({ error: "niche and location required" });
 
   const plan = req.user?.plan || "free";
   const maxLimit = plan === "free" ? 20 : 60;
   const safeLimit = Math.min(limit, maxLimit);
+  const safeOffset = plan === "free" ? 0 : Math.max(0, offset);
 
   if (req.user) recordSearch(req.user.id);
 
-  const job = createJob({ niche, location, limit: safeLimit, scrapeEmails, forceRefresh });
+  const job = createJob({ niche, location, limit: safeLimit, offset: safeOffset, scrapeEmails, forceRefresh });
   return res.json({ jobId: job.id, status: job.status });
 });
 
