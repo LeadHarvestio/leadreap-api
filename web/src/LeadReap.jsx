@@ -426,12 +426,10 @@ function generateCSV(leads) {
 }
 
 const LOADING_STEPS = [
-  "Searching your area...",
-  "Finding local businesses...",
-  "Pulling contact details...",
-  "Verifying emails...",
-  "Scoring lead quality...",
-  "Preparing your results...",
+  "Scanning Google Maps...",
+  "Collecting business details...",
+  "Extracting emails & social profiles...",
+  "Running AI lead scoring...",
 ];
 
 const LOADING_TIPS = [
@@ -496,8 +494,14 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
           const job = await res.json();
-          // Advance steps gradually (~1 step per 25s to span full scrape duration)
-          const nextStep = Math.min(Math.floor(attempts / 25), LOADING_STEPS.length - 1);
+          // Advance steps to match typical 20-30s scrape duration
+          // Step 0 (0-4s): Scanning Maps, Step 1 (4-10s): Collecting details,
+          // Step 2 (10-18s): Extracting emails, Step 3 (18s+): AI scoring
+          let nextStep;
+          if (attempts < 4) nextStep = 0;
+          else if (attempts < 10) nextStep = 1;
+          else if (attempts < 18) nextStep = 2;
+          else nextStep = 3;
           setLoadStep(nextStep);
           setPollAttempts(attempts);
 
@@ -622,7 +626,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   }
 
   const visibleLeads = isPro ? leads : leads.slice(0, 5);
-  const progressPercent = loading ? Math.min(92, (pollAttempts / 150) * 92) : (searchDone ? 100 : 0);
+  // Easing curve: fast early, slows near end — reaches ~90% at 25s, asymptotes at 95%
+  const progressPercent = loading ? Math.min(95, 95 * (1 - Math.exp(-pollAttempts / 10))) : (searchDone ? 100 : 0);
   const displayTotal = totalLeads > leads.length ? totalLeads : leads.length;
 
   return (
@@ -716,7 +721,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 <div className="loading-title">
                   Finding <span style={{ color: "var(--accent)" }}>{targetNiche}</span> leads in <span style={{ color: "var(--accent)" }}>{location}</span>
                 </div>
-                <div className="loading-sub">This typically takes 30&ndash;60 seconds</div>
+                <div className="loading-sub">This typically takes 15&ndash;30 seconds</div>
                 <div className="progress-track">
                   <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
                 </div>
