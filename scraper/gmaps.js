@@ -254,26 +254,56 @@ export const metrics = {
 
 async function collectListingUrls(page, limit) {
   const seen = new Set();
-  const urls = [];
+  const listings = []; // Now returns {url, searchRating, searchReviews} objects
   let noNewCount = 0;
 
-  for (let attempt = 0; attempt < 35 && urls.length < limit; attempt++) {
-    const hrefs = await page.$$eval(SEL.resultLinks, els =>
-      els.map(el => el.href).filter(h => h.includes("/maps/place/"))
+  for (let attempt = 0; attempt < 35 && listings.length < limit; attempt++) {
+    // Extract URLs AND review data from search result cards
+    const items = await page.$$eval(SEL.resultLinks, els =>
+      els.map(el => {
+        const href = el.href;
+        if (!href.includes("/maps/place/")) return null;
+
+        // Walk up to find the result card container
+        let card = el;
+        for (let i = 0; i < 8; i++) {
+          if (!card.parentElement) break;
+          card = card.parentElement;
+          // Stop at a reasonable container level
+          if (card.getAttribute('jsaction') || card.classList.contains('Nv2PK') || card.classList.contains('THODhf')) break;
+        }
+
+        const cardText = card?.innerText || '';
+
+        // Extract rating: look for patterns like "4.9" near stars
+        let rating = null;
+        const ratingMatch = cardText.match(/^[\s\S]*?(\d\.\d)\s*(?:\(\d|star)/m) || cardText.match(/(\d\.\d)/);
+        if (ratingMatch) rating = parseFloat(ratingMatch[1]);
+
+        // Extract review count: "(123)" or "(1,234)"
+        let reviews = 0;
+        const reviewMatch = cardText.match(/\(([\d,]+)\)/);
+        if (reviewMatch) reviews = parseInt(reviewMatch[1].replace(/,/g, ''), 10);
+
+        return { href, rating, reviews };
+      }).filter(Boolean)
     ).catch(() => []);
 
-    const prevCount = urls.length;
-    for (const href of hrefs) {
-      const base = href.split("?")[0];
-      if (!seen.has(base)) { seen.add(base); urls.push(href); }
-      if (urls.length >= limit) break;
+    const prevCount = listings.length;
+    for (const item of items) {
+      const base = item.href.split("?")[0];
+      if (!seen.has(base)) {
+        seen.add(base);
+        listings.push({ url: item.href, searchRating: item.rating, searchReviews: item.reviews });
+      }
+      if (listings.length >= limit) break;
     }
-    if (urls.length >= limit) break;
+    if (listings.length >= limit) break;
 
-    if (urls.length === prevCount) {
+    if (listings.length === prevCount) {
       noNewCount++;
       if (noNewCount >= 3) {
-        console.log(`  → Scroll exhausted at ${urls.length} URLs after ${attempt + 1} scrolls`);
+        console.log(`  → Scroll exhausted at ${listings.length} URLs after ${attempt + 1} scrolls`);
         break;
       }
     } else {
@@ -288,10 +318,13 @@ async function collectListingUrls(page, limit) {
     await sleep(CONFIG.scrollPause);
   }
 
-  return urls.slice(0, limit);
+  const result = listings.slice(0, limit);
+  const withReviews = result.filter(l => l.searchReviews > 0).length;
+  console.log(`  → Search page extracted ${withReviews}/${result.length} review counts`);
+  return result;
 }
 
-async function scrapeListingByUrl(context, url) {
+async function scrapeListingByUrl(context, url, searchData = {}) {
   return withRetry(async () => {
     const page = await context.newPage();
     page.setDefaultNavigationTimeout(CONFIG.navigationTimeout);
@@ -303,14 +336,8 @@ async function scrapeListingByUrl(context, url) {
       const name = await page.$eval(SEL.businessName, el => el.textContent.trim()).catch(() => null);
       if (!name) throw new Error("No business name found");
 
-      // KEY FIX: Wait for review count to lazy-load into the page
-      // Google renders the rating first, then injects the review count shortly after
-      await page.waitForFunction(() => {
-        const main = document.querySelector('div[role="main"]');
-        if (!main) return false;
-        const text = main.innerText || '';
-        return /\(\d[\d,]*\)/.test(text) || /\d[\d,]*\s*reviews?/i.test(text);
-      }, { timeout: 1500 }).catch(() => null);
+      // Note: Google serves stripped detail pages to headless browsers (no review counts).
+      // Review counts are extracted from the search results page in Phase 1 and passed via searchData.
 
       const [ratingText, reviewLabel, address, rawPhone, category, openedText] = await Promise.all([
         page.$eval(SEL.rating, el => el.textContent.trim()).catch(() => null),
@@ -320,25 +347,6 @@ async function scrapeListingByUrl(context, url) {
         page.$eval(SEL.category, el => el.textContent.trim()).catch(() => null),
         page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
       ]);
-
-      // DEBUG: Log what we found for reviews
-      const debugInfo = await page.evaluate(() => {
-        const main = document.querySelector('div[role="main"]');
-        const mainText = main ? (main.innerText || '').substring(0, 500) : 'NO MAIN';
-        const nice = document.querySelector('div.F7nice');
-        const niceHTML = nice ? nice.outerHTML : 'NO F7nice';
-        const niceParentText = nice?.parentElement?.innerText?.substring(0, 200) || 'N/A';
-        const allAria = Array.from(document.querySelectorAll('[aria-label]'))
-          .map(el => el.getAttribute('aria-label'))
-          .filter(l => /review|rating|\d+/i.test(l))
-          .slice(0, 10);
-        return { mainText, niceHTML, niceParentText, allAria };
-      }).catch(() => ({}));
-      console.log(`  🔍 DEBUG [${name}]: reviewLabel=${reviewLabel}, rating=${ratingText}`);
-      console.log(`  🔍 F7nice HTML: ${debugInfo.niceHTML?.substring(0, 300)}`);
-      console.log(`  🔍 F7nice parent text: ${debugInfo.niceParentText}`);
-      console.log(`  🔍 Relevant aria-labels: ${JSON.stringify(debugInfo.allAria)}`);
-      console.log(`  🔍 Main text (first 300): ${debugInfo.mainText?.substring(0, 300)}`);
 
       let finalReviewLabel = reviewLabel;
 
@@ -404,7 +412,13 @@ async function scrapeListingByUrl(context, url) {
           return null;
         }).catch(() => null);
       }
-      console.log(`  🔍 FINAL [${name}]: finalReviewLabel=${finalReviewLabel}, parsed=${parseReviewCount(finalReviewLabel)}`);
+
+      // Use search-page data as fallback when detail page doesn't have reviews
+      // (Google serves stripped pages to headless browsers)
+      const detailReviews = parseReviewCount(finalReviewLabel);
+      const finalReviews = detailReviews > 0 ? detailReviews : (searchData.searchReviews || 0);
+      const detailRating = parseRating(ratingText);
+      const finalRating = detailRating || searchData.searchRating || null;
 
       const websiteEl = await page.$(SEL.website);
       const rawWebsite = websiteEl ? await websiteEl.getAttribute("href") : null;
@@ -422,10 +436,8 @@ async function scrapeListingByUrl(context, url) {
         email: null,
         emailQuality: null,
         emailQualityLabel: null,
-        rating: parseRating(ratingText),
-        reviews: parseReviewCount(finalReviewLabel),
-        // DEBUG: log final review value
-        _debug_reviewLabel: finalReviewLabel,
+        rating: finalRating,
+        reviews: finalReviews,
         category: category || null,
         yearOpened: parseYearOpened(openedText),
         techStack: [],
@@ -604,7 +616,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
       return [];
     }
 
-    const listingUrls = await collectListingUrls(searchPage, limit);
+    const listings = await collectListingUrls(searchPage, limit);
 
     const check2 = await detectBlock(searchPage);
     if (check2.blocked) {
@@ -615,14 +627,14 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
     }
 
     await searchPage.close();
-    console.log(`  ✓ Phase 1: ${listingUrls.length} URLs in ${Date.now() - t1}ms`);
+    console.log(`  ✓ Phase 1: ${listings.length} URLs in ${Date.now() - t1}ms`);
 
     const t2 = Date.now();
-    console.log(`  → Phase 2: Scraping ${listingUrls.length} listings (${CONFIG.concurrency} parallel)...`);
+    console.log(`  → Phase 2: Scraping ${listings.length} listings (${CONFIG.concurrency} parallel)...`);
 
-    const detailTasks = listingUrls.map((url, i) => async () => {
-      const data = await scrapeListingByUrl(context, url);
-      process.stdout.write(`  [${i+1}/${listingUrls.length}] ${data ? `✓ ${data.name}` : "✗ failed"}\n`);
+    const detailTasks = listings.map((listing, i) => async () => {
+      const data = await scrapeListingByUrl(context, listing.url, listing);
+      process.stdout.write(`  [${i+1}/${listings.length}] ${data ? `✓ ${data.name} (${data.reviews} reviews)` : "✗ failed"}\n`);
       return data;
     });
 
