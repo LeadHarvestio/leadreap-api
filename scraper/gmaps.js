@@ -321,6 +321,25 @@ async function scrapeListingByUrl(context, url) {
         page.$eval(SEL.openedDate, el => el.textContent.trim()).catch(() => null),
       ]);
 
+      // DEBUG: Log what we found for reviews
+      const debugInfo = await page.evaluate(() => {
+        const main = document.querySelector('div[role="main"]');
+        const mainText = main ? (main.innerText || '').substring(0, 500) : 'NO MAIN';
+        const nice = document.querySelector('div.F7nice');
+        const niceHTML = nice ? nice.outerHTML : 'NO F7nice';
+        const niceParentText = nice?.parentElement?.innerText?.substring(0, 200) || 'N/A';
+        const allAria = Array.from(document.querySelectorAll('[aria-label]'))
+          .map(el => el.getAttribute('aria-label'))
+          .filter(l => /review|rating|\d+/i.test(l))
+          .slice(0, 10);
+        return { mainText, niceHTML, niceParentText, allAria };
+      }).catch(() => ({}));
+      console.log(`  🔍 DEBUG [${name}]: reviewLabel=${reviewLabel}, rating=${ratingText}`);
+      console.log(`  🔍 F7nice HTML: ${debugInfo.niceHTML?.substring(0, 300)}`);
+      console.log(`  🔍 F7nice parent text: ${debugInfo.niceParentText}`);
+      console.log(`  🔍 Relevant aria-labels: ${JSON.stringify(debugInfo.allAria)}`);
+      console.log(`  🔍 Main text (first 300): ${debugInfo.mainText?.substring(0, 300)}`);
+
       let finalReviewLabel = reviewLabel;
 
       // Fallback: comprehensive page-wide extraction
@@ -385,6 +404,7 @@ async function scrapeListingByUrl(context, url) {
           return null;
         }).catch(() => null);
       }
+      console.log(`  🔍 FINAL [${name}]: finalReviewLabel=${finalReviewLabel}, parsed=${parseReviewCount(finalReviewLabel)}`);
 
       const websiteEl = await page.$(SEL.website);
       const rawWebsite = websiteEl ? await websiteEl.getAttribute("href") : null;
@@ -404,6 +424,8 @@ async function scrapeListingByUrl(context, url) {
         emailQualityLabel: null,
         rating: parseRating(ratingText),
         reviews: parseReviewCount(finalReviewLabel),
+        // DEBUG: log final review value
+        _debug_reviewLabel: finalReviewLabel,
         category: category || null,
         yearOpened: parseYearOpened(openedText),
         techStack: [],
