@@ -401,11 +401,11 @@ const INDUSTRIES = [
 ];
 
 const DEMO_LEADS = [
-  { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, reviews: 312, score: 94, unclaimed: false, linkedinCompany: "https://linkedin.com/company/brightsmile", linkedinPerson: null, notes: "Running Facebook Pixel — active ad spend, good agency target." },
-  { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, reviews: 189, score: 87, unclaimed: false, linkedinCompany: null, linkedinPerson: null, notes: "High-authority listing — established reputation, ideal outreach target." },
-  { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, reviews: 245, score: 82, unclaimed: false, linkedinCompany: null, linkedinPerson: "https://linkedin.com/in/drsmith", ownerName: "Dr. Smith", notes: "Contact Dr. Smith directly — owner identified." },
-  { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, reviews: 97, score: 78, unclaimed: true, linkedinCompany: null, linkedinPerson: null, notes: "Unclaimed Google listing — owner hasn't claimed it, prime opportunity to pitch GMB management." },
-  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "\u2014", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, reviews: 64, score: 65, unclaimed: false, linkedinCompany: null, linkedinPerson: null, notes: "Wix site — likely small budget, pitch affordable web upgrades" },
+  { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, score: 94, unclaimed: false, linkedinCompany: "https://linkedin.com/company/brightsmile", facebook: "https://facebook.com/brightsmile", instagram: "https://instagram.com/brightsmile", twitter: null, linkedinPerson: null, notes: "Running Facebook Pixel — active ad spend, good agency target." },
+  { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, score: 87, unclaimed: false, linkedinCompany: null, facebook: "https://facebook.com/hillcountrydental", instagram: null, twitter: null, linkedinPerson: null, notes: "High-authority listing — established reputation, ideal outreach target." },
+  { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, score: 82, unclaimed: false, linkedinCompany: null, facebook: null, instagram: "https://instagram.com/atxdental", twitter: null, linkedinPerson: "https://linkedin.com/in/drsmith", ownerName: "Dr. Smith", notes: "Contact Dr. Smith directly — owner identified." },
+  { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, score: 78, unclaimed: true, linkedinCompany: null, facebook: null, instagram: null, twitter: null, linkedinPerson: null, notes: "Unclaimed Google listing — owner hasn't claimed it, prime opportunity to pitch GMB management." },
+  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "\u2014", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, score: 65, unclaimed: false, linkedinCompany: null, facebook: null, instagram: null, twitter: null, linkedinPerson: null, notes: "Has website but no social media links — pitch social media management." },
 ];
 
 function scoreToClass(score) {
@@ -415,11 +415,11 @@ function scoreToClass(score) {
 }
 
 function generateCSV(leads) {
-  const headers = ["Business Name", "Email", "Phone", "Website", "Address", "Rating", "Unclaimed", "LinkedIn Company", "LinkedIn Person", "Lead Score", "Insight"];
+  const headers = ["Business Name", "Email", "Phone", "Website", "Address", "Rating", "Unclaimed", "LinkedIn", "Facebook", "Instagram", "Twitter", "Lead Score", "Insight"];
   const rows = leads.map(l => [
     `"${l.name}"`, l.email || "", l.phone || "", l.website || "", `"${l.address || ""}"`,
     l.rating || "", l.unclaimed ? "Yes" : "No",
-    l.linkedinCompany || "", l.linkedinPerson || "",
+    l.linkedinCompany || l.linkedinPerson || "", l.facebook || "", l.instagram || "", l.twitter || "",
     l.score, `"${(l.notes || "").replace(/"/g, '""')}"`
   ]);
   return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
@@ -789,7 +789,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                         {includeEmail && <th>Email</th>}
                         {includePhone && <th>Phone</th>}
                         <th>Website</th>
-                        {includeSocial && <th>Social</th>}
                         <th>Rating</th>
                         <th>Lead Score</th>
                         <th>Insight</th>
@@ -802,29 +801,21 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td>
                             <div className="name-cell">{lead.name}</div>
                             <div style={{fontSize:11,color:"var(--muted)",marginTop:2,fontFamily:"IBM Plex Mono"}}>{lead.address}</div>
+                            {includeSocial && (lead.linkedinCompany || lead.linkedinPerson || lead.facebook || lead.instagram || lead.twitter) && (
+                              <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap"}}>
+                                {lead.linkedinCompany && <a href={lead.linkedinCompany} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#0a66c2",textDecoration:"none"}}>LinkedIn</a>}
+                                {lead.linkedinPerson && <a href={lead.linkedinPerson} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#0a66c2",textDecoration:"none"}}>{lead.ownerName ? `in/${lead.ownerName}` : "LinkedIn Owner"}</a>}
+                                {lead.facebook && <a href={lead.facebook} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#1877f2",textDecoration:"none"}}>Facebook</a>}
+                                {lead.instagram && <a href={lead.instagram} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#e1306c",textDecoration:"none"}}>Instagram</a>}
+                                {lead.twitter && <a href={lead.twitter} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#1da1f2",textDecoration:"none"}}>X/Twitter</a>}
+                              </div>
+                            )}
                           </td>
                           {includeEmail && <td className="email-cell">{lead.email || "\u2014"}</td>}
                           {includePhone && <td className="phone-cell">{lead.phoneDisplay || lead.phone || "\u2014"}</td>}
                           <td className="site-cell">
                             {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "\u2014"}
                           </td>
-                          {includeSocial && (
-                            <td style={{fontSize:12}}>
-                              <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                                {lead.linkedinCompany ? (
-                                  <a href={lead.linkedinCompany} target="_blank" rel="noopener noreferrer" style={{color:"#0a66c2",textDecoration:"none",display:"flex",alignItems:"center",gap:4}}>
-                                    <span style={{fontSize:10}}>in</span> Company
-                                  </a>
-                                ) : null}
-                                {lead.linkedinPerson ? (
-                                  <a href={lead.linkedinPerson} target="_blank" rel="noopener noreferrer" style={{color:"#0a66c2",textDecoration:"none",display:"flex",alignItems:"center",gap:4}}>
-                                    <span style={{fontSize:10}}>in</span> {lead.ownerName || "Owner"}
-                                  </a>
-                                ) : null}
-                                {!lead.linkedinCompany && !lead.linkedinPerson && <span style={{color:"var(--muted)"}}>—</span>}
-                              </div>
-                            </td>
-                          )}
                           <td>
                             <div className="rating-cell">
                               <span className="star">{"\u2605"}</span> {lead.rating || "\u2014"}
