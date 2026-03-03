@@ -185,7 +185,7 @@ function calculateLeadScore({ rating, reviews, hasWebsite, hasPhone, emailQualit
   return Math.min(99, Math.max(20, score));
 }
 
-function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, score, ownerName, unclaimed }) {
+function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, score, ownerName, unclaimed, hasSocial }) {
   if (unclaimed) return "Unclaimed Google listing — owner hasn't claimed it, prime opportunity to pitch GMB management.";
   if (ownerName) return `Contact ${ownerName} directly — owner identified.`;
   const adsTech = techStack?.find(t => t.category === "Paid Ads");
@@ -193,6 +193,7 @@ function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, sc
   const builderTech = techStack?.find(t => t.pitchNote && t.category === "Website Builder");
   if (builderTech) return builderTech.pitchNote;
   if (!hasWebsite) return "No website — strong pitch opportunity for web/digital services.";
+  if (hasWebsite && !hasSocial) return "Has website but no social media links — pitch social media management.";
   if (score >= 85) return "High-authority listing — established reputation, ideal outreach target.";
   if (reviews < 20) return "Low review count — may need reputation management services.";
   if (rating && rating < 3.8) return "Below-average rating — could benefit from marketing/review strategy.";
@@ -391,6 +392,9 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
         techStackSummary: null,
         linkedinCompany: null,
         linkedinPerson: null,
+        facebook: null,
+        instagram: null,
+        twitter: null,
         ownerName: null,
         ownerTitle: null,
         unclaimed: unclaimed || false,
@@ -437,6 +441,22 @@ async function enrichWebsite(context, lead) {
 
       const emailAssessment = assessEmail(email);
 
+      // Extract social media links from the website — free since we're already on the page
+      const socialLinks = await page.$$eval('a[href]', els => {
+        const links = {};
+        for (const el of els) {
+          const href = (el.href || '').toLowerCase();
+          if (href.includes('linkedin.com/company') && !links.linkedin) links.linkedin = el.href;
+          if (href.includes('linkedin.com/in/') && !links.linkedinPerson) links.linkedinPerson = el.href;
+          if (href.includes('facebook.com/') && !href.includes('facebook.com/sharer') && !links.facebook) links.facebook = el.href;
+          if (href.includes('instagram.com/') && !links.instagram) links.instagram = el.href;
+          if ((href.includes('twitter.com/') || href.includes('x.com/')) && !links.twitter) links.twitter = el.href;
+          if (href.includes('youtube.com/') && !links.youtube) links.youtube = el.href;
+          if (href.includes('tiktok.com/') && !links.tiktok) links.tiktok = el.href;
+        }
+        return links;
+      }).catch(() => ({}));
+
       return {
         ...lead,
         email: emailAssessment.valid ? email : null,
@@ -444,6 +464,11 @@ async function enrichWebsite(context, lead) {
         emailQualityLabel: emailAssessment.qualityLabel,
         techStack,
         techStackSummary: summarizeTechStack(techStack),
+        linkedinCompany: socialLinks.linkedin || lead.linkedinCompany || null,
+        linkedinPerson: socialLinks.linkedinPerson || lead.linkedinPerson || null,
+        facebook: socialLinks.facebook || null,
+        instagram: socialLinks.instagram || null,
+        twitter: socialLinks.twitter || null,
       };
     } finally {
       await page.close();
@@ -626,6 +651,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, scrapeEmai
         techStack: lead.techStack,
         ownerName: lead.ownerName,
         unclaimed: lead.unclaimed,
+        hasSocial: !!(lead.facebook || lead.instagram || lead.linkedinCompany || lead.twitter),
         score,
       }),
     };
