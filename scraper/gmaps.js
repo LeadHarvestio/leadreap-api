@@ -406,19 +406,40 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
   }, { attempts: 3, baseMs: 1500, label: `detail:${url.split("/maps/place/")[1]?.slice(0, 20)}` });
 }
 
-const EMAIL_BLACKLIST = ["example.com", "sentry.io", "wix.com", "squarespace.com",
-  "wordpress.com", "godaddy.com", "schema.org", "w3.org", "jquery.com",
-  "cloudflare.com", "googleapis.com", "gstatic.com", "gravatar.com",
-  "wp.com", "creativecommons.org", "mozilla.org", "apache.org",
-  "bootstrapcdn.com", "fontawesome.com", "google.com", "facebook.com",
-  "twitter.com", "instagram.com", "youtube.com", "linkedin.com"];
+const EMAIL_BLACKLIST = [
+  // Platform/framework domains
+  "example.com", "domain.com", "mystore.com", "yoursite.com", "yourdomain.com",
+  "email.com", "test.com", "sample.com", "placeholder.com",
+  "sentry.io", "sentry-next.", "wixpress.com", "wix.com", "squarespace.com",
+  "wordpress.com", "godaddy.com", "weebly.com", "shopify.com",
+  "webflow.io", "netlify.app", "vercel.app", "herokuapp.com",
+  // Tech/CDN domains
+  "schema.org", "w3.org", "jquery.com", "cloudflare.com",
+  "googleapis.com", "gstatic.com", "gravatar.com", "wp.com",
+  "creativecommons.org", "mozilla.org", "apache.org",
+  "bootstrapcdn.com", "fontawesome.com",
+  // Social platforms
+  "google.com", "facebook.com", "twitter.com", "instagram.com",
+  "youtube.com", "linkedin.com", "tiktok.com",
+];
+
+// Catch generic placeholder/template usernames
+const EMAIL_PLACEHOLDER_USERS = [
+  "user", "test", "admin", "info@example", "your", "name",
+  "email", "hi@mystore", "hello@mystore", "contact@mystore",
+  "noreply", "no-reply", "mailer-daemon", "postmaster",
+];
 
 function extractEmailFromText(text) {
   if (!text) return null;
   const matches = (text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [])
-    .filter(e => !EMAIL_BLACKLIST.some(b => e.toLowerCase().includes(b)))
-    .filter(e => !e.endsWith(".png") && !e.endsWith(".jpg") && !e.endsWith(".svg") && !e.endsWith(".gif"))
-    .filter(e => !e.startsWith("0") && !e.startsWith("1"));
+    .map(e => e.toLowerCase())
+    .filter(e => !EMAIL_BLACKLIST.some(b => e.includes(b)))
+    .filter(e => !e.endsWith(".png") && !e.endsWith(".jpg") && !e.endsWith(".svg") && !e.endsWith(".gif") && !e.endsWith(".js") && !e.endsWith(".css"))
+    .filter(e => !e.startsWith("0") && !e.startsWith("1"))
+    .filter(e => !EMAIL_PLACEHOLDER_USERS.some(p => e.startsWith(p + "@") || e === p))
+    .filter(e => e.length < 60) // Sentry hashes are long gibberish
+    .filter(e => !/^[a-f0-9]{16,}@/.test(e)); // Filter hex hash usernames (Sentry IDs)
   return matches[0] || null;
 }
 
