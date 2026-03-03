@@ -494,13 +494,13 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
           const job = await res.json();
-          // Advance steps to match typical 20-30s scrape duration
-          // Step 0 (0-4s): Scanning Maps, Step 1 (4-10s): Collecting details,
-          // Step 2 (10-18s): Extracting emails, Step 3 (18s+): AI scoring
+          // Advance steps to match scrape duration
+          // 20 results: ~20-30s, 40 results: ~35-50s
           let nextStep;
-          if (attempts < 4) nextStep = 0;
-          else if (attempts < 10) nextStep = 1;
-          else if (attempts < 18) nextStep = 2;
+          const t = isPro ? [6, 16, 28] : [4, 10, 18];
+          if (attempts < t[0]) nextStep = 0;
+          else if (attempts < t[1]) nextStep = 1;
+          else if (attempts < t[2]) nextStep = 2;
           else nextStep = 3;
           setLoadStep(nextStep);
           setPollAttempts(attempts);
@@ -543,7 +543,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ niche: targetNiche, location, limit: 20, scrapeEmails: includeEmail })
+        body: JSON.stringify({ niche: targetNiche, location, limit: isPro ? 40 : 20, scrapeEmails: includeEmail })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -570,14 +570,14 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     setLoadingMore(true);
     setSearchError("");
     try {
-      const newLimit = (batchNum + 1) * 20;
+      const currentOffset = leads.length;
       const res = await fetch(`${API_BASE}/api/leads/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ niche: targetNiche, location, limit: newLimit, scrapeEmails: includeEmail, forceRefresh: true })
+        body: JSON.stringify({ niche: targetNiche, location, limit: 20, offset: currentOffset, scrapeEmails: includeEmail, forceRefresh: true })
       });
       const { jobId } = await res.json();
 
@@ -626,8 +626,9 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   }
 
   const visibleLeads = isPro ? leads : leads.slice(0, 5);
-  // Easing curve: fast early, slows near end — reaches ~90% at 25s, asymptotes at 95%
-  const progressPercent = loading ? Math.min(95, 95 * (1 - Math.exp(-pollAttempts / 10))) : (searchDone ? 100 : 0);
+  // Easing curve: fast early, slows near end — adapts to 20 vs 40 result searches
+  const decayRate = isPro ? 14 : 10;
+  const progressPercent = loading ? Math.min(95, 95 * (1 - Math.exp(-pollAttempts / decayRate))) : (searchDone ? 100 : 0);
   const displayTotal = totalLeads > leads.length ? totalLeads : leads.length;
 
   return (
@@ -709,7 +710,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 </label>
               ))}
               <span className="options-hint" style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>
-                FREE: 5 leads preview &middot; PRO: unlimited exports
+                FREE: 5 leads preview &middot; PRO: 40 leads + exports
               </span>
             </div>
           </div>
@@ -721,7 +722,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 <div className="loading-title">
                   Finding <span style={{ color: "var(--accent)" }}>{targetNiche}</span> leads in <span style={{ color: "var(--accent)" }}>{location}</span>
                 </div>
-                <div className="loading-sub">This typically takes 15&ndash;30 seconds</div>
+                <div className="loading-sub">This typically takes {isPro ? "25\u201345" : "15\u201330"} seconds</div>
                 <div className="progress-track">
                   <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
                 </div>
