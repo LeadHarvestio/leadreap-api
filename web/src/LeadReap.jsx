@@ -401,11 +401,11 @@ const INDUSTRIES = [
 ];
 
 const DEMO_LEADS = [
-  { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, reviews: 312, score: 94, notes: "High review count, active website, email verified" },
-  { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, reviews: 189, score: 87, notes: "Strong Google presence, recently updated listing" },
-  { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, reviews: 245, score: 82, notes: "Multiple locations, good engagement" },
-  { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, reviews: 97, score: 71, notes: "Premium area, newer practice" },
-  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "\u2014", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, reviews: 64, score: 65, notes: "No email found, phone verified" },
+  { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, reviews: 312, score: 94, unclaimed: false, linkedinCompany: "https://linkedin.com/company/brightsmile", linkedinPerson: null, notes: "Running Facebook Pixel — active ad spend, good agency target." },
+  { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, reviews: 189, score: 87, unclaimed: false, linkedinCompany: null, linkedinPerson: null, notes: "High-authority listing — established reputation, ideal outreach target." },
+  { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, reviews: 245, score: 82, unclaimed: false, linkedinCompany: null, linkedinPerson: "https://linkedin.com/in/drsmith", ownerName: "Dr. Smith", notes: "Contact Dr. Smith directly — owner identified." },
+  { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, reviews: 97, score: 78, unclaimed: true, linkedinCompany: null, linkedinPerson: null, notes: "Unclaimed Google listing — owner hasn't claimed it, prime opportunity to pitch GMB management." },
+  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "\u2014", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, reviews: 64, score: 65, unclaimed: false, linkedinCompany: null, linkedinPerson: null, notes: "Wix site — likely small budget, pitch affordable web upgrades" },
 ];
 
 function scoreToClass(score) {
@@ -415,9 +415,12 @@ function scoreToClass(score) {
 }
 
 function generateCSV(leads) {
-  const headers = ["Business Name", "Email", "Phone", "Website", "Rating", "Reviews", "City", "Lead Score"];
+  const headers = ["Business Name", "Email", "Phone", "Website", "Address", "Rating", "Unclaimed", "LinkedIn Company", "LinkedIn Person", "Lead Score", "Insight"];
   const rows = leads.map(l => [
-    `"${l.name}"`, l.email, l.phone, l.website, l.rating, l.reviews, `"${l.city}"`, l.score
+    `"${l.name}"`, l.email || "", l.phone || "", l.website || "", `"${l.address || ""}"`,
+    l.rating || "", l.unclaimed ? "Yes" : "No",
+    l.linkedinCompany || "", l.linkedinPerson || "",
+    l.score, `"${(l.notes || "").replace(/"/g, '""')}"`
   ]);
   return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
 }
@@ -435,10 +438,10 @@ const LOADING_TIPS = [
   { text: "Leads with a 4.5+ star rating tend to convert 3x better for outreach.", label: "Insight" },
   { text: "Export your results to CSV for easy import into any CRM platform.", label: "Pro tip" },
   { text: "Businesses without websites are prime targets for web design services.", label: "Sales angle" },
-  { text: "The Lead Score factors in rating, reviews, email quality, and tech stack.", label: "How it works" },
+  { text: "The Lead Score factors in rating, email quality, tech stack, and listing status.", label: "How it works" },
   { text: "Leads running Facebook Pixel are already spending on ads \u2014 warm prospects.", label: "Insight" },
   { text: "Try narrowing your location to a zip code for more targeted results.", label: "Pro tip" },
-  { text: "Low review count businesses often need reputation management services.", label: "Sales angle" },
+  { text: "Unclaimed Google listings are gold \u2014 the owner needs help managing their online presence.", label: "Sales angle" },
   { text: "Businesses on Wix or Squarespace are often open to a website redesign.", label: "Insight" },
 ];
 
@@ -786,6 +789,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                         {includeEmail && <th>Email</th>}
                         {includePhone && <th>Phone</th>}
                         <th>Website</th>
+                        {includeSocial && <th>Social</th>}
                         <th>Rating</th>
                         <th>Lead Score</th>
                         <th>Insight</th>
@@ -804,10 +808,29 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td className="site-cell">
                             {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "\u2014"}
                           </td>
+                          {includeSocial && (
+                            <td style={{fontSize:12}}>
+                              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                                {lead.linkedinCompany ? (
+                                  <a href={lead.linkedinCompany} target="_blank" rel="noopener noreferrer" style={{color:"#0a66c2",textDecoration:"none",display:"flex",alignItems:"center",gap:4}}>
+                                    <span style={{fontSize:10}}>in</span> Company
+                                  </a>
+                                ) : null}
+                                {lead.linkedinPerson ? (
+                                  <a href={lead.linkedinPerson} target="_blank" rel="noopener noreferrer" style={{color:"#0a66c2",textDecoration:"none",display:"flex",alignItems:"center",gap:4}}>
+                                    <span style={{fontSize:10}}>in</span> {lead.ownerName || "Owner"}
+                                  </a>
+                                ) : null}
+                                {!lead.linkedinCompany && !lead.linkedinPerson && <span style={{color:"var(--muted)"}}>—</span>}
+                              </div>
+                            </td>
+                          )}
                           <td>
                             <div className="rating-cell">
                               <span className="star">{"\u2605"}</span> {lead.rating || "\u2014"}
-                              <span style={{color:"var(--muted)"}}> ({lead.reviews || 0})</span>
+                              {lead.unclaimed && (
+                                <span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:"#f59e0b22",color:"#f59e0b",fontWeight:600,whiteSpace:"nowrap"}}>UNCLAIMED</span>
+                              )}
                             </div>
                           </td>
                           <td>
@@ -871,7 +894,9 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td>
                             <div className="rating-cell">
                               <span className="star">{"\u2605"}</span> {lead.rating}
-                              <span style={{color:"var(--muted)"}}> ({lead.reviews})</span>
+                              {lead.unclaimed && (
+                                <span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:4,background:"#f59e0b22",color:"#f59e0b",fontWeight:600,whiteSpace:"nowrap"}}>UNCLAIMED</span>
+                              )}
                             </div>
                           </td>
                           <td>
