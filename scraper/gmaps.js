@@ -357,7 +357,17 @@ async function scrapeListingByUrl(context, url) {
           }
           return JSON.stringify(matches);
         }).catch(() => 'debug failed');
-        console.log('🔍 REVIEW MATCHES:', debugReview);
+       if (!finalReviewLabel) {
+        const debugDump = await page.evaluate(() => {
+          const nice = document.querySelector('div.F7nice');
+          if (!nice) return 'NO F7nice';
+          // Walk up 3 levels and dump all text
+          let el = nice;
+          for (let i = 0; i < 3; i++) { if (el.parentElement) el = el.parentElement; }
+          return el.innerText?.slice(0, 300) || 'empty';
+        }).catch(() => 'debug failed');
+        console.log('🔍 ANCESTOR TEXT:', debugDump);
+      }
       }
 
       // Fallback extraction strategies
