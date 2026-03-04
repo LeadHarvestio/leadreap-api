@@ -10,6 +10,7 @@ import { withRetry, pLimit, sleep, normalizePhone, formatPhoneDisplay, assessEma
 import { detectTechStack, summarizeTechStack } from "./techstack.js";
 import { enrichLinkedIn } from "./linkedin.js";
 import { getCached, setCached, recordStat } from "./cache.js";
+import dns from "dns/promises";
 
 const CONFIG = {
   headless:          true,
@@ -384,6 +385,7 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
         email: null,
         emailQuality: null,
         emailQualityLabel: null,
+        emailVerified: false,
         rating: finalRating,
         reviews: finalReviews,
         category: category || null,
@@ -441,6 +443,34 @@ function extractEmailFromText(text) {
     .filter(e => e.length < 60) // Sentry hashes are long gibberish
     .filter(e => !/^[a-f0-9]{16,}@/.test(e)); // Filter hex hash usernames (Sentry IDs)
   return matches[0] || null;
+}
+
+// MX record cache to avoid duplicate DNS lookups across leads on the same domain
+const mxCache = new Map();
+
+async function verifyEmailMX(email) {
+  if (!email) return { verified: false, reason: "no_email" };
+  const domain = email.split("@")[1];
+  if (!domain) return { verified: false, reason: "invalid_format" };
+
+  // Check cache first
+  if (mxCache.has(domain)) return mxCache.get(domain);
+
+  try {
+    const records = await dns.resolveMx(domain);
+    const result = records && records.length > 0
+      ? { verified: true, reason: "mx_found", mxHost: records[0].exchange }
+      : { verified: false, reason: "no_mx_records" };
+    mxCache.set(domain, result);
+    return result;
+  } catch (err) {
+    const reason = err.code === "ENOTFOUND" ? "domain_not_found"
+      : err.code === "ENODATA" ? "no_mx_records"
+      : "dns_error";
+    const result = { verified: false, reason };
+    mxCache.set(domain, result);
+    return result;
+  }
 }
 
 function parseYearOpened(text) {
@@ -515,6 +545,19 @@ async function enrichWebsite(context, lead) {
 
       const emailAssessment = assessEmail(email);
 
+      // MX record verification — check if the domain can actually receive mail
+      let emailVerified = false;
+      let emailVerifyReason = "no_email";
+      if (emailAssessment.valid && email) {
+        const mx = await verifyEmailMX(email);
+        emailVerified = mx.verified;
+        emailVerifyReason = mx.reason;
+        // If domain has no mail servers, discard the email
+        if (!mx.verified && mx.reason !== "dns_error") {
+          email = null;
+        }
+      }
+
       // Extract social media links from the website — free since we're already on the page
       const socialLinks = await page.$$eval('a[href]', els => {
         const links = {};
@@ -533,9 +576,10 @@ async function enrichWebsite(context, lead) {
 
       return {
         ...lead,
-        email: emailAssessment.valid ? email : null,
+        email: emailAssessment.valid && email ? email : null,
         emailQuality: emailAssessment.quality,
         emailQualityLabel: emailAssessment.qualityLabel,
+        emailVerified,
         techStack,
         techStackSummary: summarizeTechStack(techStack),
         linkedinCompany: socialLinks.linkedin || lead.linkedinCompany || null,
@@ -708,8 +752,9 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, offset = 0
     leads = await enrichAllLinkedIn(context, leads);
     console.log(`  ✓ Phase 3: Enrichment done in ${Date.now() - t3}ms`);
     const emailCount = leads.filter(l => l.email).length;
+    const verifiedCount = leads.filter(l => l.emailVerified).length;
     const socialCount = leads.filter(l => l.facebook || l.instagram || l.linkedinCompany || l.twitter).length;
-    console.log(`  📧 Emails: ${emailCount}/${leads.length} | 🔗 Social: ${socialCount}/${leads.length}`);
+    console.log(`  📧 Emails: ${emailCount}/${leads.length} (${verifiedCount} MX-verified) | 🔗 Social: ${socialCount}/${leads.length}`);
 
   } finally {
     await browser.close();
