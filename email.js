@@ -109,3 +109,44 @@ export async function sendSequenceEmail({ to, fromName, subject, body, leadData 
   console.log(`╚══════════════════════════════════════════════╝\n`);
   return { sent: true, dev: true };
 }
+
+/**
+ * Send a team invite email
+ */
+export async function sendTeamInviteEmail(email, teamName, inviteToken) {
+  const joinUrl = `${FRONTEND_URL}/join?token=${inviteToken}`;
+
+  if (resend) {
+    try {
+      await resend.emails.send({
+        from: `LeadReap <${FROM_EMAIL}>`,
+        to: email,
+        subject: `You've been invited to join ${teamName} on LeadReap`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; color: #333;">
+            <div style="margin-bottom: 32px;">
+              <span style="font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: #111;">Lead</span><span style="font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: #f0b429;">Reap</span>
+            </div>
+            <p style="color: #555; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">You've been invited to join <strong>${teamName}</strong> on LeadReap. As a team member, you'll have access to shared lists and leads.</p>
+            <a href="${joinUrl}" style="display: inline-block; background: #f0b429; color: #000; font-weight: 700; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 15px;">
+              Accept Invite →
+            </a>
+            <p style="color: #999; font-size: 12px; margin-top: 36px; line-height: 1.5;">This invitation expires in 7 days. If you don't have a LeadReap account yet, you'll be asked to create one first.</p>
+          </div>
+        `,
+      });
+      console.log(`[Email] Team invite sent to ${email} for ${teamName}`);
+      return { sent: true };
+    } catch (err) {
+      console.error(`[Email] Team invite failed for ${email}:`, err.message);
+      throw err;
+    }
+  }
+
+  console.log(`\n╔══════════════════════════════════════════════╗`);
+  console.log(`║  TEAM INVITE (dev mode)                       ║`);
+  console.log(`║  To: ${email.padEnd(39)}║`);
+  console.log(`║  Team: ${teamName.padEnd(37)}║`);
+  console.log(`╚══════════════════════════════════════════════╝\n`);
+  return { sent: true, dev: true };
+}
