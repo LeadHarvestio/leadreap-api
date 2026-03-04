@@ -54,3 +54,58 @@ export async function sendMagicLinkEmail(email, code) {
 
   return { sent: true, dev: true };
 }
+
+/**
+ * Send a sequence email (cold outreach)
+ * Supports {{name}}, {{business}}, {{email}} placeholders in subject/body
+ */
+export async function sendSequenceEmail({ to, fromName, subject, body, leadData }) {
+  // Replace placeholders
+  const replacements = {
+    "{{name}}": leadData?.name || "",
+    "{{business}}": leadData?.name || "",
+    "{{email}}": to,
+    "{{phone}}": leadData?.phone || "",
+    "{{website}}": leadData?.website || "",
+    "{{rating}}": leadData?.rating || "",
+    "{{city}}": leadData?.address?.split(",").slice(-2, -1)[0]?.trim() || "",
+  };
+
+  let finalSubject = subject;
+  let finalBody = body;
+  for (const [key, val] of Object.entries(replacements)) {
+    finalSubject = finalSubject.replaceAll(key, val);
+    finalBody = finalBody.replaceAll(key, val);
+  }
+
+  // Convert newlines to <br> for HTML
+  const htmlBody = finalBody.replace(/\n/g, "<br>");
+
+  if (resend) {
+    try {
+      const result = await resend.emails.send({
+        from: `${fromName || "LeadReap"} <${FROM_EMAIL}>`,
+        to,
+        subject: finalSubject,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; font-size: 15px; line-height: 1.7;">
+            ${htmlBody}
+          </div>
+        `,
+      });
+      console.log(`[Sequence] Email sent to ${to}: "${finalSubject}"`);
+      return { sent: true, id: result?.data?.id };
+    } catch (err) {
+      console.error(`[Sequence] Failed to send to ${to}:`, err.message);
+      throw err;
+    }
+  }
+
+  // Dev mode
+  console.log(`\n╔══════════════════════════════════════════════╗`);
+  console.log(`║  SEQUENCE EMAIL (dev mode)                    ║`);
+  console.log(`║  To: ${to.padEnd(39)}║`);
+  console.log(`║  Subject: ${finalSubject.slice(0, 34).padEnd(34)}║`);
+  console.log(`╚══════════════════════════════════════════════╝\n`);
+  return { sent: true, dev: true };
+}
