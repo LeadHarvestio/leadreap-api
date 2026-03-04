@@ -393,6 +393,52 @@ const STYLE = `
 
   /* Dashboard */
   .dash { max-width: 900px; margin: 0 auto; padding: 40px 40px 80px; }
+
+  /* Saved Lists */
+  .lists-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .list-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 18px; cursor: pointer; transition: all 0.2s; position: relative; }
+  .list-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .list-card-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .list-card-desc { font-size: 12px; color: var(--muted); margin-bottom: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list-card-meta { display: flex; gap: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .list-card-meta strong { color: var(--accent); }
+  .list-card-delete { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; opacity: 0; transition: all 0.15s; }
+  .list-card:hover .list-card-delete { opacity: 1; }
+  .list-card-delete:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+  .new-list-card { border-style: dashed; display: flex; align-items: center; justify-content: center; min-height: 100px; color: var(--muted); font-size: 14px; gap: 8px; }
+  .new-list-card:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* List Detail View */
+  .list-detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  .list-detail-name { font-size: 22px; font-weight: 700; }
+  .list-detail-desc { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .list-detail-filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .status-filter { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 5px 12px; border-radius: 100px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .status-filter.active { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.08); }
+  .status-tag { display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 600; letter-spacing: 0.03em; cursor: pointer; transition: all 0.15s; user-select: none; }
+  .status-new { background: rgba(96,165,250,0.12); color: #60a5fa; }
+  .status-contacted { background: rgba(251,191,36,0.12); color: #fbbf24; }
+  .status-replied { background: rgba(34,197,94,0.12); color: #22c55e; }
+  .status-closed { background: rgba(139,92,246,0.12); color: #a78bfa; }
+  .lead-note-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; color: var(--text); width: 100%; font-family: 'IBM Plex Mono', monospace; resize: none; outline: none; }
+  .lead-note-input:focus { border-color: var(--accent); }
+  .lead-note-input::placeholder { color: var(--muted); }
+
+  /* Save to List Modal */
+  .save-modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; max-width: 440px; width: 90vw; padding: 32px; position: relative; animation: slideUp 0.2s ease; }
+  .save-modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+  .save-list-option { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; background: var(--surface2); }
+  .save-list-option:hover { border-color: var(--accent); }
+  .save-list-option-name { font-weight: 600; font-size: 14px; }
+  .save-list-option-count { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .new-list-inline { display: flex; gap: 8px; margin-top: 12px; }
+  .new-list-inline input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--text); outline: none; font-family: 'IBM Plex Mono', monospace; }
+  .new-list-inline input:focus { border-color: var(--accent); }
+  .save-count { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+  @media (max-width: 640px) {
+    .lists-grid { grid-template-columns: 1fr; }
+    .list-detail-header { flex-direction: column; gap: 12px; }
+  }
   .dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; }
   .dash-greeting { font-size: 24px; font-weight: 700; }
   .dash-greeting span { color: var(--accent); }
@@ -704,6 +750,268 @@ function OutreachModal({ templates, lead, onClose }) {
   );
 }
 
+function SaveToListModal({ leads, apiBase, token, onClose, onSaved }) {
+  const [lists, setLists] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [savedTo, setSavedTo] = useState(null);
+
+  useEffect(() => {
+    fetch(`${apiBase}/api/lists`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { setLists(d.lists || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function saveToList(listId, listName) {
+    setSaving(true);
+    try {
+      const res = await fetch(`${apiBase}/api/lists/${listId}/leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ leads }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSavedTo(listName);
+        onSaved?.(listId, listName);
+        setTimeout(() => onClose(), 1200);
+      } else {
+        alert(data.error || "Failed to save");
+      }
+    } catch { alert("Failed to save leads"); }
+    setSaving(false);
+  }
+
+  async function handleCreateAndSave() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch(`${apiBase}/api/lists`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: newName }),
+      });
+      const data = await res.json();
+      if (res.ok && data.list) {
+        setLists(prev => [data.list, ...prev]);
+        await saveToList(data.list.id, data.list.name);
+      } else {
+        alert(data.error || "Failed to create list");
+      }
+    } catch { alert("Failed to create list"); }
+    setCreating(false);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="save-modal">
+        <button className="legal-close" onClick={onClose}>&times;</button>
+        <h3>Save to List</h3>
+        <div className="save-count">{leads.length} lead{leads.length !== 1 ? "s" : ""} selected</div>
+
+        {savedTo ? (
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{fontSize:32,marginBottom:8}}>✓</div>
+            <div style={{fontWeight:700,fontSize:15}}>Saved to "{savedTo}"</div>
+          </div>
+        ) : loading ? (
+          <div style={{textAlign:"center",padding:"24px 0",color:"var(--muted)"}}>Loading lists...</div>
+        ) : (
+          <>
+            {lists.map(l => (
+              <div key={l.id} className="save-list-option" onClick={() => !saving && saveToList(l.id, l.name)}>
+                <span className="save-list-option-name">{l.name}</span>
+                <span className="save-list-option-count">{l.leadCount} leads</span>
+              </div>
+            ))}
+            <div className="new-list-inline">
+              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New list name..."
+                onKeyDown={e => e.key === "Enter" && handleCreateAndSave()} />
+              <button className="btn btn-primary btn-sm" onClick={handleCreateAndSave} disabled={!newName.trim() || creating || saving}>
+                {creating ? "..." : "+ Create & Save"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const STATUS_OPTIONS = [
+  { value: "new", label: "New", className: "status-new" },
+  { value: "contacted", label: "Contacted", className: "status-contacted" },
+  { value: "replied", label: "Replied", className: "status-replied" },
+  { value: "closed", label: "Closed", className: "status-closed" },
+];
+
+function ListDetailView({ listId, apiBase, token, onBack, onOutreach }) {
+  const [list, setList] = useState(null);
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [editingNote, setEditingNote] = useState(null);
+  const [noteText, setNoteText] = useState("");
+
+  useEffect(() => { loadList(); }, [listId]);
+
+  async function loadList() {
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/api/lists/${listId}/leads`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setList(data.list);
+      setLeads(data.leads || []);
+    } catch {}
+    setLoading(false);
+  }
+
+  async function cycleStatus(lead) {
+    const order = ["new", "contacted", "replied", "closed"];
+    const next = order[(order.indexOf(lead._status) + 1) % order.length];
+    // Optimistic update
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, _status: next } : l));
+    await fetch(`${apiBase}/api/lists/${listId}/leads/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: next }),
+    });
+  }
+
+  async function saveNote(lead) {
+    await fetch(`${apiBase}/api/lists/${listId}/leads/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ notes: noteText }),
+    });
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, _notes: noteText } : l));
+    setEditingNote(null);
+  }
+
+  async function removeLead(lead) {
+    setLeads(prev => prev.filter(l => l.id !== lead.id));
+    await fetch(`${apiBase}/api/lists/${listId}/leads/${lead.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  if (loading) return <div style={{textAlign:"center",padding:"60px 0",color:"var(--muted)"}}>Loading list...</div>;
+  if (!list) return <div style={{textAlign:"center",padding:"60px 0",color:"var(--muted)"}}>List not found.</div>;
+
+  const filtered = filter === "all" ? leads : leads.filter(l => l._status === filter);
+  const statusCounts = { all: leads.length };
+  for (const l of leads) statusCounts[l._status] = (statusCounts[l._status] || 0) + 1;
+
+  return (
+    <>
+      <span className="dash-back" onClick={onBack}>&larr; Back to lists</span>
+      <div className="list-detail-header">
+        <div>
+          <div className="list-detail-name">{list.name}</div>
+          {list.description && <div className="list-detail-desc">{list.description}</div>}
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <span className="count-tag">{leads.length} lead{leads.length !== 1 ? "s" : ""}</span>
+        </div>
+      </div>
+
+      <div className="list-detail-filters">
+        {[{ value: "all", label: "All" }, ...STATUS_OPTIONS].map(s => (
+          <button key={s.value} className={`status-filter ${filter === s.value ? "active" : ""}`}
+            onClick={() => setFilter(s.value)}>
+            {s.label} {statusCounts[s.value] ? `(${statusCounts[s.value]})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="dash-empty">
+          <p>{filter === "all" ? "No leads in this list yet." : `No ${filter} leads.`}</p>
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {filtered.map(lead => (
+            <div key={lead.id} style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:12,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{lead.name}</div>
+                  <div style={{fontSize:11,color:"var(--muted)",fontFamily:"IBM Plex Mono",marginTop:2}}>{lead.address}</div>
+                  <div style={{display:"flex",gap:10,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
+                    {lead.email && lead.email !== "—" && (
+                      <span style={{fontSize:12,color:"var(--accent)",fontFamily:"IBM Plex Mono"}}>{lead.email}</span>
+                    )}
+                    {lead.phone && <span style={{fontSize:12,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>{lead.phone}</span>}
+                    {lead.rating && (
+                      <span style={{fontSize:12,color:"var(--muted)"}}>★ {lead.rating}</span>
+                    )}
+                    <span className={`score-pill ${scoreToClass(lead.score)}`} style={{fontSize:10}}>{lead.score}/100</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                  <span className={`status-tag status-${lead._status}`} onClick={() => cycleStatus(lead)}
+                    title="Click to change status">
+                    {lead._status.toUpperCase()}
+                  </span>
+                  <button onClick={() => removeLead(lead)} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:14,padding:"2px 6px"}}
+                    title="Remove from list">&times;</button>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div style={{marginTop:10}}>
+                {editingNote === lead.id ? (
+                  <div style={{display:"flex",gap:6}}>
+                    <textarea className="lead-note-input" rows={2} value={noteText} onChange={e => setNoteText(e.target.value)}
+                      placeholder="Add a note..." autoFocus />
+                    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                      <button className="btn btn-primary btn-sm" style={{fontSize:11,padding:"4px 10px"}} onClick={() => saveNote(lead)}>Save</button>
+                      <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"4px 10px"}} onClick={() => setEditingNote(null)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div onClick={() => { setEditingNote(lead.id); setNoteText(lead._notes || ""); }}
+                    style={{fontSize:12,color: lead._notes ? "var(--text)" : "var(--muted)",fontFamily:"IBM Plex Mono",
+                      cursor:"pointer",padding:"4px 0",borderBottom:"1px dashed var(--border)",transition:"color 0.15s"}}>
+                    {lead._notes || "Click to add a note..."}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick actions */}
+              <div style={{display:"flex",gap:12,marginTop:10}}>
+                {lead.email && lead.email !== "—" && (
+                  <button onClick={() => onOutreach?.(lead)}
+                    className="btn btn-outline btn-sm" style={{fontSize:11,padding:"4px 12px"}}>
+                    Send Outreach ↗
+                  </button>
+                )}
+                {lead.website && (
+                  <a href={lead.website} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:11,color:"var(--muted)",textDecoration:"none",fontFamily:"IBM Plex Mono",display:"flex",alignItems:"center"}}>
+                    Website ↗
+                  </a>
+                )}
+                {lead.mapsUrl && (
+                  <a href={lead.mapsUrl} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:11,color:"var(--muted)",textDecoration:"none",fontFamily:"IBM Plex Mono",display:"flex",alignItems:"center"}}>
+                    Maps ↗
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 function scoreToClass(score) {
   if (score >= 80) return "score-high";
   if (score >= 60) return "score-med";
@@ -781,9 +1089,24 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [dashData, setDashData] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
 
+  // Saved Lists
+  const [showSaveToList, setShowSaveToList] = useState(false);
+  const [dashLists, setDashLists] = useState([]);
+  const [viewingListId, setViewingListId] = useState(null);
+
+  function loadDashLists() {
+    if (!token) return;
+    fetch(`${API_BASE}/api/lists`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => setDashLists(d.lists || []))
+      .catch(() => {});
+  }
+
   function openDashboard() {
     setShowDashboard(true);
+    setViewingListId(null);
     setDashLoading(true);
+    loadDashLists();
     fetch(`${API_BASE}/api/account`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => r.json()).then(d => {
@@ -1047,9 +1370,20 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
         {showDashboard ? (
           <div className="dash">
-            <span className="dash-back" onClick={() => setShowDashboard(false)}>&larr; Back to search</span>
+            <span className="dash-back" onClick={() => {
+              if (viewingListId) { setViewingListId(null); }
+              else { setShowDashboard(false); }
+            }}>&larr; {viewingListId ? "Back to dashboard" : "Back to search"}</span>
 
-            {dashLoading ? (
+            {viewingListId ? (
+              <ListDetailView
+                listId={viewingListId}
+                apiBase={API_BASE}
+                token={token}
+                onBack={() => { setViewingListId(null); loadDashLists(); }}
+                onOutreach={(lead) => { setOutreachLead(lead); setShowOutreach(true); }}
+              />
+            ) : dashLoading ? (
               <div style={{textAlign:"center",padding:"60px 0",color:"var(--muted)"}}>Loading dashboard...</div>
             ) : dashData ? (
               <>
@@ -1106,6 +1440,44 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                     </div>
                   </div>
                 )}
+
+                {/* My Lists */}
+                <div className="dash-section">
+                  <div className="dash-section-title">📋 My Lists</div>
+                  <div className="lists-grid">
+                    {dashLists.map(l => (
+                      <div key={l.id} className="list-card" onClick={() => setViewingListId(l.id)}>
+                        <button className="list-card-delete" onClick={e => {
+                          e.stopPropagation();
+                          if (confirm(`Delete "${l.name}" and all its leads?`)) {
+                            fetch(`${API_BASE}/api/lists/${l.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })
+                              .then(() => setDashLists(prev => prev.filter(x => x.id !== l.id)));
+                          }
+                        }}>&times;</button>
+                        <div className="list-card-name">{l.name}</div>
+                        <div className="list-card-desc">{l.description || "No description"}</div>
+                        <div className="list-card-meta">
+                          <span><strong>{l.leadCount}</strong> leads</span>
+                          <span>{new Date(l.updatedAt || l.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="list-card new-list-card" onClick={() => {
+                      const name = prompt("New list name:");
+                      if (name && name.trim()) {
+                        fetch(`${API_BASE}/api/lists`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                          body: JSON.stringify({ name }),
+                        }).then(r => r.json()).then(d => {
+                          if (d.list) setDashLists(prev => [d.list, ...prev]);
+                        });
+                      }
+                    }}>
+                      + New List
+                    </div>
+                  </div>
+                </div>
 
                 <div className="dash-section">
                   <div className="dash-section-title">Search History</div>
@@ -1286,9 +1658,14 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                   <span style={{fontSize:13, color:"var(--muted)", fontFamily:"IBM Plex Mono"}}>{targetNiche} &middot; {location}</span>
                 </div>
                 <div className="results-actions" style={{display:"flex",gap:10}}>
-                  <button className="btn btn-outline btn-sm" onClick={handleSearch}>{"\u21BB"} Refresh</button>
+                  <button className="btn btn-outline btn-sm" onClick={handleSearch}>↻ Refresh</button>
+                  {user && (
+                    <button className="btn btn-outline btn-sm" onClick={() => isPro ? setShowSaveToList(true) : setShowPricing(true)}>
+                      💾 Save to List {!isPro && "🔒"}
+                    </button>
+                  )}
                   <button className="btn btn-green btn-sm" onClick={handleExport}>
-                    {"\u2B07"} Export CSV {!isPro && "\uD83D\uDD12"}
+                    ⬇ Export CSV {!isPro && "🔒"}
                   </button>
                 </div>
               </div>
@@ -1623,7 +2000,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       )}
 
       {toast && (
-        <div className="toast">{"\u2713"} {isPro && !leads ? "Upgraded to PRO!" : isPro ? "CSV downloaded!" : "Welcome to PRO!"}</div>
+        <div className="toast">✓ {showSaveToList ? "Saved to list!" : isPro && !leads.length ? "Upgraded to PRO!" : isPro ? "CSV downloaded!" : "Welcome to PRO!"}</div>
       )}
 
       {showOutreach && outreachLead && (() => {
@@ -1636,6 +2013,19 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           />
         );
       })()}
+
+      {showSaveToList && leads.length > 0 && (
+        <SaveToListModal
+          leads={leads}
+          apiBase={API_BASE}
+          token={token}
+          onClose={() => setShowSaveToList(false)}
+          onSaved={(listId, listName) => {
+            setToast(true);
+            setTimeout(() => setToast(false), 3000);
+          }}
+        />
+      )}
 
       {showPrivacy && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowPrivacy(false)}>
