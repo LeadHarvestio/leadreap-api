@@ -168,7 +168,7 @@ const STYLE = `
   tr:hover td { background: rgba(240,180,41,0.02); }
   .name-cell { font-weight: 600; color: var(--text); }
   .email-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); }
-  .email-verified { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(34,197,94,0.12); color: #22c55e; font-weight: 600; margin-left: 6px; vertical-align: middle; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; cursor: help; }
+  .email-verified { display: block; width: fit-content; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(34,197,94,0.12); color: #22c55e; font-weight: 600; margin-top: 4px; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; cursor: help; }
   .email-unverified { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(251,191,36,0.12); color: #fbbf24; font-weight: 600; margin-left: 6px; vertical-align: middle; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; cursor: help; }
 
   /* Expandable row detail */
@@ -190,7 +190,7 @@ const STYLE = `
     0% { box-shadow: inset 0 0 0 1px rgba(240,180,41,0.4); }
     100% { box-shadow: inset 0 0 0 1px transparent; }
   }
-  .chevron-hint { animation: chevronPulse 1.5s ease-in-out 0.5s 2; }
+  .chevron-hint span { animation: chevronPulse 1.5s ease-in-out 0.5s 2; }
   @keyframes chevronPulse {
     0%, 100% { color: var(--muted); }
     50% { color: var(--accent); transform: scale(1.3); }
@@ -1346,7 +1346,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td>
                             <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
                           </td>
-                          <td style={{textAlign:"center",color:"var(--muted)",fontSize:14,transition:"transform 0.2s",transform:expandedRow === i ? "rotate(90deg)" : "rotate(0)"}} className={i === 0 && expandedRow === 0 ? "chevron-hint" : ""}>&#9656;</td>
+                          <td style={{textAlign:"center"}} className={i === 0 && expandedRow === 0 ? "chevron-hint" : ""}><span style={{display:"inline-block",color:"var(--muted)",fontSize:14,transition:"transform 0.2s",transform:expandedRow === i ? "rotate(90deg)" : "rotate(0)"}}>&#9656;</span></td>
                         </tr>
                         {expandedRow === i && (
                           <tr className={`expand-row ${i === 0 ? "expand-peek" : ""}`}>
