@@ -589,6 +589,17 @@ const STYLE = `
   .seq-enrollment-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; gap: 12px; }
   .seq-card { border-left: 3px solid var(--accent); }
 
+  /* Enrichment display */
+  .enrichment-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .enrichment-chip { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; display: flex; flex-direction: column; gap: 1px; }
+  .enrichment-label { font-size: 9px; color: var(--muted); font-family: "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+  .enrichment-value { font-size: 13px; font-weight: 700; color: var(--text); font-family: "IBM Plex Mono", monospace; }
+  .enrichment-signal { font-size: 10px; padding: 3px 8px; border-radius: 6px; background: var(--accent-dim, rgba(240,180,41,0.1)); color: var(--accent); font-weight: 600; white-space: nowrap; }
+  .enrichment-locked .enrichment-value { filter: blur(6px); user-select: none; }
+  .enrichment-locked .enrichment-signal { filter: blur(4px); user-select: none; }
+  .enrichment-unlock { font-size: 11px; color: var(--accent); cursor: pointer; font-weight: 600; white-space: nowrap; padding: 3px 8px; border: 1px solid var(--accent); border-radius: 6px; transition: all 0.15s; }
+  .enrichment-unlock:hover { background: var(--accent); color: #000; }
+
   @media (max-width: 600px) {
     .seq-builder { padding: 18px; }
     .seq-enroll-bar { flex-direction: column; }
@@ -1310,10 +1321,11 @@ function scoreToClass(score) {
 }
 
 function generateCSV(leads) {
-  const headers = ["Business Name", "Email", "Email Verified", "Phone", "Website", "Address", "Rating", "Unclaimed", "LinkedIn", "Facebook", "Instagram", "Twitter", "Lead Score", "Insight"];
+  const headers = ["Business Name", "Email", "Email Verified", "Phone", "Website", "Address", "Rating", "Unclaimed", "Est. Revenue", "Est. Employees", "Business Signals", "LinkedIn", "Facebook", "Instagram", "Twitter", "Lead Score", "Insight"];
   const rows = leads.map(l => [
     `"${l.name}"`, l.email || "", l.emailVerified ? "Verified" : "", l.phone || "", l.website || "", `"${l.address || ""}"`,
     l.rating || "", l.unclaimed ? "Yes" : "No",
+    l.enrichment?.revenueRange || "", l.enrichment?.employeeRange || "", `"${(l.enrichment?.signals || []).join(", ")}"`,
     l.linkedinCompany || l.linkedinPerson || "", l.facebook || "", l.instagram || "", l.twitter || "",
     l.score, `"${(l.notes || "").replace(/"/g, '""')}"`
   ]);
@@ -1324,6 +1336,7 @@ const LOADING_STEPS = [
   "Scanning Google Maps...",
   "Collecting business details...",
   "Extracting emails & social profiles...",
+  "Enriching leads with revenue & employee data...",
   "Running AI lead scoring...",
 ];
 
@@ -2095,6 +2108,30 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                                 <div className="expand-insight">
                                   <strong style={{color:"var(--text)",fontSize:11,fontFamily:"IBM Plex Mono",letterSpacing:"0.03em"}}>INSIGHT:</strong> {lead.notes}
                                 </div>
+                                {lead.enrichment && (
+                                  <div className={`enrichment-row ${!isPro ? "enrichment-locked" : ""}`}>
+                                    <div className="enrichment-chip">
+                                      <span className="enrichment-label">Revenue</span>
+                                      <span className="enrichment-value">{lead.enrichment.revenueRange}</span>
+                                    </div>
+                                    <div className="enrichment-chip">
+                                      <span className="enrichment-label">Employees</span>
+                                      <span className="enrichment-value">{lead.enrichment.employeeRange}</span>
+                                    </div>
+                                    {lead.enrichment.yearsInBusiness != null && (
+                                      <div className="enrichment-chip">
+                                        <span className="enrichment-label">Years</span>
+                                        <span className="enrichment-value">{lead.enrichment.yearsInBusiness}+</span>
+                                      </div>
+                                    )}
+                                    {lead.enrichment.signals?.length > 0 && lead.enrichment.signals.slice(0, 3).map((s, si) => (
+                                      <span key={si} className="enrichment-signal">{s}</span>
+                                    ))}
+                                    {!isPro && (
+                                      <span className="enrichment-unlock" onClick={(e) => { e.stopPropagation(); setShowPricing(true); }}>🔒 Upgrade to unlock</span>
+                                    )}
+                                  </div>
+                                )}
                                 <div className="expand-actions">
                                   {lead.email && lead.email !== "\u2014" ? (
                                     <button onClick={(e) => { e.stopPropagation(); setOutreachLead(lead); setShowOutreach(true); }}
@@ -2188,6 +2225,24 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                         <div className="mobile-card-insight">
                           <strong style={{color:"var(--text)"}}>Insight:</strong> {lead.notes}
                         </div>
+                        {lead.enrichment && (
+                          <div className={`enrichment-row ${!isPro ? "enrichment-locked" : ""}`} style={{marginTop:8}}>
+                            <div className="enrichment-chip">
+                              <span className="enrichment-label">Revenue</span>
+                              <span className="enrichment-value">{lead.enrichment.revenueRange}</span>
+                            </div>
+                            <div className="enrichment-chip">
+                              <span className="enrichment-label">Employees</span>
+                              <span className="enrichment-value">{lead.enrichment.employeeRange}</span>
+                            </div>
+                            {lead.enrichment.signals?.length > 0 && lead.enrichment.signals.slice(0, 2).map((s, si) => (
+                              <span key={si} className="enrichment-signal">{s}</span>
+                            ))}
+                            {!isPro && (
+                              <span className="enrichment-unlock" onClick={(e) => { e.stopPropagation(); setShowPricing(true); }}>🔒 Upgrade</span>
+                            )}
+                          </div>
+                        )}
                         <div className="mobile-card-actions">
                           {lead.email && lead.email !== "\u2014" ? (
                             <button onClick={(e) => { e.stopPropagation(); setOutreachLead(lead); setShowOutreach(true); }}
