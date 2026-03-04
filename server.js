@@ -28,6 +28,26 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
+// ── Search history (in-memory, per user) ─────────────────────
+const searchHistory = new Map(); // userId -> [{ niche, location, leadCount, timestamp, jobId }]
+const deliveredJobs = new Set(); // track which jobs already saved to history
+
+function saveSearchHistory(userId, { niche, location, leadCount, jobId }) {
+  if (!userId) return;
+  const key = `${userId}`;
+  if (!searchHistory.has(key)) searchHistory.set(key, []);
+  const history = searchHistory.get(key);
+  // Avoid duplicates
+  if (history.some(h => h.jobId === jobId)) return;
+  history.unshift({ niche, location, leadCount, jobId, timestamp: Date.now() });
+  // Keep last 50 searches
+  if (history.length > 50) history.length = 50;
+}
+
+function getSearchHistory(userId) {
+  return searchHistory.get(`${userId}`) || [];
+}
+
 // ─────────────────────────────────────────────────────────────
 // GLOBAL MIDDLEWARE
 // ─────────────────────────────────────────────────────────────
@@ -194,6 +214,15 @@ app.get("/api/leads/job/:jobId", (req, res) => {
   const plan = req.user?.plan || "free";
   const leads = plan === "free" ? job.leads.slice(0, 5) : job.leads;
 
+  // Auto-save to search history when job completes
+  if (job.status === "done" && req.user?.id && !deliveredJobs.has(job.id)) {
+    deliveredJobs.add(job.id);
+    saveSearchHistory(req.user.id, {
+      niche: job.niche, location: job.location,
+      leadCount: job.leads.length, jobId: job.id,
+    });
+  }
+
   return res.json({
     jobId: job.id,
     status: job.status,
@@ -205,6 +234,13 @@ app.get("/api/leads/job/:jobId", (req, res) => {
     error: job.error,
     elapsedMs: job.startedAt ? (job.completedAt || Date.now()) - job.startedAt : null,
   });
+});
+
+// ── GET /api/leads/history — Recent searches ─────────────────
+app.get("/api/leads/history", (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Login required" });
+  const history = getSearchHistory(req.user.id);
+  return res.json({ searches: history });
 });
 
 // ── GET /api/leads/jobs — List recent jobs ───────────────────
