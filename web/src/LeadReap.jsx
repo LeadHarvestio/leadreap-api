@@ -190,6 +190,10 @@ const STYLE = `
     0% { box-shadow: inset 0 0 0 1px rgba(240,180,41,0.4); }
     100% { box-shadow: inset 0 0 0 1px transparent; }
   }
+  @keyframes slideUpBar {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
   .chevron-hint span { animation: chevronPulse 1.5s ease-in-out 0.5s 2; }
   @keyframes chevronPulse {
     0%, 100% { color: var(--muted); }
@@ -1382,6 +1386,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadStep, setLoadStep] = useState(0);
   const [showPricing, setShowPricing] = useState(false);
+  const [pricingContext, setPricingContext] = useState(null); // null = generic, or "export" | "search_limit" | "save_list" | "enrichment" | "sequences" | "load_more"
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [toast, setToast] = useState(false);
@@ -1654,7 +1659,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   }
 
   async function handleLoadMore() {
-    if (!isPro) { setShowPricing(true); return; }
+    if (!isPro) { setPricingContext("load_more"); setShowPricing(true); return; }
     setLoadingMore(true);
     setSearchError("");
     try {
@@ -1701,7 +1706,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   }
 
   function handleExport() {
-    if (!isPro) { setShowPricing(true); return; }
+    if (!isPro) { setPricingContext("export"); setShowPricing(true); return; }
     const csv = generateCSV(leads);
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -1745,7 +1750,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             ) : (
               <>
                 <button className="btn btn-outline btn-sm" onClick={onLoginClick}>Log In</button>
-                <button className="btn btn-primary btn-sm nav-cta" onClick={() => setShowPricing(true)}>Get Full Access &rarr;</button>
+                <button className="btn btn-primary btn-sm nav-cta" onClick={() => { setPricingContext(null); setShowPricing(true); }}>Get Full Access &rarr;</button>
               </>
             )}
           </div>
@@ -1951,7 +1956,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                       {dashData.plan?.toUpperCase()} PLAN
                     </span>
                     {dashData.plan === "free" && (
-                      <button className="btn btn-primary btn-sm" onClick={() => { setShowDashboard(false); setShowPricing(true); }}>Upgrade</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => { setShowDashboard(false); setPricingContext(null); setShowPricing(true); }}>Upgrade</button>
                     )}
                   </div>
                 </div>
@@ -1970,6 +1975,31 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                     <div className="dash-stat-value">{dashData.searchesToday || 0}</div>
                   </div>
                 </div>
+
+                {/* Free user upgrade nudge */}
+                {dashData.plan === "free" && (
+                  <div style={{
+                    padding:"20px 24px",borderRadius:12,marginBottom:20,
+                    background:"linear-gradient(135deg, rgba(240,180,41,0.06), rgba(232,93,4,0.03))",
+                    border:"1px solid rgba(240,180,41,0.15)",
+                    display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap",
+                  }}>
+                    <div>
+                      <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>You're on the free plan</div>
+                      <div style={{fontSize:13,color:"var(--muted)",lineHeight:1.5}}>
+                        {dashData.stats?.totalLeads > 0
+                          ? `You've found ${dashData.stats.totalLeads} leads so far. Upgrade to unlock unlimited searches, CSV export, email sequences, and enrichment data.`
+                          : "Upgrade to unlock unlimited leads, CSV export, automated email sequences, and revenue estimates."
+                        }
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:8,flexShrink:0}}>
+                      <button className="btn btn-primary btn-sm" onClick={() => { setShowDashboard(false); setPricingContext(null); setShowPricing(true); }}>
+                        See Plans — from $47 &rarr;
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="dash-actions">
                   <button className="btn btn-primary" onClick={() => { setShowDashboard(false); document.querySelector('.field select')?.focus(); }}>
@@ -2071,7 +2101,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                       </div>
                     ))}
                     <div className="list-card new-list-card" onClick={() => {
-                      if (user?.plan === "free") { setShowDashboard(false); setShowPricing(true); return; }
+                      if (user?.plan === "free") { setShowDashboard(false); setPricingContext("sequences"); setShowPricing(true); return; }
                       setShowSequenceBuilder(true);
                       setEditingSequence(null);
                     }}>
@@ -2113,13 +2143,13 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         <>
         <div className="hero">
           <div className="hero-tag"><div className="dot" /> AI-POWERED LEAD INTELLIGENCE</div>
-          <h1 className="hero-desktop">Find <em>any</em> local business lead<br />in under 30 seconds</h1>
+          <h1 className="hero-desktop">Find <em>verified</em> local business leads<br />in under 30 seconds</h1>
           <h1 className="hero-mobile">Find <em>verified</em> local leads in seconds</h1>
-          <p>Pull verified contact data from any local business niche. Search unlimited leads by location &mdash; filter, score, and export to CSV in seconds.</p>
+          <p>Search any niche, any city. Get emails, phone numbers, revenue estimates, and AI lead scores &mdash; export to CSV and start outreach today.</p>
           <div className="hero-stats">
-            <div className="stat"><div className="stat-num">2.1M+</div><div className="stat-label">Businesses indexed</div></div>
-            <div className="stat"><div className="stat-num">71+</div><div className="stat-label">Built-in niches</div></div>
+            <div className="stat"><div className="stat-num">47+</div><div className="stat-label">Built-in niches</div></div>
             <div className="stat"><div className="stat-num">94%</div><div className="stat-label">Email accuracy</div></div>
+            <div className="stat"><div className="stat-num">$97</div><div className="stat-label">One-time (not /mo)</div></div>
             <div className="stat"><div className="stat-num">30s</div><div className="stat-label">Avg search time</div></div>
           </div>
         </div>
@@ -2224,14 +2254,22 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           {!loading && searchDone && !searchError && leads.length > 0 && !isPro && (
             <div className="upsell-banner" style={{
               display: "flex", gap: 16, marginBottom: 20,
-              padding: "14px 20px", borderRadius: 10,
-              background: "rgba(240,180,41,0.04)", border: "1px solid rgba(240,180,41,0.12)",
-              alignItems: "center", justifyContent: "space-between",
+              padding: "16px 20px", borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(240,180,41,0.06), rgba(232,93,4,0.04))", border: "1px solid rgba(240,180,41,0.15)",
+              alignItems: "center", justifyContent: "space-between", flexWrap: "wrap",
             }}>
-              <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                Showing <strong style={{ color: "var(--text)" }}>{visibleLeads.length} of {displayTotal}</strong> leads &mdash; upgrade to unlock all results, CSV export, and unlimited searches.
-              </span>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowPricing(true)}>Unlock Full Access &rarr;</button>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
+                  {displayTotal - visibleLeads.length > 0
+                    ? `${displayTotal - visibleLeads.length} more ${targetNiche} leads behind the paywall`
+                    : `Unlock full access to ${targetNiche} leads`
+                  }
+                </div>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                  Includes email sequences, revenue estimates, CSV export, and unlimited searches.
+                </span>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => { setPricingContext("load_more"); setShowPricing(true); }}>See Plans &rarr;</button>
             </div>
           )}
 
@@ -2242,7 +2280,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 <div className="empty-title" style={{ color: "#f87171" }}>{searchError}</div>
                 <div className="empty-sub">
                   {searchError.includes("limit") || searchError.includes("Rate")
-                    ? <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setShowPricing(true)}>Upgrade for Unlimited Searches &rarr;</button>
+                    ? <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => { setPricingContext("search_limit"); setShowPricing(true); }}>Upgrade for Unlimited Searches &rarr;</button>
                     : <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={handleSearch}>Try Again</button>
                   }
                 </div>
@@ -2252,6 +2290,24 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
           {!loading && searchDone && !searchError && leads.length > 0 && (
             <>
+              {/* Anonymous user? Prompt them to sign up */}
+              {!user && (
+                <div style={{
+                  display:"flex",gap:16,marginBottom:20,padding:"16px 20px",borderRadius:10,
+                  background:"rgba(34,197,94,0.04)",border:"1px solid rgba(34,197,94,0.12)",
+                  alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",
+                }}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:700,marginBottom:3,color:"var(--green)"}}>
+                      {displayTotal} leads found — create a free account to save them
+                    </div>
+                    <span style={{fontSize:12,color:"var(--muted)"}}>
+                      Keep your results, build lists, track lead status, and get 3 free searches per day.
+                    </span>
+                  </div>
+                  <button className="btn btn-green btn-sm" onClick={onLoginClick}>Create Free Account &rarr;</button>
+                </div>
+              )}
               <div className="results-header">
                 <div className="results-meta">
                   <span style={{fontWeight:700, fontSize:15}}>Results</span>
@@ -2261,12 +2317,12 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 <div className="results-actions" style={{display:"flex",gap:10}}>
                   <button className="btn btn-outline btn-sm" onClick={handleSearch}>↻ Refresh</button>
                   {user && (
-                    <button className="btn btn-outline btn-sm" onClick={() => isPro ? setShowSaveToList(true) : setShowPricing(true)}>
-                      💾 Save to List {!isPro && "🔒"}
+                    <button className="btn btn-outline btn-sm" onClick={() => isPro ? setShowSaveToList(true) : (setPricingContext("save_list"), setShowPricing(true))}>
+                      💾 {isPro ? "Save to List" : "Save to List"}
                     </button>
                   )}
                   <button className="btn btn-green btn-sm" onClick={handleExport}>
-                    ⬇ Export CSV {!isPro && "🔒"}
+                    ⬇ {isPro ? "Export CSV" : "Export CSV"}
                   </button>
                 </div>
               </div>
@@ -2353,7 +2409,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                                       <span key={si} className="enrichment-signal">{s}</span>
                                     ))}
                                     {!isPro && (
-                                      <span className="enrichment-unlock" onClick={(e) => { e.stopPropagation(); setShowPricing(true); }}>🔒 Upgrade to unlock</span>
+                                      <span className="enrichment-unlock" onClick={(e) => { e.stopPropagation(); setPricingContext("enrichment"); setShowPricing(true); }}>🔒 Upgrade to unlock</span>
                                     )}
                                   </div>
                                 )}
@@ -2464,7 +2520,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                               <span key={si} className="enrichment-signal">{s}</span>
                             ))}
                             {!isPro && (
-                              <span className="enrichment-unlock" onClick={(e) => { e.stopPropagation(); setShowPricing(true); }}>🔒 Upgrade</span>
+                              <span className="enrichment-unlock" onClick={(e) => { e.stopPropagation(); setPricingContext("enrichment"); setShowPricing(true); }}>🔒 Upgrade</span>
                             )}
                           </div>
                         )}
@@ -2501,10 +2557,44 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               </div>
 
               {!isPro ? (
-                <div className="upgrade-bar">
-                  <p>{"\uD83D\uDD12"} Showing <strong style={{color:"var(--text)"}}>{visibleLeads.length} of {displayTotal}</strong> leads &mdash; unlock all results + CSV export</p>
-                  <button className="btn btn-primary" onClick={() => setShowPricing(true)}>Unlock Full Access &rarr;</button>
-                </div>
+                <>
+                  {/* Blurred ghost rows showing what's behind the paywall */}
+                  <div style={{position:"relative",overflow:"hidden",borderRadius:"0 0 12px 12px",border:"1px solid var(--border)",borderTop:"none"}}>
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} style={{padding:"14px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",filter:"blur(5px)",opacity:0.5,userSelect:"none"}}>
+                        <div style={{display:"flex",gap:24,alignItems:"center"}}>
+                          <span style={{fontFamily:"IBM Plex Mono",fontSize:12,color:"var(--muted)"}}>{String(visibleLeads.length + i + 1).padStart(2,"0")}</span>
+                          <div><div style={{fontWeight:600,fontSize:13}}>Business Name Here</div><div style={{fontSize:11,color:"var(--muted)"}}>123 Main St, {location || "City, ST"}</div></div>
+                        </div>
+                        <div style={{display:"flex",gap:24,alignItems:"center"}}>
+                          <span style={{color:"var(--accent)",fontFamily:"IBM Plex Mono",fontSize:12}}>email@example.com</span>
+                          <span className="score-pill score-high" style={{fontSize:11}}>85/100</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent, var(--bg) 90%)",pointerEvents:"none"}} />
+                  </div>
+                  <div className="upgrade-bar" style={{borderRadius:12,marginTop:12,flexDirection:"column",gap:12,padding:"28px 24px"}}>
+                    <div style={{fontSize:18,fontWeight:700,letterSpacing:"-0.5px"}}>
+                      {displayTotal - visibleLeads.length > 0
+                        ? <>{displayTotal - visibleLeads.length} more leads are waiting</>
+                        : <>Unlock unlimited leads</>
+                      }
+                    </div>
+                    <p style={{maxWidth:480,textAlign:"center",lineHeight:1.6,margin:0}}>
+                      {leads.filter(l => l.email).length > 0
+                        ? `You found ${leads.filter(l => l.email).length} leads with emails in "${targetNiche}." Upgrade to get all ${displayTotal}+ results with revenue estimates, AI scoring, and CSV export.`
+                        : `Upgrade to unlock all ${displayTotal} results plus email sequences, enrichment data, and unlimited searches.`
+                      }
+                    </p>
+                    <div style={{display:"flex",gap:12,alignItems:"center",marginTop:4}}>
+                      <button className="btn btn-primary" onClick={() => { setPricingContext("load_more"); setShowPricing(true); }}>
+                        Unlock All Leads &rarr;
+                      </button>
+                      <span style={{fontSize:12,color:"var(--muted)"}}>30-day money-back guarantee</span>
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div className="upgrade-bar">
                   <p style={{color:"var(--muted)"}}>Showing <strong style={{color:"var(--text)"}}>{leads.length} leads</strong> &middot; Batch {batchNum}</p>
@@ -2573,6 +2663,35 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                   <div className="sub">No credit card required &middot; 5 leads free</div>
                 </div>
               </div>
+
+              {/* Feature grid: what paid users get */}
+              <div style={{marginTop:48,display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))",gap:16}}>
+                {[
+                  { icon: "📧", title: "Email Sequences", desc: "Automate 3-step cold outreach. Leads get follow-ups on autopilot." },
+                  { icon: "📊", title: "Lead Enrichment", desc: "Revenue estimates, employee count, tech stack, and business signals." },
+                  { icon: "💾", title: "Saved Lists + CRM", desc: "Organize leads into lists. Track status, add notes, never lose a lead." },
+                  { icon: "⬇️", title: "XLSX + CSV Export", desc: "Download all leads as a spreadsheet. Import into any CRM or tool." },
+                  { icon: "🤖", title: "AI Lead Scoring", desc: "Every lead scored 0-100 based on online presence, reviews, and signals." },
+                  { icon: "🔗", title: "Webhooks + API", desc: "Push leads to Zapier, GoHighLevel, HubSpot, or your own stack." },
+                ].map((f, i) => (
+                  <div key={i} style={{
+                    padding:"20px",borderRadius:12,border:"1px solid var(--border)",background:"var(--surface)",
+                    transition:"border-color 0.2s,transform 0.2s",cursor:"default",
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(240,180,41,0.3)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.transform = "none"; }}
+                  >
+                    <div style={{fontSize:24,marginBottom:8}}>{f.icon}</div>
+                    <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>{f.title}</div>
+                    <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.6}}>{f.desc}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{textAlign:"center",marginTop:24}}>
+                <button className="btn btn-outline" onClick={() => { setPricingContext(null); setShowPricing(true); }}>
+                  See All Plans &rarr;
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -2584,7 +2703,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           <div className="footer-right">
             <span className="footer-link" onClick={() => setShowPrivacy(true)}>Privacy</span>
             <span className="footer-link" onClick={() => setShowTerms(true)}>Terms</span>
-            <span className="footer-link" onClick={() => setShowPricing(true)}>Pricing</span>
+            <span className="footer-link" onClick={() => { setPricingContext(null); setShowPricing(true); }}>Pricing</span>
           </div>
         </footer>
       </div>
@@ -2593,8 +2712,58 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowPricing(false)}>
           <div className="modal">
             <button className="modal-close" onClick={() => setShowPricing(false)}>&times;</button>
-            <h2>One-time. No subscription.</h2>
-            <p>Pay once, use forever. Every plan includes lifetime access + free updates.</p>
+
+            {/* Context-aware headline */}
+            {pricingContext === "export" ? (
+              <>
+                <h2>Export your leads to CSV</h2>
+                <p>Download all {displayTotal || "your"} leads as a spreadsheet — with emails, phone numbers, scores, and enrichment data.</p>
+              </>
+            ) : pricingContext === "search_limit" ? (
+              <>
+                <h2>You've hit the free search limit</h2>
+                <p>Unlock unlimited searches — pull as many leads as you need, any niche, any city.</p>
+              </>
+            ) : pricingContext === "save_list" ? (
+              <>
+                <h2>Save leads to organized lists</h2>
+                <p>Build a pipeline — save, tag, track status, and add notes to every lead.</p>
+              </>
+            ) : pricingContext === "enrichment" ? (
+              <>
+                <h2>Unlock revenue &amp; employee estimates</h2>
+                <p>See estimated revenue, employee count, and business signals for every lead you find.</p>
+              </>
+            ) : pricingContext === "sequences" ? (
+              <>
+                <h2>Automate your outreach</h2>
+                <p>Set up 3-step email sequences that send automatically — turn leads into clients on autopilot.</p>
+              </>
+            ) : pricingContext === "load_more" ? (
+              <>
+                <h2>Unlock all {displayTotal || ""} leads</h2>
+                <p>You're seeing a preview. Get every lead with full contact data, AI scoring, and export tools.</p>
+              </>
+            ) : (
+              <>
+                <h2>One-time. No subscription.</h2>
+                <p>Pay once, use forever. Every plan includes lifetime access + free updates.</p>
+              </>
+            )}
+
+            {/* Social proof bar */}
+            <div style={{display:"flex",justifyContent:"center",gap:24,padding:"14px 0 28px",borderBottom:"1px solid var(--border)",marginBottom:28,flexWrap:"wrap"}}>
+              <span style={{fontSize:12,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>
+                <span style={{color:"var(--green)",fontWeight:700}}>4.9/5</span> avg rating
+              </span>
+              <span style={{fontSize:12,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>
+                <span style={{color:"var(--accent)",fontWeight:700}}>2,400+</span> leads found today
+              </span>
+              <span style={{fontSize:12,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>
+                <span style={{color:"var(--text)",fontWeight:700}}>30-day</span> money-back guarantee
+              </span>
+            </div>
+
             <div className="pricing-grid">
               {[
                 {
@@ -2635,9 +2804,19 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 </div>
               ))}
             </div>
-            <p style={{textAlign:"center", marginTop:28, color:"var(--muted)", fontSize:13}}>
-              Secure checkout &middot; 30-day money-back guarantee &middot; Instant access
-            </p>
+
+            {/* Value anchor + guarantee */}
+            <div style={{marginTop:32,textAlign:"center"}}>
+              <div style={{display:"inline-flex",gap:8,alignItems:"center",padding:"10px 20px",background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.15)",borderRadius:10,marginBottom:16}}>
+                <span style={{fontSize:18}}>🛡</span>
+                <span style={{fontSize:13,color:"var(--text)",fontWeight:600}}>30-Day Money-Back Guarantee</span>
+                <span style={{fontSize:12,color:"var(--muted)"}}>&mdash; no questions asked</span>
+              </div>
+              <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.7}}>
+                Secure checkout via Stripe &middot; Instant access after purchase<br />
+                <span style={{color:"var(--accent)"}}>Other tools charge $100+/month.</span> LeadReap is a one-time purchase.
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -2781,6 +2960,30 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             <h3>Contact</h3>
             <p>For questions about these terms, contact us at support@leadreap.com.</p>
           </div>
+        </div>
+      )}
+
+      {/* Sticky bottom CTA bar for free/anonymous users with results */}
+      {searchDone && leads.length > 0 && !isPro && !showPricing && !showDashboard && (
+        <div style={{
+          position:"fixed",bottom:0,left:0,right:0,zIndex:99,
+          padding:"12px 24px",
+          background:"rgba(10,10,11,0.95)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+          borderTop:"1px solid rgba(240,180,41,0.2)",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:16,flexWrap:"wrap",
+          animation:"slideUpBar 0.4s ease-out",
+        }}>
+          <span style={{fontSize:13,color:"var(--muted)"}}>
+            {!user 
+              ? <>Found <strong style={{color:"var(--text)"}}>{displayTotal} leads</strong> &mdash; create a free account to save them</>
+              : <>You're seeing <strong style={{color:"var(--text)"}}>{visibleLeads.length} of {displayTotal}</strong> leads &mdash; from <strong style={{color:"var(--accent)"}}>$47</strong> one-time</>
+            }
+          </span>
+          {!user ? (
+            <button className="btn btn-green btn-sm" onClick={onLoginClick}>Sign Up Free</button>
+          ) : (
+            <button className="btn btn-primary btn-sm" onClick={() => { setPricingContext("load_more"); setShowPricing(true); }}>Unlock All Leads &rarr;</button>
+          )}
         </div>
       )}
     </>
