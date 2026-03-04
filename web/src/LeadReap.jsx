@@ -320,11 +320,21 @@ const STYLE = `
   .niche-ticker::before, .niche-ticker::after { content: ''; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2; pointer-events: none; }
   .niche-ticker::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
   .niche-ticker::after { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
-  .ticker-track { display: flex; gap: 12px; animation: ticker 45s linear infinite; width: max-content; }
+  .ticker-track { display: flex; gap: 12px; animation: ticker 120s linear infinite; width: max-content; }
   .ticker-track:hover { animation-play-state: paused; }
   .ticker-item { white-space: nowrap; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); padding: 5px 14px; border: 1px solid var(--border); border-radius: 100px; background: rgba(240,180,41,0.04); transition: all 0.2s; }
   .ticker-item:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.08); }
   @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+  /* Google Places Autocomplete dropdown styling */
+  .pac-container { background: #1a1a1f; border: 1px solid #2a2a33; border-radius: 8px; margin-top: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; z-index: 9999; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  .pac-item { padding: 8px 14px; border-bottom: 1px solid #2a2a33; color: #e0e0e0; cursor: pointer; }
+  .pac-item:hover { background: rgba(240,180,41,0.08); }
+  .pac-item-query { color: #f0b429; font-weight: 500; }
+  .pac-matched { color: #f0b429; }
+  .pac-icon { display: none; }
+  .pac-item .pac-icon-marker { display: none; }
+  .pac-logo::after { display: none; }
 
   /* Legal modal */
   .legal-modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; max-width: 640px; width: 90vw; max-height: 80vh; overflow-y: auto; padding: 40px; position: relative; }
@@ -452,13 +462,51 @@ const INDUSTRIES = [
   "Print Shop", "Pet Groomer", "Locksmith", "Moving Company", "Towing Service",
 ];
 
-const DEMO_LEADS = [
-  { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, score: 94, unclaimed: false, linkedinCompany: "https://linkedin.com/company/brightsmile", facebook: "https://facebook.com/brightsmile", instagram: "https://instagram.com/brightsmile", twitter: null, linkedinPerson: null, notes: "Running Facebook Pixel — active ad spend, good agency target." },
-  { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, score: 87, unclaimed: false, linkedinCompany: null, facebook: "https://facebook.com/hillcountrydental", instagram: null, twitter: null, linkedinPerson: null, notes: "High-authority listing — established reputation, ideal outreach target." },
-  { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, score: 82, unclaimed: false, linkedinCompany: null, facebook: null, instagram: "https://instagram.com/atxdental", twitter: null, linkedinPerson: "https://linkedin.com/in/drsmith", ownerName: "Dr. Smith", notes: "Contact Dr. Smith directly — owner identified." },
-  { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, score: 78, unclaimed: true, linkedinCompany: null, facebook: null, instagram: null, twitter: null, linkedinPerson: null, notes: "Unclaimed Google listing — owner hasn't claimed it, prime opportunity to pitch GMB management." },
-  { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "\u2014", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, score: 65, unclaimed: false, linkedinCompany: null, facebook: null, instagram: null, twitter: null, linkedinPerson: null, notes: "Has website but no social media links — pitch social media management." },
-];
+const DEMO_DATA = {
+  "Dentist": { city: "Austin, TX", leads: [
+    { name: "Bright Smile Dental", address: "1420 Main St, Austin, TX", email: "info@brightsmile.com", phone: "(512) 555-0142", website: "brightsmile.com", rating: 4.9, score: 94 },
+    { name: "Hill Country Family Dentistry", address: "8801 Research Blvd, Austin, TX", email: "hello@hillcountrydental.com", phone: "(512) 555-0287", website: "hillcountrydental.com", rating: 4.8, score: 87 },
+    { name: "Austin Dental Works", address: "3500 S Lamar Blvd, Austin, TX", email: "contact@atxdental.com", phone: "(512) 555-0391", website: "atxdental.com", rating: 4.7, score: 82 },
+    { name: "Westlake Smiles", address: "701 Capital of TX Hwy, Austin, TX", email: "team@westlakesmiles.com", phone: "(512) 555-0463", website: "westlakesmiles.com", rating: 4.6, score: 78, unclaimed: true },
+    { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "\u2014", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, score: 65 },
+  ]},
+  "Roofing Contractor": { city: "Denver, CO", leads: [
+    { name: "Summit Roofing Co", address: "4820 Broadway, Denver, CO", email: "jobs@summitroofing.co", phone: "(303) 555-0184", website: "summitroofing.co", rating: 4.8, score: 91 },
+    { name: "Mile High Roof Pros", address: "1200 Larimer St, Denver, CO", email: "info@milehighroofpros.com", phone: "(303) 555-0229", website: "milehighroofpros.com", rating: 4.7, score: 86 },
+    { name: "Front Range Exteriors", address: "7600 E Colfax Ave, Denver, CO", email: "bids@frontrangeext.com", phone: "(303) 555-0371", website: "frontrangeext.com", rating: 4.6, score: 80 },
+    { name: "Denver Roof Repair", address: "3300 S Federal Blvd, Denver, CO", email: "\u2014", phone: "(303) 555-0445", website: "denverroofrepair.net", rating: 4.5, score: 72 },
+    { name: "Apex Roofing Solutions", address: "901 Auraria Pkwy, Denver, CO", email: "hello@apexroof.com", phone: "(303) 555-0502", website: "apexroof.com", rating: 4.4, score: 68, unclaimed: true },
+  ]},
+  "Hair Salon": { city: "Rancho Cordova, CA", leads: [
+    { name: "Luxe Hair Studio", address: "2050 Zinfandel Dr, Rancho Cordova, CA", email: "book@luxehairstudio.com", phone: "(916) 555-0133", website: "luxehairstudio.com", rating: 4.9, score: 93 },
+    { name: "The Cutting Edge Salon", address: "10789 Folsom Blvd, Rancho Cordova, CA", email: "info@cuttingedge916.com", phone: "(916) 555-0267", website: "cuttingedge916.com", rating: 4.8, score: 88 },
+    { name: "Bella Vida Hair", address: "3301 Mather Field Rd, Rancho Cordova, CA", email: "appts@bellavidahair.com", phone: "(916) 555-0398", website: "bellavidahair.com", rating: 4.7, score: 81 },
+    { name: "Shear Perfection", address: "2245 Sunrise Blvd, Rancho Cordova, CA", email: "\u2014", phone: "(916) 555-0412", website: "shearperfection.co", rating: 4.6, score: 74 },
+    { name: "Golden Shears", address: "10901 White Rock Rd, Rancho Cordova, CA", email: "style@goldenshears.net", phone: "(916) 555-0589", website: "goldenshears.net", rating: 4.5, score: 69, unclaimed: true },
+  ]},
+  "Law Firm": { city: "Chicago, IL", leads: [
+    { name: "Clark & Associates", address: "120 N LaSalle St, Chicago, IL", email: "intake@clarklaw.com", phone: "(312) 555-0177", website: "clarklaw.com", rating: 4.9, score: 95 },
+    { name: "Lakefront Legal Group", address: "444 N Michigan Ave, Chicago, IL", email: "consult@lakefrontlegal.com", phone: "(312) 555-0284", website: "lakefrontlegal.com", rating: 4.8, score: 89 },
+    { name: "Windy City Injury Law", address: "77 W Wacker Dr, Chicago, IL", email: "help@windycitylaw.com", phone: "(312) 555-0356", website: "windycitylaw.com", rating: 4.7, score: 83 },
+    { name: "Loop Law Office", address: "200 W Adams St, Chicago, IL", email: "info@looplaw.com", phone: "(312) 555-0441", website: "looplaw.com", rating: 4.6, score: 76 },
+    { name: "South Side Legal Aid", address: "6401 S Halsted St, Chicago, IL", email: "\u2014", phone: "(312) 555-0528", website: "southsidelegal.org", rating: 4.5, score: 67, unclaimed: true },
+  ]},
+  "HVAC Company": { city: "Phoenix, AZ", leads: [
+    { name: "Desert Cool HVAC", address: "3840 E Indian School Rd, Phoenix, AZ", email: "service@desertcoolhvac.com", phone: "(480) 555-0192", website: "desertcoolhvac.com", rating: 4.9, score: 92 },
+    { name: "Sun Valley Air Systems", address: "7005 N 16th St, Phoenix, AZ", email: "info@sunvalleyair.com", phone: "(480) 555-0238", website: "sunvalleyair.com", rating: 4.8, score: 87 },
+    { name: "Phoenix Climate Control", address: "2100 W Camelback Rd, Phoenix, AZ", email: "quotes@phxclimate.com", phone: "(480) 555-0371", website: "phxclimate.com", rating: 4.6, score: 79 },
+    { name: "AZ Comfort Experts", address: "4420 S Rural Rd, Tempe, AZ", email: "\u2014", phone: "(480) 555-0445", website: "azcomfortexperts.com", rating: 4.5, score: 71 },
+    { name: "Cactus Air Pros", address: "9801 N Metro Pkwy, Phoenix, AZ", email: "hello@cactusairpros.com", phone: "(480) 555-0512", website: "cactusairpros.com", rating: 4.4, score: 66, unclaimed: true },
+  ]},
+  "Restaurant": { city: "Nashville, TN", leads: [
+    { name: "Hot Chicken Kitchen", address: "1201 Broadway, Nashville, TN", email: "catering@hotchickenkitchen.com", phone: "(615) 555-0148", website: "hotchickenkitchen.com", rating: 4.9, score: 93 },
+    { name: "Music Row Bistro", address: "1600 Division St, Nashville, TN", email: "events@musicrowbistro.com", phone: "(615) 555-0265", website: "musicrowbistro.com", rating: 4.8, score: 86 },
+    { name: "The Gulch Grille", address: "500 12th Ave S, Nashville, TN", email: "info@gulchgrille.com", phone: "(615) 555-0387", website: "gulchgrille.com", rating: 4.7, score: 80 },
+    { name: "East Side Tacos", address: "1000 Woodland St, Nashville, TN", email: "\u2014", phone: "(615) 555-0419", website: "eastsidetacos.co", rating: 4.6, score: 73 },
+    { name: "Germantown Kitchen", address: "1200 4th Ave N, Nashville, TN", email: "hello@germantownkitchen.com", phone: "(615) 555-0534", website: "germantownkitchen.com", rating: 4.5, score: 68, unclaimed: true },
+  ]},
+};
+const DEMO_NICHES = Object.keys(DEMO_DATA);
 
 function getOutreachTemplates(lead) {
   const biz = lead.name || "your business";
@@ -642,29 +690,23 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         types: ["(cities)"],
         componentRestrictions: { country: "us" },
       });
+      // Use place_changed for autocomplete selection
       autocomplete.addListener("place_changed", () => {
         const place = autocomplete.getPlace();
-        if (place?.formatted_address) {
-          setLocation(place.formatted_address);
-        } else if (place?.name) {
-          setLocation(place.name);
-        }
+        const val = place?.formatted_address || place?.name || locationRef.current.value;
+        setLocation(val);
       });
+      // Mark that Google is managing this input
+      locationRef.current.dataset.gmaps = "true";
+    };
+    script.onerror = () => {
+      // API failed to load (bad key, network, etc) — input still works normally
+      console.warn("Google Maps API failed to load — location autocomplete disabled");
     };
     document.head.appendChild(script);
   }, []);
 
   // Animated niche cycling for demo preview
-  const DEMO_CYCLES = [
-    { niche: "Dentist", city: "Austin, TX" },
-    { niche: "Roofing Contractor", city: "Denver, CO" },
-    { niche: "Hair Salon", city: "Rancho Cordova, CA" },
-    { niche: "Law Firm", city: "Chicago, IL" },
-    { niche: "HVAC Company", city: "Phoenix, AZ" },
-    { niche: "Restaurant", city: "Nashville, TN" },
-    { niche: "Med Spa / Aesthetics", city: "Miami, FL" },
-    { niche: "Auto Repair Shop", city: "Dallas, TX" },
-  ];
   const [demoIndex, setDemoIndex] = useState(0);
   const [demoFade, setDemoFade] = useState(true);
   useEffect(() => {
@@ -672,12 +714,13 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     const iv = setInterval(() => {
       setDemoFade(false);
       setTimeout(() => {
-        setDemoIndex(i => (i + 1) % DEMO_CYCLES.length);
+        setDemoIndex(i => (i + 1) % DEMO_NICHES.length);
         setDemoFade(true);
-      }, 400);
-    }, 3500);
+      }, 500);
+    }, 5000);
     return () => clearInterval(iv);
   }, [loading, searchDone]);
+  const currentDemo = DEMO_DATA[DEMO_NICHES[demoIndex]];
   const [batchNum, setBatchNum] = useState(1);
   const [searchError, setSearchError] = useState("");
   const [currentTip, setCurrentTip] = useState(0);
@@ -893,7 +936,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         <div className="niche-ticker">
           <div className="ticker-track">
             {[...INDUSTRIES, ...INDUSTRIES].map((n, i) => (
-              <span key={i} className="ticker-item">{n}</span>
+              <span key={i} className="ticker-item" onClick={() => { setNiche(INDUSTRIES.includes(n) ? n : "custom"); if (!INDUSTRIES.includes(n)) setCustomNiche(n); }} style={{cursor:"pointer"}}>{n}</span>
             ))}
           </div>
         </div>
@@ -918,7 +961,12 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               )}
               <div className="field">
                 <label>Location</label>
-                <input ref={locationRef} value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State &mdash; e.g. Austin, TX" />
+                <input ref={locationRef} 
+                  value={location} 
+                  onChange={e => setLocation(e.target.value)} 
+                  onBlur={e => { if (locationRef.current) setLocation(locationRef.current.value); }}
+                  placeholder="City, State &mdash; e.g. Austin, TX" 
+                  autoComplete="off" />
               </div>
               <button className="btn btn-primary" onClick={handleSearch} disabled={loading || !targetNiche || !location} style={{ height: 46 }}>
                 {loading ? "Searching..." : "Find Leads"}
@@ -1117,12 +1165,12 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           {!loading && !searchDone && (
             <div className="demo-section">
               <div className="demo-header">
-                <span className="demo-label" style={{transition:"opacity 0.4s ease", opacity: demoFade ? 1 : 0}}>
-                  Example: &quot;{DEMO_CYCLES[demoIndex].niche}&quot; in {DEMO_CYCLES[demoIndex].city}
+                <span className="demo-label" style={{transition:"opacity 0.5s ease", opacity: demoFade ? 1 : 0}}>
+                  Example: &quot;{DEMO_NICHES[demoIndex]}&quot; in {currentDemo.city}
                 </span>
                 <span className="count-tag" style={{opacity:0.5}}>{"\u2713"} 20 leads found</span>
               </div>
-              <div className="demo-wrap">
+              <div className="demo-wrap" style={{transition:"opacity 0.5s ease", opacity: demoFade ? 1 : 0}}>
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -1137,8 +1185,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                       </tr>
                     </thead>
                     <tbody>
-                      {DEMO_LEADS.map((lead, i) => (
-                        <tr key={i} style={{opacity: 1 - (i * 0.08)}}>
+                      {currentDemo.leads.map((lead, i) => (
+                        <tr key={`${demoIndex}-${i}`} style={{opacity: 1 - (i * 0.08)}}>
                           <td style={{color:"var(--muted)",fontSize:12,fontFamily:"IBM Plex Mono"}}>{String(i+1).padStart(2,"0")}</td>
                           <td>
                             <div className="name-cell">{lead.name}</div>
