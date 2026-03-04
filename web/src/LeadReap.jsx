@@ -565,6 +565,36 @@ const STYLE = `
     .logo-mark { width: 28px; height: 28px; }
     .logo-mark svg { width: 28px; height: 28px; }
   }
+
+  /* Sequence Builder */
+  .seq-builder { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+  .seq-builder-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .seq-builder-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+  .seq-steps { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+  .seq-step-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .seq-step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .seq-step-num { font-weight: 700; font-size: 13px; color: var(--accent); font-family: "IBM Plex Mono", monospace; }
+  .seq-step-delay { font-size: 12px; color: var(--muted); display: flex; align-items: center; }
+  .seq-builder-fields code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: var(--accent); }
+
+  /* Sequence Detail */
+  .seq-detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .seq-enroll-bar { display: flex; gap: 10px; align-items: center; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .seq-steps-preview { display: flex; flex-direction: column; gap: 12px; }
+  .seq-step-preview { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .seq-step-preview-num { font-weight: 700; font-size: 12px; color: var(--accent); font-family: "IBM Plex Mono", monospace; margin-bottom: 6px; }
+  .seq-step-preview-subject { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .seq-step-preview-body { font-size: 12px; color: var(--muted); line-height: 1.5; white-space: pre-line; }
+  .seq-enrollments { display: flex; flex-direction: column; gap: 8px; }
+  .seq-enrollment-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; gap: 12px; }
+  .seq-card { border-left: 3px solid var(--accent); }
+
+  @media (max-width: 600px) {
+    .seq-builder { padding: 18px; }
+    .seq-enroll-bar { flex-direction: column; }
+    .seq-enrollment-row { flex-direction: column; align-items: flex-start; }
+    .seq-detail-header { flex-direction: column; gap: 12px; }
+  }
 `;
 
 function LogoMark() {
@@ -1012,6 +1042,267 @@ function ListDetailView({ listId, apiBase, token, onBack, onOutreach }) {
   );
 }
 
+// ─── Sequence Builder (Create / Edit) ─────────────────────────
+function SequenceBuilder({ apiBase, token, existing, onClose, onSaved }) {
+  const [name, setName] = useState(existing?.name || "");
+  const [fromName, setFromName] = useState(existing?.from_name || "");
+  const [steps, setSteps] = useState(
+    existing?.steps?.length ? existing.steps.map(s => ({
+      stepNumber: s.step_number, subject: s.subject, body: s.body, delayHours: s.delay_hours
+    })) : [
+      { stepNumber: 1, subject: "Quick question about {{business}}", body: "Hi,\n\nI came across {{business}} and was impressed by your {{rating}}-star rating.\n\nI help businesses like yours get more customers through [your service]. Would you be open to a quick chat this week?\n\nBest,\n[Your name]", delayHours: 0 },
+      { stepNumber: 2, subject: "Following up — {{business}}", body: "Hi,\n\nJust wanted to follow up on my last email. I know you're busy running {{business}}, so I'll keep this short.\n\n[One sentence value prop]. Can I send over a quick example?\n\nBest,\n[Your name]", delayHours: 48 },
+      { stepNumber: 3, subject: "Last note — {{business}}", body: "Hi,\n\nI don't want to be a pest, so this will be my last note. If you're ever looking for help with [your service], feel free to reach out.\n\nWishing {{business}} continued success!\n\nBest,\n[Your name]", delayHours: 120 },
+    ]
+  );
+  const [saving, setSaving] = useState(false);
+
+  function addStep() {
+    if (steps.length >= 5) return;
+    setSteps(prev => [...prev, {
+      stepNumber: prev.length + 1,
+      subject: "",
+      body: "",
+      delayHours: (prev.length + 1) * 48,
+    }]);
+  }
+
+  function removeStep(idx) {
+    if (steps.length <= 1) return;
+    setSteps(prev => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, stepNumber: i + 1 })));
+  }
+
+  function updateStep(idx, field, value) {
+    setSteps(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  }
+
+  async function handleSave() {
+    if (!name.trim()) return;
+    if (steps.some(s => !s.subject.trim() || !s.body.trim())) return;
+    setSaving(true);
+    try {
+      const url = existing ? `${apiBase}/api/sequences/${existing.id}` : `${apiBase}/api/sequences`;
+      const method = existing ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, fromName, steps }),
+      });
+      const data = await res.json();
+      if (data.ok || data.sequence) { onSaved(); onClose(); }
+    } catch (e) { console.error(e); }
+    setSaving(false);
+  }
+
+  return (
+    <div className="seq-builder">
+      <div className="seq-builder-header">
+        <h3>{existing ? "Edit Sequence" : "New Email Sequence"}</h3>
+        <button className="btn btn-ghost btn-sm" onClick={onClose}>&times;</button>
+      </div>
+      <div className="seq-builder-fields">
+        <div className="field" style={{marginBottom: 12}}>
+          <label style={{fontSize:12,color:"var(--muted)",marginBottom:4,display:"block"}}>Sequence Name</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Cold outreach — Restaurants" style={{width:"100%",padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:14}} />
+        </div>
+        <div className="field" style={{marginBottom: 16}}>
+          <label style={{fontSize:12,color:"var(--muted)",marginBottom:4,display:"block"}}>From Name (shown as sender)</label>
+          <input value={fromName} onChange={e => setFromName(e.target.value)} placeholder="e.g., John from LeadReap" style={{width:"100%",padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:14}} />
+        </div>
+      </div>
+
+      <div className="seq-steps">
+        {steps.map((step, idx) => (
+          <div key={idx} className="seq-step-card">
+            <div className="seq-step-header">
+              <span className="seq-step-num">Step {step.stepNumber}</span>
+              {idx > 0 && (
+                <span className="seq-step-delay">
+                  Send after
+                  <input type="number" min="1" max="720" value={step.delayHours} onChange={e => updateStep(idx, "delayHours", parseInt(e.target.value) || 0)}
+                    style={{width:50,padding:"4px 8px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text)",fontSize:13,margin:"0 6px",textAlign:"center"}} />
+                  hours
+                </span>
+              )}
+              {idx === 0 && <span style={{fontSize:12,color:"var(--accent)"}}>Sent immediately</span>}
+              {steps.length > 1 && (
+                <button className="btn btn-ghost btn-sm" onClick={() => removeStep(idx)} style={{marginLeft:"auto",color:"var(--muted)"}}>&times;</button>
+              )}
+            </div>
+            <input value={step.subject} onChange={e => updateStep(idx, "subject", e.target.value)} placeholder="Subject line..."
+              style={{width:"100%",padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:14,marginBottom:8}} />
+            <textarea value={step.body} onChange={e => updateStep(idx, "body", e.target.value)} placeholder="Email body... Use {{business}}, {{name}}, {{email}}, {{phone}}, {{website}}, {{city}} as placeholders"
+              rows={6} style={{width:"100%",padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:13,lineHeight:1.6,resize:"vertical",fontFamily:"inherit"}} />
+          </div>
+        ))}
+        {steps.length < 5 && (
+          <button className="btn btn-ghost" onClick={addStep} style={{width:"100%",padding:"14px",border:"2px dashed var(--border)",borderRadius:10,color:"var(--muted)",fontSize:13}}>
+            + Add Step {steps.length + 1}
+          </button>
+        )}
+      </div>
+
+      <div className="seq-builder-hint" style={{fontSize:12,color:"var(--muted)",margin:"12px 0",lineHeight:1.5}}>
+        Placeholders: <code>{`{{business}}`}</code> <code>{`{{email}}`}</code> <code>{`{{phone}}`}</code> <code>{`{{website}}`}</code> <code>{`{{city}}`}</code> <code>{`{{rating}}`}</code>
+      </div>
+
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
+        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving || !name.trim()}>
+          {saving ? "Saving..." : existing ? "Save Changes" : "Create Sequence"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sequence Detail View ─────────────────────────────────────
+function SequenceDetailView({ sequenceId, apiBase, token, onBack, lists, onEnrollFromList }) {
+  const [seq, setSeq] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollListId, setEnrollListId] = useState("");
+
+  async function loadSeq() {
+    try {
+      const res = await fetch(`${apiBase}/api/sequences/${sequenceId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setSeq(data.sequence);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
+
+  useEffect(() => { loadSeq(); }, []);
+
+  async function handleEnrollFromList() {
+    if (!enrollListId) return;
+    setEnrolling(true);
+    try {
+      // Fetch leads from the list
+      const listRes = await fetch(`${apiBase}/api/lists/${enrollListId}/leads`, { headers: { Authorization: `Bearer ${token}` } });
+      const listData = await listRes.json();
+      const leads = (listData.leads || []).map(l => {
+        const ld = JSON.parse(l.leadData || "{}");
+        return { email: ld.email, name: ld.name, phone: ld.phone, website: ld.website, address: ld.address, rating: ld.rating, ...ld };
+      });
+
+      const res = await fetch(`${apiBase}/api/sequences/${sequenceId}/enroll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ leads }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        loadSeq();
+        setEnrollListId("");
+      }
+    } catch (e) { console.error(e); }
+    setEnrolling(false);
+  }
+
+  async function toggleStatus() {
+    const newStatus = seq.status === "active" ? "paused" : "active";
+    await fetch(`${apiBase}/api/sequences/${sequenceId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    setSeq(prev => ({ ...prev, status: newStatus }));
+  }
+
+  if (loading) return <div style={{textAlign:"center",padding:"40px 0",color:"var(--muted)"}}>Loading sequence...</div>;
+  if (!seq) return <div style={{textAlign:"center",padding:"40px 0",color:"var(--muted)"}}>Sequence not found</div>;
+
+  const stats = seq.stats || {};
+  const totalSent = stats.sent || 0;
+  const totalPending = stats.pending || 0;
+  const totalFailed = stats.failed || 0;
+
+  return (
+    <>
+      <div className="seq-detail-header">
+        <div>
+          <h3 style={{margin:0,fontSize:18}}>{seq.name}</h3>
+          <div style={{fontSize:12,color:"var(--muted)",marginTop:4}}>
+            {seq.steps?.length || 0} steps &middot; {seq.enrollments?.length || 0} enrolled &middot;
+            <span className={`status-tag status-${seq.status === "active" ? "new" : "closed"}`} style={{marginLeft:6}}>{seq.status}</span>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-ghost btn-sm" onClick={toggleStatus}>
+            {seq.status === "active" ? "⏸ Pause" : "▶ Activate"}
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="dash-stats" style={{marginBottom:20}}>
+        <div className="dash-stat"><div className="dash-stat-label">Sent</div><div className="dash-stat-value" style={{color:"#34d399"}}>{totalSent}</div></div>
+        <div className="dash-stat"><div className="dash-stat-label">Pending</div><div className="dash-stat-value" style={{color:"var(--accent)"}}>{totalPending}</div></div>
+        <div className="dash-stat"><div className="dash-stat-label">Failed</div><div className="dash-stat-value" style={{color:"#f87171"}}>{totalFailed}</div></div>
+      </div>
+
+      {/* Enroll from list */}
+      <div className="seq-enroll-bar">
+        <select value={enrollListId} onChange={e => setEnrollListId(e.target.value)}
+          style={{flex:1,padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:13}}>
+          <option value="">Select a list to enroll leads from...</option>
+          {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.leadCount} leads)</option>)}
+        </select>
+        <button className="btn btn-primary btn-sm" onClick={handleEnrollFromList} disabled={!enrollListId || enrolling}>
+          {enrolling ? "Enrolling..." : "Enroll Leads"}
+        </button>
+      </div>
+
+      {/* Steps preview */}
+      <div className="dash-section" style={{marginTop:20}}>
+        <div className="dash-section-title">📧 Email Steps</div>
+        <div className="seq-steps-preview">
+          {(seq.steps || []).map((step, i) => (
+            <div key={i} className="seq-step-preview">
+              <div className="seq-step-preview-num">
+                Step {step.step_number}
+                {step.delay_hours > 0 && <span style={{fontSize:11,color:"var(--muted)",marginLeft:8}}>+{step.delay_hours}h delay</span>}
+              </div>
+              <div className="seq-step-preview-subject">{step.subject}</div>
+              <div className="seq-step-preview-body">{step.body.slice(0, 120)}{step.body.length > 120 ? "..." : ""}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Enrollments */}
+      <div className="dash-section" style={{marginTop:20}}>
+        <div className="dash-section-title">👥 Enrolled Leads ({seq.enrollments?.length || 0})</div>
+        {seq.enrollments?.length > 0 ? (
+          <div className="seq-enrollments">
+            {seq.enrollments.map((e, i) => (
+              <div key={i} className="seq-enrollment-row">
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:14}}>{e.lead_name || e.lead_email}</div>
+                  <div style={{fontSize:12,color:"var(--muted)"}}>{e.lead_email}</div>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span className={`status-tag status-${e.status === "completed" ? "closed" : e.status === "active" ? "new" : "replied"}`}>
+                    {e.status === "completed" ? "✓ Done" : e.status === "active" ? `Step ${e.current_step + 1}` : e.status}
+                  </span>
+                  {e.sends?.map((s, si) => (
+                    <span key={si} title={`Step ${s.step_number}: ${s.status}`}
+                      style={{width:8,height:8,borderRadius:"50%",background: s.status === "sent" ? "#34d399" : s.status === "pending" ? "var(--accent)" : "#f87171"}} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="dash-empty" style={{padding:"24px 0"}}>
+            <p>No leads enrolled yet. Select a list above to enroll leads.</p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function scoreToClass(score) {
   if (score >= 80) return "score-high";
   if (score >= 60) return "score-med";
@@ -1094,6 +1385,12 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [dashLists, setDashLists] = useState([]);
   const [viewingListId, setViewingListId] = useState(null);
 
+  // Sequences
+  const [dashSequences, setDashSequences] = useState([]);
+  const [viewingSequenceId, setViewingSequenceId] = useState(null);
+  const [showSequenceBuilder, setShowSequenceBuilder] = useState(false);
+  const [editingSequence, setEditingSequence] = useState(null);
+
   function loadDashLists() {
     if (!token) return;
     fetch(`${API_BASE}/api/lists`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1102,11 +1399,23 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       .catch(() => {});
   }
 
+  function loadSequences() {
+    if (!token) return;
+    fetch(`${API_BASE}/api/sequences`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => setDashSequences(d.sequences || []))
+      .catch(() => {});
+  }
+
   function openDashboard() {
     setShowDashboard(true);
     setViewingListId(null);
+    setViewingSequenceId(null);
+    setShowSequenceBuilder(false);
+    setEditingSequence(null);
     setDashLoading(true);
     loadDashLists();
+    loadSequences();
     fetch(`${API_BASE}/api/account`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => r.json()).then(d => {
@@ -1371,11 +1680,29 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         {showDashboard ? (
           <div className="dash">
             <span className="dash-back" onClick={() => {
-              if (viewingListId) { setViewingListId(null); }
+              if (showSequenceBuilder) { setShowSequenceBuilder(false); setEditingSequence(null); }
+              else if (viewingSequenceId) { setViewingSequenceId(null); loadSequences(); }
+              else if (viewingListId) { setViewingListId(null); }
               else { setShowDashboard(false); }
-            }}>&larr; {viewingListId ? "Back to dashboard" : "Back to search"}</span>
+            }}>&larr; {showSequenceBuilder ? "Back to sequences" : viewingSequenceId ? "Back to dashboard" : viewingListId ? "Back to dashboard" : "Back to search"}</span>
 
-            {viewingListId ? (
+            {showSequenceBuilder ? (
+              <SequenceBuilder
+                apiBase={API_BASE}
+                token={token}
+                existing={editingSequence}
+                onClose={() => { setShowSequenceBuilder(false); setEditingSequence(null); }}
+                onSaved={() => { loadSequences(); }}
+              />
+            ) : viewingSequenceId ? (
+              <SequenceDetailView
+                sequenceId={viewingSequenceId}
+                apiBase={API_BASE}
+                token={token}
+                onBack={() => { setViewingSequenceId(null); loadSequences(); }}
+                lists={dashLists}
+              />
+            ) : viewingListId ? (
               <ListDetailView
                 listId={viewingListId}
                 apiBase={API_BASE}
@@ -1475,6 +1802,42 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                       }
                     }}>
                       + New List
+                    </div>
+                  </div>
+                </div>
+
+                {/* My Sequences */}
+                <div className="dash-section">
+                  <div className="dash-section-title">📧 My Sequences</div>
+                  <div className="lists-grid">
+                    {dashSequences.map(s => (
+                      <div key={s.id} className="list-card seq-card" onClick={() => setViewingSequenceId(s.id)}>
+                        <button className="list-card-delete" onClick={e => {
+                          e.stopPropagation();
+                          if (confirm(`Delete sequence "${s.name}"? All enrollments will be cancelled.`)) {
+                            fetch(`${API_BASE}/api/sequences/${s.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })
+                              .then(() => setDashSequences(prev => prev.filter(x => x.id !== s.id)));
+                          }
+                        }}>&times;</button>
+                        <div className="list-card-name">{s.name}</div>
+                        <div className="list-card-desc">
+                          {s.stepCount} steps &middot; {s.enrolledCount} enrolled
+                          {s.activeCount > 0 && <span style={{color:"var(--accent)"}}> &middot; {s.activeCount} active</span>}
+                        </div>
+                        <div className="list-card-meta">
+                          <span className={`status-tag status-${s.status === "active" ? "new" : "closed"}`} style={{fontSize:11}}>{s.status}</span>
+                          <span>
+                            {s.stats?.sent ? `${s.stats.sent} sent` : "No sends yet"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="list-card new-list-card" onClick={() => {
+                      if (user?.plan === "free") { setShowDashboard(false); setShowPricing(true); return; }
+                      setShowSequenceBuilder(true);
+                      setEditingSequence(null);
+                    }}>
+                      {user?.plan === "free" ? "🔒 " : "+ "}New Sequence
                     </div>
                   </div>
                 </div>
