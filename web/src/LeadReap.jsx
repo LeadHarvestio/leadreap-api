@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap');
@@ -168,8 +168,16 @@ const STYLE = `
   tr:hover td { background: rgba(240,180,41,0.02); }
   .name-cell { font-weight: 600; color: var(--text); }
   .email-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); }
-  .email-verified { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(34,197,94,0.12); color: #22c55e; font-weight: 600; margin-left: 6px; vertical-align: middle; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; }
-  .email-unverified { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(251,191,36,0.12); color: #fbbf24; font-weight: 600; margin-left: 6px; vertical-align: middle; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; }
+  .email-verified { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(34,197,94,0.12); color: #22c55e; font-weight: 600; margin-left: 6px; vertical-align: middle; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; cursor: help; }
+  .email-unverified { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(251,191,36,0.12); color: #fbbf24; font-weight: 600; margin-left: 6px; vertical-align: middle; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; cursor: help; }
+
+  /* Expandable row detail */
+  tr.row-expandable { cursor: pointer; }
+  tr.row-expandable:hover td { background: rgba(240,180,41,0.03); }
+  .expand-row td { padding: 0 !important; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .expand-content { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; }
+  .expand-insight { flex: 1; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .expand-actions { display: flex; gap: 8px; flex-shrink: 0; }
   .phone-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
   .site-cell { color: #60a5fa; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .site-cell a { color: #60a5fa; text-decoration: none; }
@@ -711,6 +719,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   // Outreach template modal
   const [showOutreach, setShowOutreach] = useState(false);
   const [outreachLead, setOutreachLead] = useState(null);
+  const [expandedRow, setExpandedRow] = useState(null);
 
   // Dashboard
   const [showDashboard, setShowDashboard] = useState(false);
@@ -1228,6 +1237,13 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 </div>
               </div>
 
+              <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:12,flexWrap:"wrap",fontSize:11,fontFamily:"IBM Plex Mono",color:"var(--muted)"}}>
+                <span>Click any row to expand details & outreach</span>
+                <span style={{display:"flex",alignItems:"center",gap:4}}><span className="email-verified" style={{marginLeft:0}}>Verified ✓</span> Email domain accepts mail</span>
+                <span style={{display:"flex",alignItems:"center",gap:4}}><span className="email-unverified" style={{marginLeft:0}}>Unverified</span> Could not confirm</span>
+                <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"#f59e0b22",color:"#f59e0b",fontWeight:600}}>UNCLAIMED</span> Google listing not claimed</span>
+              </div>
+
               <div className={!isPro ? "lock-overlay" : ""}>
                 <div className="table-wrap">
                   <table>
@@ -1240,33 +1256,32 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                         <th>Website</th>
                         <th>Rating</th>
                         <th>Lead Score</th>
-                        <th>Insight</th>
-                        <th style={{minWidth:80}}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visibleLeads.map((lead, i) => (
-                        <tr key={i}>
+                        <React.Fragment key={i}>
+                        <tr className="row-expandable" onClick={() => setExpandedRow(expandedRow === i ? null : i)}>
                           <td style={{color:"var(--muted)",fontSize:12,fontFamily:"IBM Plex Mono"}}>{String(i+1).padStart(2,"0")}</td>
                           <td>
                             <div className="name-cell">{lead.name}</div>
                             <div style={{fontSize:11,color:"var(--muted)",marginTop:2,fontFamily:"IBM Plex Mono"}}>{lead.address}</div>
                             {includeSocial && (lead.linkedinCompany || lead.linkedinPerson || lead.facebook || lead.instagram || lead.twitter) && (
                               <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap"}}>
-                                {lead.linkedinCompany && <a href={lead.linkedinCompany} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#0a66c2",textDecoration:"none"}}>LinkedIn</a>}
-                                {lead.linkedinPerson && <a href={lead.linkedinPerson} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#0a66c2",textDecoration:"none"}}>{lead.ownerName ? `in/${lead.ownerName}` : "LinkedIn Owner"}</a>}
-                                {lead.facebook && <a href={lead.facebook} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#1877f2",textDecoration:"none"}}>Facebook</a>}
-                                {lead.instagram && <a href={lead.instagram} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#e1306c",textDecoration:"none"}}>Instagram</a>}
-                                {lead.twitter && <a href={lead.twitter} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#1da1f2",textDecoration:"none"}}>X/Twitter</a>}
+                                {lead.linkedinCompany && <a href={lead.linkedinCompany} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#0a66c2",textDecoration:"none"}} onClick={e => e.stopPropagation()}>LinkedIn</a>}
+                                {lead.linkedinPerson && <a href={lead.linkedinPerson} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#0a66c2",textDecoration:"none"}} onClick={e => e.stopPropagation()}>{lead.ownerName ? `in/${lead.ownerName}` : "LinkedIn Owner"}</a>}
+                                {lead.facebook && <a href={lead.facebook} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#1877f2",textDecoration:"none"}} onClick={e => e.stopPropagation()}>Facebook</a>}
+                                {lead.instagram && <a href={lead.instagram} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#e1306c",textDecoration:"none"}} onClick={e => e.stopPropagation()}>Instagram</a>}
+                                {lead.twitter && <a href={lead.twitter} target="_blank" rel="noopener noreferrer" style={{fontSize:10,color:"#1da1f2",textDecoration:"none"}} onClick={e => e.stopPropagation()}>X/Twitter</a>}
                               </div>
                             )}
                           </td>
                           {includeEmail && <td className="email-cell">
-                            {lead.email ? <>{lead.email}{lead.emailVerified ? <span className="email-verified">MX ✓</span> : <span className="email-unverified">unverified</span>}</> : "\u2014"}
+                            {lead.email ? <>{lead.email}{lead.emailVerified ? <span className="email-verified" title="Mail server verified — this domain accepts email">Verified ✓</span> : <span className="email-unverified" title="Could not verify mail server — email may still be valid">Unverified</span>}</> : "\u2014"}
                           </td>}
                           {includePhone && <td className="phone-cell">{lead.phoneDisplay || lead.phone || "\u2014"}</td>}
                           <td className="site-cell">
-                            {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "\u2014"}
+                            {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "\u2014"}
                           </td>
                           <td>
                             <div className="rating-cell">
@@ -1279,20 +1294,41 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td>
                             <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
                           </td>
-                          <td style={{minWidth:180,maxWidth:260,fontSize:12,color:"var(--muted)",lineHeight:"1.5"}}>{lead.notes}</td>
-                          <td>
-                            {lead.email && lead.email !== "\u2014" ? (
-                              <button onClick={() => { setOutreachLead(lead); setShowOutreach(true); }}
-                                style={{fontSize:11,fontFamily:"IBM Plex Mono",padding:"4px 10px",borderRadius:6,
-                                  border:"1px solid var(--accent)",background:"rgba(240,180,41,0.08)",
-                                  color:"var(--accent)",cursor:"pointer",whiteSpace:"nowrap",fontWeight:600}}>
-                                Outreach ↗
-                              </button>
-                            ) : (
-                              <span style={{fontSize:11,color:"var(--border)"}}>—</span>
-                            )}
-                          </td>
                         </tr>
+                        {expandedRow === i && (
+                          <tr className="expand-row">
+                            <td colSpan={99}>
+                              <div className="expand-content">
+                                <div className="expand-insight">
+                                  <strong style={{color:"var(--text)",fontSize:11,fontFamily:"IBM Plex Mono",letterSpacing:"0.03em"}}>INSIGHT:</strong> {lead.notes}
+                                </div>
+                                <div className="expand-actions">
+                                  {lead.email && lead.email !== "\u2014" && (
+                                    <button onClick={(e) => { e.stopPropagation(); setOutreachLead(lead); setShowOutreach(true); }}
+                                      className="btn btn-primary btn-sm" style={{fontSize:11,whiteSpace:"nowrap"}}>
+                                      Outreach ↗
+                                    </button>
+                                  )}
+                                  {lead.website && (
+                                    <a href={lead.website} target="_blank" rel="noopener noreferrer"
+                                      className="btn btn-outline btn-sm" style={{fontSize:11,whiteSpace:"nowrap",textDecoration:"none"}}
+                                      onClick={e => e.stopPropagation()}>
+                                      Visit Site
+                                    </a>
+                                  )}
+                                  {lead.mapsUrl && (
+                                    <a href={lead.mapsUrl} target="_blank" rel="noopener noreferrer"
+                                      className="btn btn-outline btn-sm" style={{fontSize:11,whiteSpace:"nowrap",textDecoration:"none"}}
+                                      onClick={e => e.stopPropagation()}>
+                                      Maps
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
