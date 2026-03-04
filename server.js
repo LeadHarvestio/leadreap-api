@@ -25,9 +25,13 @@ import {
   updateSavedList, deleteSavedList,
   addLeadsToList, getListLeads,
   updateLeadStatus, updateLeadNotes, removeLeadFromList,
+  createSequence, getUserSequences, getSequenceWithSteps,
+  updateSequence, setSequenceStatus, deleteSequence,
+  enrollLeads, getDueSends, markSendComplete, markSendFailed,
+  setEnrollmentStatus,
 } from "./auth.js";
 import { createCheckout, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
-import { sendMagicLinkEmail } from "./email.js";
+import { sendMagicLinkEmail, sendSequenceEmail } from "./email.js";
 import { attachUser, requireAuth, requireSearchQuota, ipRateLimit } from "./middleware.js";
 
 const app = express();
@@ -386,6 +390,94 @@ app.delete("/api/lists/:listId/leads/:leadId", requireAuth, (req, res) => {
 
 
 // ═════════════════════════════════════════════════════════════
+// EMAIL SEQUENCES
+// ═════════════════════════════════════════════════════════════
+
+// ── GET /api/sequences — List user's sequences ──────────────
+app.get("/api/sequences", requireAuth, (req, res) => {
+  const seqs = getUserSequences(req.user.id);
+  return res.json({ sequences: seqs });
+});
+
+// ── POST /api/sequences — Create a sequence with steps ──────
+app.post("/api/sequences", requireAuth, (req, res) => {
+  if (req.user.plan === "free") return res.status(403).json({ error: "Pro plan required" });
+
+  const { name, fromName, steps } = req.body;
+  if (!name || !steps || !steps.length) return res.status(400).json({ error: "Name and steps are required" });
+  if (steps.length > 5) return res.status(400).json({ error: "Maximum 5 steps per sequence" });
+
+  // Validate steps
+  for (const s of steps) {
+    if (!s.subject || !s.body) return res.status(400).json({ error: `Step ${s.stepNumber}: subject and body required` });
+  }
+
+  const userSeqs = getUserSequences(req.user.id);
+  if (userSeqs.length >= 10) return res.status(400).json({ error: "Maximum 10 sequences" });
+
+  const seq = createSequence(req.user.id, name, fromName || "", steps);
+  return res.json({ ok: true, sequence: seq });
+});
+
+// ── GET /api/sequences/:id — Get sequence with steps + enrollments ──
+app.get("/api/sequences/:id", requireAuth, (req, res) => {
+  const seq = getSequenceWithSteps(req.params.id, req.user.id);
+  if (!seq) return res.status(404).json({ error: "Sequence not found" });
+  return res.json({ sequence: seq });
+});
+
+// ── PUT /api/sequences/:id — Update sequence name/steps ─────
+app.put("/api/sequences/:id", requireAuth, (req, res) => {
+  const { name, fromName, steps } = req.body;
+  if (!name || !steps || !steps.length) return res.status(400).json({ error: "Name and steps required" });
+  if (steps.length > 5) return res.status(400).json({ error: "Maximum 5 steps" });
+
+  const ok = updateSequence(req.params.id, req.user.id, name, fromName || "", steps);
+  if (!ok) return res.status(404).json({ error: "Sequence not found" });
+  return res.json({ ok: true });
+});
+
+// ── PATCH /api/sequences/:id/status — Pause/activate ────────
+app.patch("/api/sequences/:id/status", requireAuth, (req, res) => {
+  const { status } = req.body;
+  if (!["active", "paused"].includes(status)) return res.status(400).json({ error: "Invalid status" });
+  setSequenceStatus(req.params.id, req.user.id, status);
+  return res.json({ ok: true });
+});
+
+// ── DELETE /api/sequences/:id — Delete a sequence ───────────
+app.delete("/api/sequences/:id", requireAuth, (req, res) => {
+  const ok = deleteSequence(req.params.id, req.user.id);
+  if (!ok) return res.status(404).json({ error: "Sequence not found" });
+  return res.json({ ok: true });
+});
+
+// ── POST /api/sequences/:id/enroll — Enroll leads ──────────
+app.post("/api/sequences/:id/enroll", requireAuth, (req, res) => {
+  if (req.user.plan === "free") return res.status(403).json({ error: "Pro plan required" });
+
+  const seq = getSequenceWithSteps(req.params.id, req.user.id);
+  if (!seq) return res.status(404).json({ error: "Sequence not found" });
+  if (seq.status !== "active") return res.status(400).json({ error: "Sequence is paused" });
+
+  const { leads } = req.body;
+  if (!leads || !leads.length) return res.status(400).json({ error: "No leads provided" });
+  if (leads.length > 500) return res.status(400).json({ error: "Maximum 500 leads per enrollment" });
+
+  const result = enrollLeads(req.params.id, req.user.id, leads);
+  return res.json({ ok: true, ...result });
+});
+
+// ── PATCH /api/sequences/enrollments/:id/status — Pause/resume enrollment ──
+app.patch("/api/sequences/enrollments/:id/status", requireAuth, (req, res) => {
+  const { status } = req.body;
+  if (!["active", "paused", "cancelled"].includes(status)) return res.status(400).json({ error: "Invalid status" });
+  setEnrollmentStatus(req.params.id, status);
+  return res.json({ ok: true });
+});
+
+
+// ═════════════════════════════════════════════════════════════
 // SYSTEM ROUTES
 // ═════════════════════════════════════════════════════════════
 
@@ -425,9 +517,56 @@ clearExpired();
 setInterval(clearExpired, 6 * 60 * 60 * 1000);
 cleanupAuth();
 
+// ── Sequence email scheduler ────────────────────────────────
+async function processSequenceQueue() {
+  try {
+    const dueSends = getDueSends();
+    if (!dueSends.length) return;
+
+    console.log(`[Scheduler] Processing ${dueSends.length} pending sends`);
+
+    for (const send of dueSends) {
+      try {
+        const seq = getSequenceWithSteps(send.sequence_id, send.user_id);
+        if (!seq || seq.status !== "active") {
+          markSendFailed(send.id, "Sequence paused or deleted");
+          continue;
+        }
+
+        const step = seq.steps.find(s => s.step_number === send.step_number);
+        if (!step) {
+          markSendFailed(send.id, "Step not found");
+          continue;
+        }
+
+        const leadData = JSON.parse(send.lead_data || "{}");
+
+        await sendSequenceEmail({
+          to: send.lead_email,
+          fromName: seq.from_name || "LeadReap",
+          subject: step.subject,
+          body: step.body,
+          leadData,
+        });
+
+        markSendComplete(send.id, send.enrollment_id);
+      } catch (err) {
+        console.error(`[Scheduler] Send ${send.id} failed:`, err.message);
+        markSendFailed(send.id, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("[Scheduler] Queue error:", err.message);
+  }
+}
+
+// Process queue every 60 seconds
+setInterval(processSequenceQueue, 60 * 1000);
+processSequenceQueue(); // Run once on startup
+
 app.listen(PORT, () => {
   console.log(`
-  LeadReap API v3.4 — port ${PORT}
+  LeadReap API v3.5 — port ${PORT}
   ────────────────────────────────
   POST /api/auth/magic
   POST /api/auth/verify
@@ -442,6 +581,13 @@ app.listen(PORT, () => {
   GET  /api/lists/:id/leads
   POST /api/lists/:id/leads
   PATCH /api/lists/:lid/leads/:id
+  GET  /api/sequences
+  POST /api/sequences
+  GET  /api/sequences/:id
+  PUT  /api/sequences/:id
+  PATCH /api/sequences/:id/status
+  DELETE /api/sequences/:id
+  POST /api/sequences/:id/enroll
   GET  /api/metrics
   GET  /health
   ────────────────────────────────
