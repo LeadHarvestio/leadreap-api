@@ -143,6 +143,66 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_enrollments_user ON sequence_enrollments(user_id);
   CREATE INDEX IF NOT EXISTS idx_sends_enrollment ON sequence_sends(enrollment_id);
   CREATE INDEX IF NOT EXISTS idx_sends_status ON sequence_sends(status, scheduled_at);
+
+  CREATE TABLE IF NOT EXISTS teams (
+    id          TEXT PRIMARY KEY,
+    owner_id    TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (owner_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS team_members (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id     TEXT NOT NULL,
+    user_id     TEXT NOT NULL,
+    role        TEXT DEFAULT 'member',
+    joined_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS team_invites (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id     TEXT NOT NULL,
+    email       TEXT NOT NULL,
+    token       TEXT UNIQUE NOT NULL,
+    status      TEXT DEFAULT 'pending',
+    created_at  TEXT DEFAULT (datetime('now')),
+    expires_at  TEXT NOT NULL,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS webhooks (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    url         TEXT NOT NULL,
+    events      TEXT DEFAULT 'search.completed,lead.status_changed',
+    secret      TEXT NOT NULL,
+    active      INTEGER DEFAULT 1,
+    created_at  TEXT DEFAULT (datetime('now')),
+    last_triggered TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS api_keys (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    key_prefix  TEXT NOT NULL,
+    key_hash    TEXT UNIQUE NOT NULL,
+    name        TEXT DEFAULT 'Default',
+    last_used   TEXT,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_teams_owner ON teams(owner_id);
+  CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id);
+  CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
+  CREATE INDEX IF NOT EXISTS idx_team_invites_token ON team_invites(token);
+  CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks(user_id);
+  CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
+  CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 `);
 
 // ─────────────────────────────────────────────────────────────
@@ -218,6 +278,40 @@ const stmts = {
   markSendFailed:   db.prepare("UPDATE sequence_sends SET status = 'failed', error = ? WHERE id = ?"),
   getSequenceSendStats: db.prepare("SELECT s.status, COUNT(*) as count FROM sequence_sends s JOIN sequence_enrollments e ON s.enrollment_id = e.id WHERE e.sequence_id = ? GROUP BY s.status"),
   getEnrollmentSends: db.prepare("SELECT * FROM sequence_sends WHERE enrollment_id = ? ORDER BY step_number ASC"),
+
+  // Teams
+  createTeam:        db.prepare("INSERT INTO teams (id, owner_id, name) VALUES (?, ?, ?)"),
+  getTeamByOwner:    db.prepare("SELECT * FROM teams WHERE owner_id = ?"),
+  getTeamById:       db.prepare("SELECT * FROM teams WHERE id = ?"),
+  deleteTeam:        db.prepare("DELETE FROM teams WHERE id = ? AND owner_id = ?"),
+  addTeamMember:     db.prepare("INSERT INTO team_members (team_id, user_id, role) VALUES (?, ?, ?)"),
+  getTeamMembers:    db.prepare("SELECT tm.*, u.email, u.plan FROM team_members tm JOIN users u ON tm.user_id = u.id WHERE tm.team_id = ?"),
+  removeTeamMember:  db.prepare("DELETE FROM team_members WHERE team_id = ? AND user_id = ?"),
+  getTeamForUser:    db.prepare("SELECT t.* FROM teams t JOIN team_members tm ON t.id = tm.team_id WHERE tm.user_id = ?"),
+  isTeamMember:      db.prepare("SELECT COUNT(*) AS count FROM team_members WHERE team_id = ? AND user_id = ?"),
+  countTeamMembers:  db.prepare("SELECT COUNT(*) AS count FROM team_members WHERE team_id = ?"),
+
+  // Team invites
+  createInvite:      db.prepare("INSERT INTO team_invites (team_id, email, token, expires_at) VALUES (?, ?, ?, ?)"),
+  getInviteByToken:  db.prepare("SELECT * FROM team_invites WHERE token = ? AND status = 'pending' AND expires_at > datetime('now')"),
+  markInviteUsed:    db.prepare("UPDATE team_invites SET status = 'accepted' WHERE id = ?"),
+  getPendingInvites: db.prepare("SELECT * FROM team_invites WHERE team_id = ? AND status = 'pending' AND expires_at > datetime('now')"),
+
+  // Webhooks
+  createWebhook:     db.prepare("INSERT INTO webhooks (id, user_id, url, events, secret) VALUES (?, ?, ?, ?, ?)"),
+  getUserWebhooks:   db.prepare("SELECT id, url, events, active, created_at, last_triggered FROM webhooks WHERE user_id = ?"),
+  getWebhookById:    db.prepare("SELECT * FROM webhooks WHERE id = ? AND user_id = ?"),
+  deleteWebhook:     db.prepare("DELETE FROM webhooks WHERE id = ? AND user_id = ?"),
+  toggleWebhook:     db.prepare("UPDATE webhooks SET active = ? WHERE id = ? AND user_id = ?"),
+  touchWebhook:      db.prepare("UPDATE webhooks SET last_triggered = datetime('now') WHERE id = ?"),
+  getActiveWebhooksForUser: db.prepare("SELECT * FROM webhooks WHERE user_id = ? AND active = 1"),
+
+  // API keys
+  createApiKey:      db.prepare("INSERT INTO api_keys (id, user_id, key_prefix, key_hash, name) VALUES (?, ?, ?, ?, ?)"),
+  getUserApiKeys:    db.prepare("SELECT id, key_prefix, name, last_used, created_at FROM api_keys WHERE user_id = ?"),
+  getApiKeyByHash:   db.prepare("SELECT ak.*, u.email, u.plan, u.id AS uid FROM api_keys ak JOIN users u ON ak.user_id = u.id WHERE ak.key_hash = ?"),
+  deleteApiKey:      db.prepare("DELETE FROM api_keys WHERE id = ? AND user_id = ?"),
+  touchApiKey:       db.prepare("UPDATE api_keys SET last_used = datetime('now') WHERE id = ?"),
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -575,6 +669,169 @@ export function markSendFailed(sendId, error) {
 /** Pause/resume an enrollment */
 export function setEnrollmentStatus(enrollmentId, status) {
   stmts.pauseEnrollment.run(status, enrollmentId);
+}
+
+// ─────────────────────────────────────────────────────────────
+// TEAMS (Agency tier)
+// ─────────────────────────────────────────────────────────────
+
+/** Create a team (one per agency user) */
+export function createTeam(ownerId, name) {
+  const existing = stmts.getTeamByOwner.get(ownerId);
+  if (existing) return existing;
+  const id = randomUUID();
+  stmts.createTeam.run(id, ownerId, name.trim());
+  stmts.addTeamMember.run(id, ownerId, "owner");
+  return { id, owner_id: ownerId, name: name.trim() };
+}
+
+/** Get the team a user belongs to (either as owner or member) */
+export function getUserTeam(userId) {
+  // Check if owner
+  const owned = stmts.getTeamByOwner.get(userId);
+  if (owned) return owned;
+  // Check if member
+  return stmts.getTeamForUser.get(userId) || null;
+}
+
+/** Get team members */
+export function getTeamMembers(teamId) {
+  return stmts.getTeamMembers.all(teamId);
+}
+
+/** Invite a user to a team */
+export function createTeamInvite(teamId, email) {
+  const token = randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  stmts.createInvite.run(teamId, email.toLowerCase().trim(), token, expiresAt);
+  return { token, email: email.toLowerCase().trim() };
+}
+
+/** Accept a team invite */
+export function acceptTeamInvite(token, userId) {
+  const invite = stmts.getInviteByToken.get(token);
+  if (!invite) return { error: "Invalid or expired invite" };
+
+  const memberCount = stmts.countTeamMembers.get(invite.team_id);
+  if (memberCount.count >= 6) return { error: "Team is full (max 6 members)" };
+
+  const isMember = stmts.isTeamMember.get(invite.team_id, userId);
+  if (isMember.count > 0) return { error: "Already a team member" };
+
+  stmts.addTeamMember.run(invite.team_id, userId, "member");
+  stmts.markInviteUsed.run(invite.id);
+  return { ok: true, teamId: invite.team_id };
+}
+
+/** Remove a team member */
+export function removeTeamMember(teamId, userId, ownerId) {
+  const team = stmts.getTeamById.get(teamId);
+  if (!team || team.owner_id !== ownerId) return false;
+  if (userId === ownerId) return false;
+  stmts.removeTeamMember.run(teamId, userId);
+  return true;
+}
+
+/** Get pending invites for a team */
+export function getPendingInvites(teamId) {
+  return stmts.getPendingInvites.all(teamId);
+}
+
+/** Check if two users share a team */
+export function areTeammates(userId1, userId2) {
+  const team1 = getUserTeam(userId1);
+  if (!team1) return false;
+  const isMember = stmts.isTeamMember.get(team1.id, userId2);
+  return isMember.count > 0;
+}
+
+/** Get lists visible to a user (own + teammates') */
+export function getAccessibleLists(userId) {
+  const own = stmts.getUserLists.all(userId);
+  const team = getUserTeam(userId);
+  if (!team) return own;
+  const members = stmts.getTeamMembers.all(team.id);
+  const teamLists = [];
+  for (const m of members) {
+    if (m.user_id === userId) continue;
+    const lists = stmts.getUserLists.all(m.user_id);
+    teamLists.push(...lists.map(l => ({ ...l, sharedBy: m.email })));
+  }
+  return [...own, ...teamLists];
+}
+
+// ─────────────────────────────────────────────────────────────
+// WEBHOOKS
+// ─────────────────────────────────────────────────────────────
+
+/** Create a webhook */
+export function createWebhook(userId, url, events) {
+  const id = randomUUID();
+  const secret = `whsec_${randomUUID().replace(/-/g, "")}`;
+  stmts.createWebhook.run(id, userId, url, events || "search.completed", secret);
+  return { id, url, events, secret };
+}
+
+/** Get user's webhooks */
+export function getUserWebhooks(userId) {
+  return stmts.getUserWebhooks.all(userId);
+}
+
+/** Delete a webhook */
+export function deleteWebhook(webhookId, userId) {
+  stmts.deleteWebhook.run(webhookId, userId);
+}
+
+/** Toggle webhook active state */
+export function toggleWebhook(webhookId, userId, active) {
+  stmts.toggleWebhook.run(active ? 1 : 0, webhookId, userId);
+}
+
+/** Get active webhooks for a user — used by trigger system */
+export function getActiveWebhooks(userId) {
+  return stmts.getActiveWebhooksForUser.all(userId);
+}
+
+/** Mark webhook as triggered */
+export function touchWebhookTimestamp(webhookId) {
+  stmts.touchWebhook.run(webhookId);
+}
+
+// ─────────────────────────────────────────────────────────────
+// API KEYS
+// ─────────────────────────────────────────────────────────────
+
+/** Create an API key (returns the raw key only once) */
+export function createApiKey(userId, name) {
+  const id = randomUUID();
+  const rawKey = `lr_${randomUUID().replace(/-/g, "")}`;
+  const keyPrefix = rawKey.slice(0, 10) + "...";
+  const keyHash = createHmac("sha256", "leadreap-api-key-salt").update(rawKey).digest("hex");
+
+  const existing = stmts.getUserApiKeys.all(userId);
+  if (existing.length >= 5) return { error: "Maximum 5 API keys" };
+
+  stmts.createApiKey.run(id, userId, keyPrefix, keyHash, name || "Default");
+  return { id, key: rawKey, keyPrefix, name: name || "Default" };
+}
+
+/** Get user's API keys (never returns the full key) */
+export function getUserApiKeys(userId) {
+  return stmts.getUserApiKeys.all(userId);
+}
+
+/** Validate an API key — returns user info or null */
+export function validateApiKey(rawKey) {
+  const keyHash = createHmac("sha256", "leadreap-api-key-salt").update(rawKey).digest("hex");
+  const row = stmts.getApiKeyByHash.get(keyHash);
+  if (!row) return null;
+  stmts.touchApiKey.run(row.id);
+  return { id: row.uid, email: row.email, plan: row.plan };
+}
+
+/** Delete an API key */
+export function deleteApiKey(keyId, userId) {
+  stmts.deleteApiKey.run(keyId, userId);
 }
 
 // Run cleanup every hour
