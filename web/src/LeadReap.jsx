@@ -597,59 +597,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [niche, setNiche] = useState("");
   const [location, setLocation] = useState("");
   const locationRef = useRef(null);
-
-  // Google Places Autocomplete for location input
-  useEffect(() => {
-    const GMAPS_KEY = import.meta.env.VITE_GMAPS_KEY;
-    if (!GMAPS_KEY || document.getElementById("gmaps-script")) return;
-    const script = document.createElement("script");
-    script.id = "gmaps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=places`;
-    script.async = true;
-    script.onload = () => {
-      if (!locationRef.current || !window.google?.maps?.places) return;
-      const autocomplete = new window.google.maps.places.Autocomplete(locationRef.current, {
-        types: ["(cities)"],
-        componentRestrictions: { country: "us" },
-      });
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place?.formatted_address) {
-          setLocation(place.formatted_address);
-        } else if (place?.name) {
-          setLocation(place.name);
-        }
-      });
-    };
-    document.head.appendChild(script);
-  }, []);
   const [customNiche, setCustomNiche] = useState("");
   const [includeEmail, setIncludeEmail] = useState(true);
-
-  // Animated niche cycling for demo preview
-  const DEMO_CYCLES = [
-    { niche: "Dentist", city: "Austin, TX" },
-    { niche: "Roofing Contractor", city: "Denver, CO" },
-    { niche: "Hair Salon", city: "Rancho Cordova, CA" },
-    { niche: "Law Firm", city: "Chicago, IL" },
-    { niche: "HVAC Company", city: "Phoenix, AZ" },
-    { niche: "Restaurant", city: "Nashville, TN" },
-    { niche: "Med Spa / Aesthetics", city: "Miami, FL" },
-    { niche: "Auto Repair Shop", city: "Dallas, TX" },
-  ];
-  const [demoIndex, setDemoIndex] = useState(0);
-  const [demoFade, setDemoFade] = useState(true);
-  useEffect(() => {
-    if (loading || searchDone) return;
-    const iv = setInterval(() => {
-      setDemoFade(false);
-      setTimeout(() => {
-        setDemoIndex(i => (i + 1) % DEMO_CYCLES.length);
-        setDemoFade(true);
-      }, 400);
-    }, 3500);
-    return () => clearInterval(iv);
-  }, [loading, searchDone]);
   const [includePhone, setIncludePhone] = useState(true);
   const [includeSocial, setIncludeSocial] = useState(false);
   const [leads, setLeads] = useState([]);
@@ -678,6 +627,57 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   // Outreach template modal
   const [showOutreach, setShowOutreach] = useState(false);
   const [outreachLead, setOutreachLead] = useState(null);
+
+  // Google Places Autocomplete for location input
+  useEffect(() => {
+    const GMAPS_KEY = import.meta.env.VITE_GMAPS_KEY;
+    if (!GMAPS_KEY || document.getElementById("gmaps-script")) return;
+    const script = document.createElement("script");
+    script.id = "gmaps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=places`;
+    script.async = true;
+    script.onload = () => {
+      if (!locationRef.current || !window.google?.maps?.places) return;
+      const autocomplete = new window.google.maps.places.Autocomplete(locationRef.current, {
+        types: ["(cities)"],
+        componentRestrictions: { country: "us" },
+      });
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place?.formatted_address) {
+          setLocation(place.formatted_address);
+        } else if (place?.name) {
+          setLocation(place.name);
+        }
+      });
+    };
+    document.head.appendChild(script);
+  }, []);
+
+  // Animated niche cycling for demo preview
+  const DEMO_CYCLES = [
+    { niche: "Dentist", city: "Austin, TX" },
+    { niche: "Roofing Contractor", city: "Denver, CO" },
+    { niche: "Hair Salon", city: "Rancho Cordova, CA" },
+    { niche: "Law Firm", city: "Chicago, IL" },
+    { niche: "HVAC Company", city: "Phoenix, AZ" },
+    { niche: "Restaurant", city: "Nashville, TN" },
+    { niche: "Med Spa / Aesthetics", city: "Miami, FL" },
+    { niche: "Auto Repair Shop", city: "Dallas, TX" },
+  ];
+  const [demoIndex, setDemoIndex] = useState(0);
+  const [demoFade, setDemoFade] = useState(true);
+  useEffect(() => {
+    if (loading || searchDone) return;
+    const iv = setInterval(() => {
+      setDemoFade(false);
+      setTimeout(() => {
+        setDemoIndex(i => (i + 1) % DEMO_CYCLES.length);
+        setDemoFade(true);
+      }, 400);
+    }, 3500);
+    return () => clearInterval(iv);
+  }, [loading, searchDone]);
   const [batchNum, setBatchNum] = useState(1);
   const [searchError, setSearchError] = useState("");
   const [currentTip, setCurrentTip] = useState(0);
