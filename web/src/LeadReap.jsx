@@ -1433,7 +1433,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
   function loadDashLists() {
     if (!token) return;
-    fetch(`${API_BASE}/api/lists`, { headers: { Authorization: `Bearer ${token}` } })
+    const endpoint = user?.plan === "agency" ? "/api/team/lists" : "/api/lists";
+    fetch(`${API_BASE}${endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(d => setDashLists(d.lists || []))
       .catch(() => {});
@@ -1482,9 +1483,9 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     }).catch(() => setDashLoading(false));
   }
 
-  function openSettings(tab = "team") {
+  function openSettings(tab) {
     setShowSettings(true);
-    setSettingsTab(tab);
+    setSettingsTab(tab || (user?.plan === "agency" ? "team" : "webhooks"));
     setNewApiKey(null);
     if (user?.plan !== "free") {
       loadTeam();
@@ -1582,11 +1583,12 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           // Advance steps to match scrape duration
           // 20 results: ~20-30s, 40 results: ~35-50s
           let nextStep;
-          const t = isPro ? [6, 16, 28] : [4, 10, 18];
+          const t = isPro ? [5, 12, 22, 34] : [3, 8, 14, 22];
           if (attempts < t[0]) nextStep = 0;
           else if (attempts < t[1]) nextStep = 1;
           else if (attempts < t[2]) nextStep = 2;
-          else nextStep = 3;
+          else if (attempts < t[3]) nextStep = 3;
+          else nextStep = 4;
           setLoadStep(nextStep);
           setPollAttempts(attempts);
 
@@ -1665,6 +1667,10 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         },
         body: JSON.stringify({ niche: targetNiche, location, limit: 20, offset: currentOffset, scrapeEmails: includeEmail, forceRefresh: true })
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to start search");
+      }
       const { jobId } = await res.json();
 
       const moreLeads = await new Promise((resolve, reject) => {
@@ -1722,12 +1728,11 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       <style>{STYLE}</style>
       <div className="app">
         <nav className="nav">
-          <div className="logo">
+          <div className="logo" onClick={() => { setShowDashboard(false); setShowPricing(false); }} style={{cursor:"pointer"}}>
             <div className="logo-mark"><LogoMark /></div>
-            Lead<span>Reap</span>
+            <span>Lead<span>Reap</span></span>
           </div>
           <div className="nav-actions">
-            <span className="badge mono nav-beta">BETA</span>
             {user ? (
               <>
                 <span className="badge mono" style={{ background: isPro ? "rgba(34,197,94,0.12)" : undefined, color: isPro ? "#22c55e" : undefined, borderColor: isPro ? "rgba(34,197,94,0.3)" : undefined }}>
@@ -2594,17 +2599,17 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               {[
                 {
                   name: "STARTER", planId: "starter", price: 47, note: "one-time payment",
-                  features: ["250 leads/month", "5 niches", "CSV export", "Email + phone data", "Email support"],
+                  features: ["250 leads/month", "5 niches", "XLSX + CSV export", "Email + phone data", "Saved lists", "Email support"],
                   featured: false
                 },
                 {
                   name: "PRO", planId: "pro", price: 97, note: "one-time payment",
-                  features: ["Unlimited leads", "All 47 niches", "CSV + JSON export", "Email + phone + social", "Lead scoring AI", "Priority support"],
+                  features: ["Unlimited leads", "All niches + custom", "XLSX + CSV export", "Lead enrichment data", "Email sequences", "Webhooks + integrations", "Priority support"],
                   featured: true, badge: "MOST POPULAR"
                 },
                 {
                   name: "AGENCY", planId: "agency", price: 197, note: "one-time payment",
-                  features: ["Unlimited leads", "All niches + custom", "Bulk export (1000s)", "API access", "White-label license", "Dedicated support"],
+                  features: ["Everything in Pro", "Team seats (up to 5)", "White-label PDF reports", "Public API access", "Shared team lists", "Dedicated support"],
                   featured: false
                 }
               ].map((plan, i) => (
@@ -2695,6 +2700,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 const a = document.createElement("a");
                 a.href = url; a.download = `report-${showReportModal.name}.pdf`;
                 a.click(); URL.revokeObjectURL(url);
+                setShowReportModal(null);
               } else {
                 alert("Report generation failed");
               }
@@ -2739,13 +2745,13 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             <h2>Privacy Policy</h2>
             <div className="legal-updated">Last updated: March 1, 2026</div>
             <h3>Information We Collect</h3>
-            <p>LeadReap collects your email address when you create an account, payment information processed securely through our payment provider (LemonSqueezy), and search queries you perform within the platform. We do not sell, share, or distribute your personal information to third parties.</p>
+            <p>LeadReap collects your email address when you create an account, payment information processed securely through Stripe, and search queries you perform within the platform. We do not sell, share, or distribute your personal information to third parties.</p>
             <h3>How We Use Your Data</h3>
             <p>Your email is used solely for account authentication (magic link login) and important service communications. Search data is used to deliver results and improve our scraping accuracy. We do not send marketing emails unless you explicitly opt in.</p>
             <h3>Data from Searches</h3>
             <p>Business information returned by LeadReap (names, phone numbers, emails, websites) is sourced from publicly available data on Google Maps and business websites. LeadReap does not create or fabricate contact data. Users are responsible for complying with applicable laws (including CAN-SPAM and GDPR) when using scraped data for outreach.</p>
             <h3>Data Security</h3>
-            <p>Sessions are secured with encrypted tokens. Payment processing is handled entirely by LemonSqueezy — we never store your credit card information. Search result caches are stored temporarily in memory and automatically purged.</p>
+            <p>Sessions are secured with encrypted tokens. Payment processing is handled entirely by Stripe — we never store your credit card information. Search result caches are stored temporarily and automatically purged.</p>
             <h3>Your Rights</h3>
             <p>You may request deletion of your account and all associated data at any time by contacting us. Upon deletion, all personal data including search history will be permanently removed.</p>
             <h3>Contact</h3>
@@ -2765,7 +2771,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             <h3>Acceptable Use</h3>
             <p>You agree to use LeadReap for lawful business purposes only. You are solely responsible for how you use the data obtained through our service, including compliance with CAN-SPAM, GDPR, CCPA, and any other applicable regulations. Automated mass scraping beyond normal usage, reselling raw data, or using the service for harassment is prohibited.</p>
             <h3>Accounts &amp; Billing</h3>
-            <p>Free accounts include limited searches per day with capped results. Paid plans are billed monthly through LemonSqueezy. You may cancel at any time — access continues through the end of your billing period. Refunds are available within 30 days of purchase if you are unsatisfied.</p>
+            <p>Free accounts include limited searches per day with capped results. Paid plans are one-time purchases processed securely through Stripe. You receive lifetime access immediately upon payment. Refunds are available within 30 days of purchase if you are unsatisfied.</p>
             <h3>Intellectual Property</h3>
             <p>The LeadReap platform, scoring algorithms, and interface are proprietary. Data returned by searches is sourced from public information and is not owned by LeadReap. You may use search results for your own business purposes.</p>
             <h3>Limitation of Liability</h3>
