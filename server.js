@@ -38,7 +38,7 @@ import {
   createApiKey, getUserApiKeys, deleteApiKey,
 } from "./auth.js";
 import { createCheckout, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
-import { sendMagicLinkEmail, sendSequenceEmail } from "./email.js";
+import { sendMagicLinkEmail, sendSequenceEmail, sendTeamInviteEmail } from "./email.js";
 import { generateReport } from "./reports.js";
 import { attachUser, requireAuth, requireSearchQuota, ipRateLimit, requireAgency, requirePro } from "./middleware.js";
 
@@ -531,60 +531,79 @@ async function triggerWebhooks(userId, event, payload) {
 
 // ── GET /api/team — Get user's team info ─────────────────────
 app.get("/api/team", requireAuth, (req, res) => {
-  const team = getUserTeam(req.user.id);
-  if (!team) return res.json({ team: null });
-  const members = getTeamMembers(team.id);
-  const invites = team.owner_id === req.user.id ? getPendingInvites(team.id) : [];
-  return res.json({ team: { ...team, members, invites, isOwner: team.owner_id === req.user.id } });
+  try {
+    const team = getUserTeam(req.user.id);
+    if (!team) return res.json({ team: null });
+    const members = getTeamMembers(team.id);
+    const invites = team.owner_id === req.user.id ? getPendingInvites(team.id) : [];
+    return res.json({ team: { ...team, members, invites, isOwner: team.owner_id === req.user.id } });
+  } catch (e) { console.error("[Team] GET error:", e.message); return res.status(500).json({ error: "Failed to load team" }); }
 });
 
 // ── POST /api/team — Create a team ──────────────────────────
 app.post("/api/team", requireAgency, (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: "Team name required" });
-  const team = createTeam(req.user.id, name);
-  return res.json({ ok: true, team });
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Team name required" });
+    const team = createTeam(req.user.id, name);
+    return res.json({ ok: true, team });
+  } catch (e) { console.error("[Team] Create error:", e.message); return res.status(500).json({ error: "Failed to create team" }); }
 });
 
 // ── POST /api/team/invite — Invite a member ─────────────────
-app.post("/api/team/invite", requireAgency, (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: "Email required" });
+app.post("/api/team/invite", requireAgency, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
 
-  const team = getUserTeam(req.user.id);
-  if (!team || team.owner_id !== req.user.id) return res.status(403).json({ error: "Only team owners can invite" });
+    const team = getUserTeam(req.user.id);
+    if (!team || team.owner_id !== req.user.id) return res.status(403).json({ error: "Only team owners can invite" });
 
-  const members = getTeamMembers(team.id);
-  const invites = getPendingInvites(team.id);
-  if (members.length + invites.length >= 6) return res.status(400).json({ error: "Team is full (max 6 members including owner)" });
+    const members = getTeamMembers(team.id);
+    const invites = getPendingInvites(team.id);
+    if (members.length + invites.length >= 6) return res.status(400).json({ error: "Team is full (max 6 members including owner)" });
 
-  const invite = createTeamInvite(team.id, email);
-  // TODO: Send invite email via Resend
-  return res.json({ ok: true, invite });
+    const invite = createTeamInvite(team.id, email);
+
+    // Send invite email (non-blocking)
+    try {
+      await sendTeamInviteEmail(email, team.name, invite.token);
+    } catch (emailErr) {
+      console.warn("[Team] Invite email failed (non-blocking):", emailErr.message);
+    }
+
+    return res.json({ ok: true, invite });
+  } catch (e) { console.error("[Team] Invite error:", e.message); return res.status(500).json({ error: "Failed to send invite" }); }
 });
 
 // ── POST /api/team/join — Accept an invite ──────────────────
 app.post("/api/team/join", requireAuth, (req, res) => {
-  const { token } = req.body;
-  if (!token) return res.status(400).json({ error: "Invite token required" });
-  const result = acceptTeamInvite(token, req.user.id);
-  if (result.error) return res.status(400).json(result);
-  return res.json({ ok: true, teamId: result.teamId });
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: "Invite token required" });
+    const result = acceptTeamInvite(token, req.user.id);
+    if (result.error) return res.status(400).json(result);
+    return res.json({ ok: true, teamId: result.teamId });
+  } catch (e) { console.error("[Team] Join error:", e.message); return res.status(500).json({ error: "Failed to join team" }); }
 });
 
 // ── DELETE /api/team/members/:userId — Remove a member ──────
 app.delete("/api/team/members/:userId", requireAgency, (req, res) => {
-  const team = getUserTeam(req.user.id);
-  if (!team) return res.status(404).json({ error: "No team" });
-  const ok = removeTeamMember(team.id, req.params.userId, req.user.id);
-  if (!ok) return res.status(400).json({ error: "Cannot remove" });
-  return res.json({ ok: true });
+  try {
+    const team = getUserTeam(req.user.id);
+    if (!team) return res.status(404).json({ error: "No team" });
+    const ok = removeTeamMember(team.id, req.params.userId, req.user.id);
+    if (!ok) return res.status(400).json({ error: "Cannot remove" });
+    return res.json({ ok: true });
+  } catch (e) { console.error("[Team] Remove error:", e.message); return res.status(500).json({ error: "Failed to remove member" }); }
 });
 
 // ── GET /api/team/lists — Get shared lists across team ──────
 app.get("/api/team/lists", requireAuth, (req, res) => {
-  const lists = getAccessibleLists(req.user.id);
-  return res.json({ lists });
+  try {
+    const lists = getAccessibleLists(req.user.id);
+    return res.json({ lists });
+  } catch (e) { console.error("[Team] Lists error:", e.message); return res.status(500).json({ error: "Failed to load lists" }); }
 });
 
 
@@ -594,39 +613,48 @@ app.get("/api/team/lists", requireAuth, (req, res) => {
 
 // ── GET /api/webhooks — List user's webhooks ────────────────
 app.get("/api/webhooks", requirePro, (req, res) => {
-  const hooks = getUserWebhooks(req.user.id);
-  return res.json({ webhooks: hooks });
+  try {
+    const hooks = getUserWebhooks(req.user.id);
+    return res.json({ webhooks: hooks });
+  } catch (e) { console.error("[Webhooks] GET error:", e.message); return res.status(500).json({ error: "Failed to load webhooks" }); }
 });
 
 // ── POST /api/webhooks — Create a webhook ───────────────────
 app.post("/api/webhooks", requirePro, (req, res) => {
-  const { url, events } = req.body;
-  if (!url) return res.status(400).json({ error: "URL required" });
+  try {
+    const { url, events } = req.body;
+    if (!url) return res.status(400).json({ error: "URL required" });
 
-  try { new URL(url); } catch { return res.status(400).json({ error: "Invalid URL" }); }
+    try { new URL(url); } catch { return res.status(400).json({ error: "Invalid URL" }); }
+    if (!url.startsWith("https://")) return res.status(400).json({ error: "Webhook URL must use HTTPS" });
 
-  const existing = getUserWebhooks(req.user.id);
-  if (existing.length >= 5) return res.status(400).json({ error: "Maximum 5 webhooks" });
+    const existing = getUserWebhooks(req.user.id);
+    if (existing.length >= 5) return res.status(400).json({ error: "Maximum 5 webhooks" });
 
-  const validEvents = ["search.completed", "lead.status_changed", "lead.added", "sequence.completed", "*"];
-  const eventList = (events || "search.completed").split(",").map(e => e.trim());
-  if (eventList.some(e => !validEvents.includes(e))) return res.status(400).json({ error: "Invalid event type" });
+    const validEvents = ["search.completed", "lead.status_changed", "lead.added", "sequence.completed", "*"];
+    const eventList = (events || "search.completed").split(",").map(e => e.trim());
+    if (eventList.some(e => !validEvents.includes(e))) return res.status(400).json({ error: "Invalid event type" });
 
-  const hook = createWebhook(req.user.id, url, eventList.join(","));
-  return res.json({ ok: true, webhook: hook });
+    const hook = createWebhook(req.user.id, url, eventList.join(","));
+    return res.json({ ok: true, webhook: hook });
+  } catch (e) { console.error("[Webhooks] Create error:", e.message); return res.status(500).json({ error: "Failed to create webhook" }); }
 });
 
 // ── DELETE /api/webhooks/:id — Delete a webhook ─────────────
 app.delete("/api/webhooks/:id", requirePro, (req, res) => {
-  deleteWebhook(req.params.id, req.user.id);
-  return res.json({ ok: true });
+  try {
+    deleteWebhook(req.params.id, req.user.id);
+    return res.json({ ok: true });
+  } catch (e) { console.error("[Webhooks] Delete error:", e.message); return res.status(500).json({ error: "Failed to delete webhook" }); }
 });
 
 // ── PATCH /api/webhooks/:id/toggle — Enable/disable ─────────
 app.patch("/api/webhooks/:id/toggle", requirePro, (req, res) => {
-  const { active } = req.body;
-  toggleWebhook(req.params.id, req.user.id, !!active);
-  return res.json({ ok: true });
+  try {
+    const { active } = req.body;
+    toggleWebhook(req.params.id, req.user.id, !!active);
+    return res.json({ ok: true });
+  } catch (e) { console.error("[Webhooks] Toggle error:", e.message); return res.status(500).json({ error: "Failed to toggle webhook" }); }
 });
 
 
@@ -636,22 +664,28 @@ app.patch("/api/webhooks/:id/toggle", requirePro, (req, res) => {
 
 // ── GET /api/keys — List user's API keys ────────────────────
 app.get("/api/keys", requirePro, (req, res) => {
-  const keys = getUserApiKeys(req.user.id);
-  return res.json({ keys });
+  try {
+    const keys = getUserApiKeys(req.user.id);
+    return res.json({ keys });
+  } catch (e) { console.error("[API Keys] GET error:", e.message); return res.status(500).json({ error: "Failed to load API keys" }); }
 });
 
 // ── POST /api/keys — Create an API key ──────────────────────
 app.post("/api/keys", requirePro, (req, res) => {
-  const { name } = req.body;
-  const result = createApiKey(req.user.id, name || "Default");
-  if (result.error) return res.status(400).json(result);
-  return res.json({ ok: true, ...result });
+  try {
+    const { name } = req.body;
+    const result = createApiKey(req.user.id, name || "Default");
+    if (result.error) return res.status(400).json(result);
+    return res.json({ ok: true, ...result });
+  } catch (e) { console.error("[API Keys] Create error:", e.message); return res.status(500).json({ error: "Failed to create API key" }); }
 });
 
 // ── DELETE /api/keys/:id — Revoke an API key ────────────────
 app.delete("/api/keys/:id", requirePro, (req, res) => {
-  deleteApiKey(req.params.id, req.user.id);
-  return res.json({ ok: true });
+  try {
+    deleteApiKey(req.params.id, req.user.id);
+    return res.json({ ok: true });
+  } catch (e) { console.error("[API Keys] Delete error:", e.message); return res.status(500).json({ error: "Failed to delete API key" }); }
 });
 
 
@@ -881,4 +915,27 @@ app.listen(PORT, () => {
   GET  /health
   ────────────────────────────────
   `);
+});
+
+// ═════════════════════════════════════════════════════════════
+// GLOBAL ERROR HANDLING
+// ═════════════════════════════════════════════════════════════
+
+// Express error middleware — catches thrown errors in routes
+app.use((err, req, res, _next) => {
+  console.error(`[Error] ${req.method} ${req.path}:`, err.message || err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+});
+
+// Prevent crash on unhandled promise rejections
+process.on("unhandledRejection", (reason) => {
+  console.error("[Unhandled Rejection]", reason);
+});
+
+// Prevent crash on uncaught exceptions (log but stay alive)
+process.on("uncaughtException", (err) => {
+  console.error("[Uncaught Exception]", err.message);
+  // Don't exit — let the process stay alive for Railway
 });
