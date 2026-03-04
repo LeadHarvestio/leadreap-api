@@ -64,10 +64,32 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS saved_lists (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    created_at  TEXT DEFAULT (datetime('now')),
+    updated_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS list_leads (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_id     TEXT NOT NULL,
+    lead_data   TEXT NOT NULL,
+    status      TEXT DEFAULT 'new',
+    notes       TEXT DEFAULT '',
+    added_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (list_id) REFERENCES saved_lists(id) ON DELETE CASCADE
+  );
+
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
   CREATE INDEX IF NOT EXISTS idx_search_history_user ON search_history(user_id);
   CREATE INDEX IF NOT EXISTS idx_search_history_job ON search_history(job_id);
+  CREATE INDEX IF NOT EXISTS idx_saved_lists_user ON saved_lists(user_id);
+  CREATE INDEX IF NOT EXISTS idx_list_leads_list ON list_leads(list_id);
 `);
 
 // ─────────────────────────────────────────────────────────────
@@ -96,6 +118,22 @@ const stmts = {
   // Search history
   insertSearch:     db.prepare("INSERT OR IGNORE INTO search_history (user_id, niche, location, lead_count, job_id) VALUES (?, ?, ?, ?, ?)"),
   getUserHistory:   db.prepare("SELECT niche, location, lead_count AS leadCount, job_id AS jobId, created_at AS timestamp FROM search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 50"),
+
+  // Saved lists
+  createList:       db.prepare("INSERT INTO saved_lists (id, user_id, name, description) VALUES (?, ?, ?, ?)"),
+  getUserLists:     db.prepare("SELECT l.id, l.name, l.description, l.created_at AS createdAt, l.updated_at AS updatedAt, (SELECT COUNT(*) FROM list_leads WHERE list_id = l.id) AS leadCount FROM saved_lists l WHERE l.user_id = ? ORDER BY l.updated_at DESC"),
+  getList:          db.prepare("SELECT * FROM saved_lists WHERE id = ? AND user_id = ?"),
+  updateList:       db.prepare("UPDATE saved_lists SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"),
+  deleteList:       db.prepare("DELETE FROM saved_lists WHERE id = ? AND user_id = ?"),
+  touchList:        db.prepare("UPDATE saved_lists SET updated_at = datetime('now') WHERE id = ?"),
+
+  // List leads
+  addLeadToList:    db.prepare("INSERT INTO list_leads (list_id, lead_data, status, notes) VALUES (?, ?, ?, ?)"),
+  getListLeads:     db.prepare("SELECT id, lead_data AS leadData, status, notes, added_at AS addedAt FROM list_leads WHERE list_id = ? ORDER BY added_at DESC"),
+  updateLeadStatus: db.prepare("UPDATE list_leads SET status = ? WHERE id = ? AND list_id = ?"),
+  updateLeadNotes:  db.prepare("UPDATE list_leads SET notes = ? WHERE id = ? AND list_id = ?"),
+  removeLeadFromList: db.prepare("DELETE FROM list_leads WHERE id = ? AND list_id = ?"),
+  countListLeads:   db.prepare("SELECT COUNT(*) AS count FROM list_leads WHERE list_id = ?"),
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -221,6 +259,87 @@ export function saveSearchHistory(userId, { niche, location, leadCount, jobId })
 export function getSearchHistory(userId) {
   if (!userId) return [];
   return stmts.getUserHistory.all(userId);
+}
+
+// ─────────────────────────────────────────────────────────────
+// SAVED LISTS
+// ─────────────────────────────────────────────────────────────
+
+/** Create a new saved list */
+export function createSavedList(userId, name, description = "") {
+  const id = randomUUID();
+  stmts.createList.run(id, userId, name.trim(), description.trim());
+  return { id, name: name.trim(), description: description.trim(), leadCount: 0 };
+}
+
+/** Get all lists for a user */
+export function getUserLists(userId) {
+  if (!userId) return [];
+  return stmts.getUserLists.all(userId);
+}
+
+/** Get a single list (with ownership check) */
+export function getList(listId, userId) {
+  return stmts.getList.get(listId, userId);
+}
+
+/** Update list name/description */
+export function updateSavedList(listId, userId, name, description) {
+  stmts.updateList.run(name.trim(), (description || "").trim(), listId, userId);
+}
+
+/** Delete a list and all its leads */
+export function deleteSavedList(listId, userId) {
+  const list = stmts.getList.get(listId, userId);
+  if (!list) return false;
+  stmts.deleteList.run(listId, userId);
+  return true;
+}
+
+/** Add leads to a list (accepts array of lead objects) */
+export function addLeadsToList(listId, leads) {
+  const insert = db.transaction((items) => {
+    for (const lead of items) {
+      stmts.addLeadToList.run(listId, JSON.stringify(lead), "new", "");
+    }
+    stmts.touchList.run(listId);
+  });
+  insert(leads);
+  return leads.length;
+}
+
+/** Get all leads in a list */
+export function getListLeads(listId) {
+  const rows = stmts.getListLeads.all(listId);
+  return rows.map(r => ({
+    id: r.id,
+    ...JSON.parse(r.leadData),
+    _status: r.status,
+    _notes: r.notes,
+    _addedAt: r.addedAt,
+  }));
+}
+
+/** Update a lead's status (new/contacted/replied/closed) */
+export function updateLeadStatus(listId, leadId, status) {
+  const valid = ["new", "contacted", "replied", "closed"];
+  if (!valid.includes(status)) return false;
+  stmts.updateLeadStatus.run(status, leadId, listId);
+  stmts.touchList.run(listId);
+  return true;
+}
+
+/** Update a lead's notes */
+export function updateLeadNotes(listId, leadId, notes) {
+  stmts.updateLeadNotes.run(notes, leadId, listId);
+  return true;
+}
+
+/** Remove a lead from a list */
+export function removeLeadFromList(listId, leadId) {
+  stmts.removeLeadFromList.run(leadId, listId);
+  stmts.touchList.run(listId);
+  return true;
 }
 
 // Run cleanup every hour
