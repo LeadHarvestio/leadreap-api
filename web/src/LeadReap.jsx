@@ -600,6 +600,22 @@ const STYLE = `
   .enrichment-unlock { font-size: 11px; color: var(--accent); cursor: pointer; font-weight: 600; white-space: nowrap; padding: 3px 8px; border: 1px solid var(--accent); border-radius: 6px; transition: all 0.15s; }
   .enrichment-unlock:hover { background: var(--accent); color: #000; }
 
+  /* Settings Panel */
+  .settings-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+  .settings-tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .settings-tab { background: none; border: none; padding: 8px 16px; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 600; border-radius: 8px 8px 0 0; transition: all 0.15s; }
+  .settings-tab:hover { color: var(--text); }
+  .settings-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+  .settings-section { margin-top: 8px; }
+  .settings-list { display: flex; flex-direction: column; gap: 8px; }
+  .settings-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; gap: 12px; }
+
+  @media (max-width: 600px) {
+    .settings-panel { padding: 18px; }
+    .settings-tabs { flex-wrap: wrap; }
+    .settings-list-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+  }
+
   @media (max-width: 600px) {
     .seq-builder { padding: 18px; }
     .seq-enroll-bar { flex-direction: column; }
@@ -1404,6 +1420,17 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [showSequenceBuilder, setShowSequenceBuilder] = useState(false);
   const [editingSequence, setEditingSequence] = useState(null);
 
+  // Settings view (teams, webhooks, api keys)
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("team");
+  const [teamData, setTeamData] = useState(null);
+  const [webhooksData, setWebhooksData] = useState([]);
+  const [apiKeysData, setApiKeysData] = useState([]);
+  const [newApiKey, setNewApiKey] = useState(null);
+
+  // Reports
+  const [showReportModal, setShowReportModal] = useState(null);
+
   function loadDashLists() {
     if (!token) return;
     fetch(`${API_BASE}/api/lists`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1420,12 +1447,30 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       .catch(() => {});
   }
 
+  function loadTeam() {
+    if (!token) return;
+    fetch(`${API_BASE}/api/team`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setTeamData(d.team)).catch(() => {});
+  }
+  function loadWebhooks() {
+    if (!token) return;
+    fetch(`${API_BASE}/api/webhooks`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setWebhooksData(d.webhooks || [])).catch(() => {});
+  }
+  function loadApiKeys() {
+    if (!token) return;
+    fetch(`${API_BASE}/api/keys`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setApiKeysData(d.keys || [])).catch(() => {});
+  }
+
   function openDashboard() {
     setShowDashboard(true);
     setViewingListId(null);
     setViewingSequenceId(null);
     setShowSequenceBuilder(false);
     setEditingSequence(null);
+    setShowSettings(false);
+    setShowReportModal(null);
     setDashLoading(true);
     loadDashLists();
     loadSequences();
@@ -1435,6 +1480,17 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       setDashData(d);
       setDashLoading(false);
     }).catch(() => setDashLoading(false));
+  }
+
+  function openSettings(tab = "team") {
+    setShowSettings(true);
+    setSettingsTab(tab);
+    setNewApiKey(null);
+    if (user?.plan !== "free") {
+      loadTeam();
+      loadWebhooks();
+      loadApiKeys();
+    }
   }
 
   function dashRerun(search) {
@@ -1695,9 +1751,10 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             <span className="dash-back" onClick={() => {
               if (showSequenceBuilder) { setShowSequenceBuilder(false); setEditingSequence(null); }
               else if (viewingSequenceId) { setViewingSequenceId(null); loadSequences(); }
+              else if (showSettings) { setShowSettings(false); }
               else if (viewingListId) { setViewingListId(null); }
               else { setShowDashboard(false); }
-            }}>&larr; {showSequenceBuilder ? "Back to sequences" : viewingSequenceId ? "Back to dashboard" : viewingListId ? "Back to dashboard" : "Back to search"}</span>
+            }}>&larr; {showSequenceBuilder ? "Back to sequences" : viewingSequenceId ? "Back to dashboard" : showSettings ? "Back to dashboard" : viewingListId ? "Back to dashboard" : "Back to search"}</span>
 
             {showSequenceBuilder ? (
               <SequenceBuilder
@@ -1715,6 +1772,158 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 onBack={() => { setViewingSequenceId(null); loadSequences(); }}
                 lists={dashLists}
               />
+            ) : showSettings ? (
+              /* ── Settings Panel ────────────────── */
+              <div className="settings-panel">
+                <h3 style={{margin:"0 0 16px",fontSize:18,fontWeight:700}}>Settings</h3>
+                <div className="settings-tabs">
+                  {user?.plan === "agency" && <button className={`settings-tab ${settingsTab === "team" ? "active" : ""}`} onClick={() => setSettingsTab("team")}>Team</button>}
+                  {user?.plan !== "free" && <button className={`settings-tab ${settingsTab === "webhooks" ? "active" : ""}`} onClick={() => setSettingsTab("webhooks")}>Webhooks</button>}
+                  {user?.plan !== "free" && <button className={`settings-tab ${settingsTab === "api" ? "active" : ""}`} onClick={() => setSettingsTab("api")}>API Keys</button>}
+                </div>
+
+                {/* Team Management */}
+                {settingsTab === "team" && user?.plan === "agency" && (
+                  <div className="settings-section">
+                    {!teamData ? (
+                      <div>
+                        <p style={{color:"var(--muted)",marginBottom:12}}>Create a team to share lists and leads with up to 5 team members.</p>
+                        <button className="btn btn-primary" onClick={() => {
+                          const name = prompt("Team name:");
+                          if (name?.trim()) {
+                            fetch(`${API_BASE}/api/team`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name }) })
+                              .then(r => r.json()).then(() => loadTeam());
+                          }
+                        }}>Create Team</button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{fontWeight:700,fontSize:16,marginBottom:12}}>{teamData.name}</div>
+                        <div className="settings-list">
+                          {teamData.members?.map((m, i) => (
+                            <div key={i} className="settings-list-item">
+                              <div>
+                                <div style={{fontWeight:600}}>{m.email}</div>
+                                <div style={{fontSize:11,color:"var(--muted)"}}>{m.role === "owner" ? "Owner" : "Member"} &middot; {m.plan} plan</div>
+                              </div>
+                              {teamData.isOwner && m.role !== "owner" && (
+                                <button className="btn btn-ghost btn-sm" style={{color:"#f87171"}} onClick={() => {
+                                  if (confirm(`Remove ${m.email}?`)) {
+                                    fetch(`${API_BASE}/api/team/members/${m.user_id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }).then(() => loadTeam());
+                                  }
+                                }}>Remove</button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {teamData.invites?.length > 0 && (
+                          <div style={{marginTop:12}}>
+                            <div style={{fontSize:12,color:"var(--muted)",marginBottom:6}}>Pending Invites:</div>
+                            {teamData.invites.map((inv, i) => (
+                              <div key={i} style={{fontSize:13,color:"var(--accent)",padding:"4px 0"}}>{inv.email}</div>
+                            ))}
+                          </div>
+                        )}
+                        {teamData.isOwner && teamData.members?.length < 6 && (
+                          <button className="btn btn-outline btn-sm" style={{marginTop:12}} onClick={() => {
+                            const email = prompt("Email to invite:");
+                            if (email?.trim()) {
+                              fetch(`${API_BASE}/api/team/invite`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email }) })
+                                .then(r => r.json()).then(d => { if (d.ok) { loadTeam(); alert(`Invite sent to ${email}. Share this token: ${d.invite?.token}`); } });
+                            }
+                          }}>+ Invite Member</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Webhooks */}
+                {settingsTab === "webhooks" && (
+                  <div className="settings-section">
+                    <p style={{fontSize:12,color:"var(--muted)",marginBottom:12}}>Webhooks fire when events happen (search completed, lead status changed). Use them to push data to your CRM.</p>
+                    <div className="settings-list">
+                      {webhooksData.map(h => (
+                        <div key={h.id} className="settings-list-item">
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:600,fontSize:13,wordBreak:"break-all"}}>{h.url}</div>
+                            <div style={{fontSize:11,color:"var(--muted)"}}>{h.events} &middot; {h.active ? "Active" : "Paused"}</div>
+                          </div>
+                          <div style={{display:"flex",gap:6}}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => {
+                              fetch(`${API_BASE}/api/webhooks/${h.id}/toggle`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ active: !h.active }) }).then(() => loadWebhooks());
+                            }}>{h.active ? "Pause" : "Enable"}</button>
+                            <button className="btn btn-ghost btn-sm" style={{color:"#f87171"}} onClick={() => {
+                              fetch(`${API_BASE}/api/webhooks/${h.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }).then(() => loadWebhooks());
+                            }}>&times;</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button className="btn btn-outline btn-sm" style={{marginTop:12}} onClick={() => {
+                      const url = prompt("Webhook URL (must be HTTPS):");
+                      if (url?.trim()) {
+                        fetch(`${API_BASE}/api/webhooks`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ url, events: "search.completed,lead.status_changed" }) })
+                          .then(r => r.json()).then(d => {
+                            if (d.ok) { loadWebhooks(); alert(`Webhook created!\n\nSigning secret: ${d.webhook.secret}\n\nSave this — it won't be shown again.`); }
+                            else alert(d.error || "Failed");
+                          });
+                      }
+                    }}>+ Add Webhook</button>
+                    <div style={{marginTop:16,padding:12,background:"var(--surface2)",borderRadius:8,fontSize:11,color:"var(--muted)",lineHeight:1.6}}>
+                      <strong>Events:</strong> search.completed, lead.status_changed, lead.added, sequence.completed, * (all)<br/>
+                      <strong>Headers:</strong> X-LeadReap-Signature (HMAC-SHA256), X-LeadReap-Event<br/>
+                      <strong>Compatible with:</strong> Zapier Webhooks, GoHighLevel, HubSpot Workflows, Make.com
+                    </div>
+                  </div>
+                )}
+
+                {/* API Keys */}
+                {settingsTab === "api" && (
+                  <div className="settings-section">
+                    <p style={{fontSize:12,color:"var(--muted)",marginBottom:12}}>Use API keys to integrate LeadReap into your own tools and workflows.</p>
+                    {newApiKey && (
+                      <div style={{padding:12,background:"#22c55e11",border:"1px solid #22c55e44",borderRadius:8,marginBottom:16}}>
+                        <div style={{fontSize:12,fontWeight:700,color:"#22c55e",marginBottom:6}}>New API Key Created — Copy it now!</div>
+                        <code style={{fontSize:13,color:"var(--text)",wordBreak:"break-all",fontFamily:"IBM Plex Mono"}}>{newApiKey}</code>
+                        <div style={{fontSize:10,color:"var(--muted)",marginTop:6}}>This key won't be shown again.</div>
+                      </div>
+                    )}
+                    <div className="settings-list">
+                      {apiKeysData.map(k => (
+                        <div key={k.id} className="settings-list-item">
+                          <div>
+                            <div style={{fontWeight:600,fontSize:13}}>{k.name}</div>
+                            <div style={{fontSize:11,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>{k.key_prefix} &middot; {k.last_used ? `Last used ${new Date(k.last_used).toLocaleDateString()}` : "Never used"}</div>
+                          </div>
+                          <button className="btn btn-ghost btn-sm" style={{color:"#f87171"}} onClick={() => {
+                            if (confirm(`Revoke key "${k.name}"?`)) {
+                              fetch(`${API_BASE}/api/keys/${k.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }).then(() => { loadApiKeys(); });
+                            }
+                          }}>Revoke</button>
+                        </div>
+                      ))}
+                    </div>
+                    <button className="btn btn-outline btn-sm" style={{marginTop:12}} onClick={() => {
+                      const name = prompt("Key name (e.g., 'My CRM Integration'):") || "Default";
+                      fetch(`${API_BASE}/api/keys`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name }) })
+                        .then(r => r.json()).then(d => {
+                          if (d.ok) { setNewApiKey(d.key); loadApiKeys(); }
+                          else alert(d.error || "Failed");
+                        });
+                    }}>+ Create API Key</button>
+                    <div style={{marginTop:16,padding:12,background:"var(--surface2)",borderRadius:8,fontSize:11,color:"var(--muted)",lineHeight:1.8}}>
+                      <strong>Base URL:</strong> <code style={{color:"var(--accent)"}}>{API_BASE || window.location.origin}</code><br/>
+                      <strong>Auth:</strong> <code>Authorization: Bearer lr_your_key</code><br/>
+                      <strong>Endpoints:</strong><br/>
+                      &nbsp;&nbsp;POST /api/v1/search — Start a search<br/>
+                      &nbsp;&nbsp;GET /api/v1/search/:id — Poll results<br/>
+                      &nbsp;&nbsp;GET /api/v1/lists — Get your lists<br/>
+                      &nbsp;&nbsp;GET /api/v1/lists/:id/leads — Get leads from a list
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : viewingListId ? (
               <ListDetailView
                 listId={viewingListId}
@@ -1766,6 +1975,11 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                       Export Last Results
                     </button>
                   )}
+                  {dashData.plan !== "free" && (
+                    <button className="btn btn-ghost" onClick={() => openSettings("team")} style={{fontSize:13}}>
+                      ⚙ Settings
+                    </button>
+                  )}
                 </div>
 
                 {dashData.stats?.topNiches?.length > 0 && (
@@ -1800,6 +2014,12 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <span><strong>{l.leadCount}</strong> leads</span>
                           <span>{new Date(l.updatedAt || l.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
                         </div>
+                        {user?.plan === "agency" && l.leadCount > 0 && (
+                          <button className="btn btn-ghost btn-sm" style={{fontSize:10,marginTop:6,width:"100%",justifyContent:"center",color:"var(--accent)"}} onClick={e => {
+                            e.stopPropagation();
+                            setShowReportModal(l);
+                          }}>📄 Generate Report</button>
+                        )}
                       </div>
                     ))}
                     <div className="list-card new-list-card" onClick={() => {
@@ -2444,6 +2664,73 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           }}
         />
       )}
+
+      {showReportModal && (() => {
+        const ReportModal = () => {
+          const [agencyName, setAgencyName] = useState("");
+          const [clientName, setClientName] = useState("");
+          const [rNiche, setRNiche] = useState("");
+          const [rLocation, setRLocation] = useState("");
+          const [contactEmail, setContactEmail] = useState(user?.email || "");
+          const [contactPhone, setContactPhone] = useState("");
+          const [generating, setGenerating] = useState(false);
+
+          async function handleGenerate() {
+            setGenerating(true);
+            try {
+              const res = await fetch(`${API_BASE}/api/reports/generate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                  listId: showReportModal.id,
+                  agencyName: agencyName || "Market Intelligence",
+                  clientName, niche: rNiche || "Local Businesses",
+                  location: rLocation || "",
+                  contactEmail, contactPhone,
+                }),
+              });
+              if (res.ok) {
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = `report-${showReportModal.name}.pdf`;
+                a.click(); URL.revokeObjectURL(url);
+              } else {
+                alert("Report generation failed");
+              }
+            } catch (e) { alert("Error: " + e.message); }
+            setGenerating(false);
+          }
+
+          return (
+            <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowReportModal(null)}>
+              <div className="save-modal" style={{maxWidth:500}}>
+                <button style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:18}} onClick={() => setShowReportModal(null)}>&times;</button>
+                <h3 style={{fontSize:18,fontWeight:700,marginBottom:4}}>Generate White-Label Report</h3>
+                <p style={{fontSize:12,color:"var(--muted)",marginBottom:16}}>PDF report for "{showReportModal.name}" ({showReportModal.leadCount} leads)</p>
+
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  <input value={agencyName} onChange={e => setAgencyName(e.target.value)} placeholder="Your agency / company name" style={{padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:13}} />
+                  <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Client name (optional)" style={{padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:13}} />
+                  <div style={{display:"flex",gap:8}}>
+                    <input value={rNiche} onChange={e => setRNiche(e.target.value)} placeholder="Niche (e.g., Plumbers)" style={{flex:1,padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:13}} />
+                    <input value={rLocation} onChange={e => setRLocation(e.target.value)} placeholder="Location" style={{flex:1,padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:13}} />
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Your contact email" style={{flex:1,padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:13}} />
+                    <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Phone (optional)" style={{flex:1,padding:"10px 14px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontSize:13}} />
+                  </div>
+                </div>
+
+                <button className="btn btn-primary" style={{width:"100%",marginTop:16}} onClick={handleGenerate} disabled={generating}>
+                  {generating ? "Generating PDF..." : "Download Report PDF"}
+                </button>
+              </div>
+            </div>
+          );
+        };
+        return <ReportModal />;
+      })()}
 
       {showPrivacy && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowPrivacy(false)}>
