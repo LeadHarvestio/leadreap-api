@@ -2,18 +2,28 @@
 // MIDDLEWARE — Auth + rate limiting
 // ─────────────────────────────────────────────────────────────
 
-import { validateSession, getSearchLimit } from "./auth.js";
+import { validateSession, getSearchLimit, validateApiKey } from "./auth.js";
 
 /**
- * Attaches req.user if a valid session token is present.
+ * Attaches req.user if a valid session token or API key is present.
  * Does NOT block unauthenticated requests (use requireAuth for that).
  */
 export function attachUser(req, res, next) {
-  const token =
-    req.headers.authorization?.replace("Bearer ", "") ||
-    req.cookies?.session ||
-    null;
+  const authHeader = req.headers.authorization || "";
 
+  // Check for API key first (Bearer lr_...)
+  if (authHeader.startsWith("Bearer lr_")) {
+    const apiKey = authHeader.replace("Bearer ", "");
+    const apiUser = validateApiKey(apiKey);
+    if (apiUser) {
+      req.user = apiUser;
+      req.isApiKey = true;
+      return next();
+    }
+  }
+
+  // Fall back to session token
+  const token = authHeader.replace("Bearer ", "") || req.cookies?.session || null;
   if (token) {
     req.user = validateSession(token);
   } else {
@@ -23,12 +33,30 @@ export function attachUser(req, res, next) {
 }
 
 /**
- * Blocks requests without a valid session.
+ * Blocks requests without a valid session or API key.
  */
 export function requireAuth(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
   }
+  next();
+}
+
+/**
+ * Requires Agency plan.
+ */
+export function requireAgency(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: "Authentication required" });
+  if (req.user.plan !== "agency") return res.status(403).json({ error: "Agency plan required" });
+  next();
+}
+
+/**
+ * Requires Pro or Agency plan.
+ */
+export function requirePro(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: "Authentication required" });
+  if (req.user.plan === "free") return res.status(403).json({ error: "Pro plan required" });
   next();
 }
 
