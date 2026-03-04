@@ -190,9 +190,13 @@ const STYLE = `
     0% { box-shadow: inset 0 0 0 1px rgba(240,180,41,0.4); }
     100% { box-shadow: inset 0 0 0 1px transparent; }
   }
-  @keyframes slideUpBar {
-    from { transform: translateY(100%); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+  @keyframes carouselSlideIn {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes carouselSlideInR {
+    from { opacity: 0; transform: translateX(-40px); }
+    to { opacity: 1; transform: translateX(0); }
   }
   .chevron-hint span { animation: chevronPulse 1.5s ease-in-out 0.5s 2; }
   @keyframes chevronPulse {
@@ -274,15 +278,17 @@ const STYLE = `
   /* PRICING MODAL */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 200; padding: 20px; animation: fadeIn 0.15s ease;
+    display: flex; align-items: flex-start; justify-content: center;
+    z-index: 200; padding: 40px 20px; animation: fadeIn 0.15s ease;
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
   .modal {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 20px; padding: 48px; max-width: 900px; width: 100%;
     position: relative; animation: slideUp 0.25s ease;
+    flex-shrink: 0; margin: auto 0;
   }
   @keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform:none; opacity:1; } }
   .modal-close {
@@ -544,7 +550,7 @@ const STYLE = `
     .loading-title { font-size: 16px; }
     .loading-sub { font-size: 12px; }
     .loading-tip { font-size: 12px; padding: 12px 16px; max-width: 100%; }
-    .modal-overlay { padding: 12px; align-items: flex-start; overflow-y: auto; }
+    .modal-overlay { padding: 16px 12px; }
     .modal { padding: 24px 18px; border-radius: 14px; margin-top: 40px; }
     .modal h2 { font-size: 22px; }
     .modal > p { font-size: 13px; margin-bottom: 24px; }
@@ -1371,6 +1377,68 @@ const LOADING_TIPS = [
   { text: "Businesses on Wix or Squarespace are often open to a website redesign.", label: "Insight" },
 ];
 
+// ── Feature Carousel (auto-rotating, one at a time) ─────────
+const FEATURES = [
+  { icon: "📧", title: "Email Sequences", desc: "Automate 3-step cold outreach that sends on autopilot. Personalize with lead data — name, business, city — and let the follow-ups run themselves." },
+  { icon: "📊", title: "Lead Enrichment", desc: "Every lead comes with estimated revenue, employee count, tech stack detection, and business signals — so you know exactly who to target first." },
+  { icon: "💾", title: "Saved Lists + CRM", desc: "Organize leads into named lists. Tag status (new, contacted, closed), add notes, and build a lightweight pipeline — no external CRM needed." },
+  { icon: "⬇️", title: "XLSX + CSV Export", desc: "Download all your leads as a clean spreadsheet. Import directly into HubSpot, GoHighLevel, Mailchimp, or any CRM you already use." },
+  { icon: "🤖", title: "AI Lead Scoring", desc: "Every lead scored 0–100 based on reviews, website quality, social presence, and online signals. Focus your outreach on leads most likely to convert." },
+  { icon: "🔗", title: "Webhooks + API", desc: "Push new leads to Zapier, Make.com, or your own backend in real-time. Build custom integrations with the public REST API and signed webhooks." },
+];
+
+function FeatureCarousel({ onShowPricing }) {
+  const [idx, setIdx] = useState(0);
+  const [dir, setDir] = useState(1);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setDir(1);
+      setIdx(i => (i + 1) % FEATURES.length);
+    }, 4500);
+    return () => clearInterval(iv);
+  }, []);
+
+  function goTo(i) {
+    setDir(i > idx ? 1 : -1);
+    setIdx(i);
+  }
+
+  const f = FEATURES[idx];
+  return (
+    <div style={{marginTop:48,textAlign:"center"}}>
+      <div style={{fontSize:11,fontFamily:"IBM Plex Mono",color:"var(--muted)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:16}}>
+        What&apos;s included with paid plans
+      </div>
+      <div style={{
+        position:"relative",overflow:"hidden",
+        maxWidth:520,margin:"0 auto",minHeight:140,
+      }}>
+        <div key={idx} style={{
+          animation: `carouselSlide${dir > 0 ? "In" : "InR"} 0.4s ease`,
+          padding:"24px 32px",borderRadius:14,border:"1px solid var(--border)",background:"var(--surface)",
+        }}>
+          <div style={{fontSize:32,marginBottom:10}}>{f.icon}</div>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:6}}>{f.title}</div>
+          <div style={{fontSize:13,color:"var(--muted)",lineHeight:1.7,maxWidth:400,margin:"0 auto"}}>{f.desc}</div>
+        </div>
+      </div>
+      <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:16}}>
+        {FEATURES.map((_, i) => (
+          <button key={i} onClick={() => goTo(i)} style={{
+            width: i === idx ? 24 : 8, height:8, borderRadius:4,
+            background: i === idx ? "var(--accent)" : "var(--border)",
+            border:"none",cursor:"pointer",transition:"all 0.3s ease",padding:0,
+          }} />
+        ))}
+      </div>
+      <div style={{marginTop:20}}>
+        <button className="btn btn-outline btn-sm" onClick={onShowPricing}>See All Plans &rarr;</button>
+      </div>
+    </div>
+  );
+}
+
 export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLogout, onCheckout, onRefreshAuth }) {
   const API_BASE = apiBase;
   const [niche, setNiche] = useState("");
@@ -1979,25 +2047,16 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 {/* Free user upgrade nudge */}
                 {dashData.plan === "free" && (
                   <div style={{
-                    padding:"20px 24px",borderRadius:12,marginBottom:20,
-                    background:"linear-gradient(135deg, rgba(240,180,41,0.06), rgba(232,93,4,0.03))",
-                    border:"1px solid rgba(240,180,41,0.15)",
-                    display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap",
+                    padding:"12px 16px",borderRadius:8,marginBottom:16,
+                    border:"1px solid var(--border)",background:"var(--surface)",
+                    display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",
                   }}>
-                    <div>
-                      <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>You're on the free plan</div>
-                      <div style={{fontSize:13,color:"var(--muted)",lineHeight:1.5}}>
-                        {dashData.stats?.totalLeads > 0
-                          ? `You've found ${dashData.stats.totalLeads} leads so far. Upgrade to unlock unlimited searches, CSV export, email sequences, and enrichment data.`
-                          : "Upgrade to unlock unlimited leads, CSV export, automated email sequences, and revenue estimates."
-                        }
-                      </div>
-                    </div>
-                    <div style={{display:"flex",gap:8,flexShrink:0}}>
-                      <button className="btn btn-primary btn-sm" onClick={() => { setShowDashboard(false); setPricingContext(null); setShowPricing(true); }}>
-                        See Plans — from $47 &rarr;
-                      </button>
-                    </div>
+                    <span style={{fontSize:13,color:"var(--muted)"}}>
+                      You're on the free plan &mdash; <span style={{color:"var(--text)"}}>upgrade for unlimited leads, export, and sequences</span>
+                    </span>
+                    <button className="btn btn-outline btn-sm" style={{fontSize:12}} onClick={() => { setShowDashboard(false); setPricingContext(null); setShowPricing(true); }}>
+                      See Plans
+                    </button>
                   </div>
                 )}
 
@@ -2149,7 +2208,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           <div className="hero-stats">
             <div className="stat"><div className="stat-num">47+</div><div className="stat-label">Built-in niches</div></div>
             <div className="stat"><div className="stat-num">94%</div><div className="stat-label">Email accuracy</div></div>
-            <div className="stat"><div className="stat-num">$97</div><div className="stat-label">One-time (not /mo)</div></div>
+            <div className="stat"><div className="stat-num">$0/mo</div><div className="stat-label">No subscriptions</div></div>
             <div className="stat"><div className="stat-num">30s</div><div className="stat-label">Avg search time</div></div>
           </div>
         </div>
@@ -2252,24 +2311,16 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           )}
 
           {!loading && searchDone && !searchError && leads.length > 0 && !isPro && (
-            <div className="upsell-banner" style={{
-              display: "flex", gap: 16, marginBottom: 20,
-              padding: "16px 20px", borderRadius: 10,
-              background: "linear-gradient(135deg, rgba(240,180,41,0.06), rgba(232,93,4,0.04))", border: "1px solid rgba(240,180,41,0.15)",
+            <div style={{
+              display: "flex", gap: 12, marginBottom: 16,
+              padding: "10px 16px", borderRadius: 8,
+              border: "1px solid var(--border)", background: "var(--surface)",
               alignItems: "center", justifyContent: "space-between", flexWrap: "wrap",
             }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
-                  {displayTotal - visibleLeads.length > 0
-                    ? `${displayTotal - visibleLeads.length} more ${targetNiche} leads behind the paywall`
-                    : `Unlock full access to ${targetNiche} leads`
-                  }
-                </div>
-                <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                  Includes email sequences, revenue estimates, CSV export, and unlimited searches.
-                </span>
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={() => { setPricingContext("load_more"); setShowPricing(true); }}>See Plans &rarr;</button>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                Showing <strong style={{ color: "var(--text)" }}>{visibleLeads.length} of {displayTotal}</strong> leads &mdash; upgrade to see all results + export
+              </span>
+              <button className="btn btn-outline btn-sm" style={{fontSize:12}} onClick={() => { setPricingContext("load_more"); setShowPricing(true); }}>See Plans</button>
             </div>
           )}
 
@@ -2290,24 +2341,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
           {!loading && searchDone && !searchError && leads.length > 0 && (
             <>
-              {/* Anonymous user? Prompt them to sign up */}
-              {!user && (
-                <div style={{
-                  display:"flex",gap:16,marginBottom:20,padding:"16px 20px",borderRadius:10,
-                  background:"rgba(34,197,94,0.04)",border:"1px solid rgba(34,197,94,0.12)",
-                  alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",
-                }}>
-                  <div>
-                    <div style={{fontSize:14,fontWeight:700,marginBottom:3,color:"var(--green)"}}>
-                      {displayTotal} leads found — create a free account to save them
-                    </div>
-                    <span style={{fontSize:12,color:"var(--muted)"}}>
-                      Keep your results, build lists, track lead status, and get 3 free searches per day.
-                    </span>
-                  </div>
-                  <button className="btn btn-green btn-sm" onClick={onLoginClick}>Create Free Account &rarr;</button>
-                </div>
-              )}
               <div className="results-header">
                 <div className="results-meta">
                   <span style={{fontWeight:700, fontSize:15}}>Results</span>
@@ -2558,41 +2591,27 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
               {!isPro ? (
                 <>
-                  {/* Blurred ghost rows showing what's behind the paywall */}
-                  <div style={{position:"relative",overflow:"hidden",borderRadius:"0 0 12px 12px",border:"1px solid var(--border)",borderTop:"none"}}>
+                  {/* Subtle blurred ghost rows */}
+                  <div style={{position:"relative",overflow:"hidden"}}>
                     {[...Array(3)].map((_, i) => (
-                      <div key={i} style={{padding:"14px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",filter:"blur(5px)",opacity:0.5,userSelect:"none"}}>
+                      <div key={i} style={{padding:"12px 20px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",filter:"blur(5px)",opacity:0.4,userSelect:"none"}}>
                         <div style={{display:"flex",gap:24,alignItems:"center"}}>
                           <span style={{fontFamily:"IBM Plex Mono",fontSize:12,color:"var(--muted)"}}>{String(visibleLeads.length + i + 1).padStart(2,"0")}</span>
                           <div><div style={{fontWeight:600,fontSize:13}}>Business Name Here</div><div style={{fontSize:11,color:"var(--muted)"}}>123 Main St, {location || "City, ST"}</div></div>
                         </div>
-                        <div style={{display:"flex",gap:24,alignItems:"center"}}>
-                          <span style={{color:"var(--accent)",fontFamily:"IBM Plex Mono",fontSize:12}}>email@example.com</span>
-                          <span className="score-pill score-high" style={{fontSize:11}}>85/100</span>
-                        </div>
+                        <span className="score-pill score-high" style={{fontSize:11}}>85/100</span>
                       </div>
                     ))}
-                    <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent, var(--bg) 90%)",pointerEvents:"none"}} />
+                    <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent 10%, var(--bg) 95%)",pointerEvents:"none"}} />
                   </div>
-                  <div className="upgrade-bar" style={{borderRadius:12,marginTop:12,flexDirection:"column",gap:12,padding:"28px 24px"}}>
-                    <div style={{fontSize:18,fontWeight:700,letterSpacing:"-0.5px"}}>
+                  <div className="upgrade-bar">
+                    <p>
                       {displayTotal - visibleLeads.length > 0
-                        ? <>{displayTotal - visibleLeads.length} more leads are waiting</>
-                        : <>Unlock unlimited leads</>
-                      }
-                    </div>
-                    <p style={{maxWidth:480,textAlign:"center",lineHeight:1.6,margin:0}}>
-                      {leads.filter(l => l.email).length > 0
-                        ? `You found ${leads.filter(l => l.email).length} leads with emails in "${targetNiche}." Upgrade to get all ${displayTotal}+ results with revenue estimates, AI scoring, and CSV export.`
-                        : `Upgrade to unlock all ${displayTotal} results plus email sequences, enrichment data, and unlimited searches.`
+                        ? <><strong style={{color:"var(--text)"}}>{displayTotal - visibleLeads.length} more leads</strong> available</>
+                        : <>Upgrade for unlimited leads</>
                       }
                     </p>
-                    <div style={{display:"flex",gap:12,alignItems:"center",marginTop:4}}>
-                      <button className="btn btn-primary" onClick={() => { setPricingContext("load_more"); setShowPricing(true); }}>
-                        Unlock All Leads &rarr;
-                      </button>
-                      <span style={{fontSize:12,color:"var(--muted)"}}>30-day money-back guarantee</span>
-                    </div>
+                    <button className="btn btn-primary btn-sm" onClick={() => { setPricingContext("load_more"); setShowPricing(true); }}>See Plans &rarr;</button>
                   </div>
                 </>
               ) : (
@@ -2664,34 +2683,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 </div>
               </div>
 
-              {/* Feature grid: what paid users get */}
-              <div style={{marginTop:48,display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))",gap:16}}>
-                {[
-                  { icon: "📧", title: "Email Sequences", desc: "Automate 3-step cold outreach. Leads get follow-ups on autopilot." },
-                  { icon: "📊", title: "Lead Enrichment", desc: "Revenue estimates, employee count, tech stack, and business signals." },
-                  { icon: "💾", title: "Saved Lists + CRM", desc: "Organize leads into lists. Track status, add notes, never lose a lead." },
-                  { icon: "⬇️", title: "XLSX + CSV Export", desc: "Download all leads as a spreadsheet. Import into any CRM or tool." },
-                  { icon: "🤖", title: "AI Lead Scoring", desc: "Every lead scored 0-100 based on online presence, reviews, and signals." },
-                  { icon: "🔗", title: "Webhooks + API", desc: "Push leads to Zapier, GoHighLevel, HubSpot, or your own stack." },
-                ].map((f, i) => (
-                  <div key={i} style={{
-                    padding:"20px",borderRadius:12,border:"1px solid var(--border)",background:"var(--surface)",
-                    transition:"border-color 0.2s,transform 0.2s",cursor:"default",
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(240,180,41,0.3)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.transform = "none"; }}
-                  >
-                    <div style={{fontSize:24,marginBottom:8}}>{f.icon}</div>
-                    <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>{f.title}</div>
-                    <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.6}}>{f.desc}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{textAlign:"center",marginTop:24}}>
-                <button className="btn btn-outline" onClick={() => { setPricingContext(null); setShowPricing(true); }}>
-                  See All Plans &rarr;
-                </button>
-              </div>
+              {/* Auto-rotating feature carousel */}
+              <FeatureCarousel onShowPricing={() => { setPricingContext(null); setShowPricing(true); }} />
             </div>
           )}
         </div>
@@ -2960,30 +2953,6 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             <h3>Contact</h3>
             <p>For questions about these terms, contact us at support@leadreap.com.</p>
           </div>
-        </div>
-      )}
-
-      {/* Sticky bottom CTA bar for free/anonymous users with results */}
-      {searchDone && leads.length > 0 && !isPro && !showPricing && !showDashboard && (
-        <div style={{
-          position:"fixed",bottom:0,left:0,right:0,zIndex:99,
-          padding:"12px 24px",
-          background:"rgba(10,10,11,0.95)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
-          borderTop:"1px solid rgba(240,180,41,0.2)",
-          display:"flex",alignItems:"center",justifyContent:"center",gap:16,flexWrap:"wrap",
-          animation:"slideUpBar 0.4s ease-out",
-        }}>
-          <span style={{fontSize:13,color:"var(--muted)"}}>
-            {!user 
-              ? <>Found <strong style={{color:"var(--text)"}}>{displayTotal} leads</strong> &mdash; create a free account to save them</>
-              : <>You're seeing <strong style={{color:"var(--text)"}}>{visibleLeads.length} of {displayTotal}</strong> leads &mdash; from <strong style={{color:"var(--accent)"}}>$47</strong> one-time</>
-            }
-          </span>
-          {!user ? (
-            <button className="btn btn-green btn-sm" onClick={onLoginClick}>Sign Up Free</button>
-          ) : (
-            <button className="btn btn-primary btn-sm" onClick={() => { setPricingContext("load_more"); setShowPricing(true); }}>Unlock All Leads &rarr;</button>
-          )}
         </div>
       )}
     </>
