@@ -243,6 +243,30 @@ app.get("/api/leads/history", (req, res) => {
   return res.json({ searches: history });
 });
 
+// ── GET /api/account — Dashboard data ────────────────────────
+app.get("/api/account", (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Login required" });
+  const history = getSearchHistory(req.user.id);
+  const totalLeads = history.reduce((sum, h) => sum + (h.leadCount || 0), 0);
+  const topNiches = {};
+  for (const h of history) {
+    topNiches[h.niche] = (topNiches[h.niche] || 0) + 1;
+  }
+  const sortedNiches = Object.entries(topNiches).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  return res.json({
+    email: req.user.email,
+    plan: req.user.plan,
+    searchesToday: req.user.searchesToday || 0,
+    stats: {
+      totalSearches: history.length,
+      totalLeads,
+      topNiches: sortedNiches.map(([niche, count]) => ({ niche, count })),
+      recentSearches: history.slice(0, 20),
+    },
+  });
+});
+
 // ── GET /api/leads/jobs — List recent jobs ───────────────────
 app.get("/api/leads/jobs", (req, res) => {
   res.json({ jobs: listJobs().map(j => ({
