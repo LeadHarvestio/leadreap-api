@@ -168,6 +168,8 @@ const STYLE = `
   tr:hover td { background: rgba(240,180,41,0.02); }
   .name-cell { font-weight: 600; color: var(--text); }
   .email-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); }
+  .email-verified { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(34,197,94,0.12); color: #22c55e; font-weight: 600; margin-left: 6px; vertical-align: middle; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; }
+  .email-unverified { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(251,191,36,0.12); color: #fbbf24; font-weight: 600; margin-left: 6px; vertical-align: middle; letter-spacing: 0.02em; font-family: 'IBM Plex Mono', monospace; }
   .phone-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
   .site-cell { color: #60a5fa; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .site-cell a { color: #60a5fa; text-decoration: none; }
@@ -332,6 +334,16 @@ const STYLE = `
   .legal-modal p { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 12px; }
   .legal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 4px 8px; }
 
+  /* Outreach modal */
+  .outreach-modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; max-width: 680px; width: 95vw; max-height: 85vh; overflow-y: auto; padding: 32px; position: relative; }
+  .outreach-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .outreach-tab { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 6px 14px; border-radius: 100px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .outreach-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.08); }
+  .outreach-subject { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 13px; margin-bottom: 10px; font-family: 'IBM Plex Mono', monospace; }
+  .outreach-body { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; color: var(--text); font-size: 13px; min-height: 220px; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, sans-serif; resize: vertical; }
+  .outreach-actions { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
+  .outreach-copied { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #22c55e; }
+
   /* MOBILE */
   @media (max-width: 768px) {
     .nav { padding: 12px 16px; gap: 8px; }
@@ -448,6 +460,103 @@ const DEMO_LEADS = [
   { name: "Lakeway Dental Care", address: "2300 Lohmans Crossing, Austin, TX", email: "\u2014", phone: "(512) 555-0518", website: "lakewaydental.com", rating: 4.5, score: 65, unclaimed: false, linkedinCompany: null, facebook: null, instagram: null, twitter: null, linkedinPerson: null, notes: "Has website but no social media links — pitch social media management." },
 ];
 
+function getOutreachTemplates(lead) {
+  const biz = lead.name || "your business";
+  const firstName = lead.ownerName ? lead.ownerName.split(" ")[0] : "";
+  const greeting = firstName ? `Hi ${firstName}` : `Hi there`;
+  const hasSocial = lead.facebook || lead.instagram || lead.twitter;
+  const isUnclaimed = lead.unclaimed;
+  const techNote = lead.techStackSummary || "";
+  const isOldBuilder = /wix|weebly|squarespace/i.test(techNote);
+
+  const templates = [
+    {
+      id: "general",
+      label: "General Outreach",
+      subject: `Quick question about ${biz}`,
+      body: `${greeting},\n\nI came across ${biz} and was really impressed by your ${lead.rating ? lead.rating + "-star rating" : "online presence"}. I work with local businesses like yours to help them get more customers through digital marketing.\n\nI had a few ideas specific to your business that I think could make a real impact. Would you be open to a quick 10-minute call this week?\n\nNo pressure either way — just thought it was worth reaching out.\n\nBest,\n[Your Name]`
+    },
+    {
+      id: "website",
+      label: "Website Redesign",
+      subject: `${biz} — website opportunity`,
+      body: `${greeting},\n\nI was looking at the ${biz} website${isOldBuilder ? ` and noticed it's built on ${techNote.split(",")[0].trim()}` : ""} — it's a solid start, but I think there's a big opportunity to turn it into a real lead-generation machine.\n\nA few things I noticed:\n• The site could load faster and be more mobile-friendly\n• There's room to improve the call-to-action flow\n• Some SEO quick wins that could bring in more organic traffic\n\nI specialize in redesigning websites for local businesses — typically my clients see a 30-40% increase in leads within the first few months.\n\nWould it be worth a quick chat? I'd be happy to walk you through what I'd change.\n\nBest,\n[Your Name]`
+    },
+    {
+      id: "social",
+      label: "Social Media",
+      subject: `Social media strategy for ${biz}`,
+      body: `${greeting},\n\nI found ${biz} on Google Maps and noticed you've got a strong reputation with great reviews${!hasSocial ? " — but I couldn't find much social media presence" : ""}.\n\n${!hasSocial ? "Businesses in your niche that are active on Instagram and Facebook typically see 20-30% more walk-ins" : "I think there's an opportunity to turn your social following into more paying customers"}. I work with local businesses to build their social presence with content that actually converts.\n\nHere's what I typically do for businesses like yours:\n• Professional content creation (photos + short-form video)\n• Targeted local audience growth\n• Review generation strategy\n\nWould you be open to hearing more? No commitment — just a 10-minute overview.\n\nBest,\n[Your Name]`
+    },
+  ];
+
+  if (isUnclaimed) {
+    templates.push({
+      id: "unclaimed",
+      label: "Unclaimed Listing",
+      subject: `Urgent: Your ${biz} Google listing needs attention`,
+      body: `${greeting},\n\nI'm reaching out because I noticed your Google Business listing for ${biz} hasn't been claimed yet. This means anyone could potentially request ownership of it, and you're missing out on a lot of free features.\n\nWhen a listing is unclaimed, you can't:\n• Respond to customer reviews\n• Update your hours, photos, or contact info\n• Access insights on how customers find you\n• Run Google Ads linked to your listing\n\nI help local businesses claim, optimize, and manage their Google presence. I'd be happy to walk you through the process — it only takes about 15 minutes and could make a big difference for your visibility.\n\nWant me to send over more details?\n\nBest,\n[Your Name]`
+    });
+  }
+
+  return templates;
+}
+
+function OutreachModal({ templates, lead, onClose }) {
+  const [activeTab, setActiveTab] = useState(0);
+  const [subject, setSubject] = useState(templates[0]?.subject || "");
+  const [body, setBody] = useState(templates[0]?.body || "");
+  const [copied, setCopied] = useState(false);
+
+  function selectTemplate(idx) {
+    setActiveTab(idx);
+    setSubject(templates[idx].subject);
+    setBody(templates[idx].body);
+    setCopied(false);
+  }
+
+  function handleCopy() {
+    navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function handleMailto() {
+    window.open(`mailto:${lead.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="outreach-modal">
+        <button className="legal-close" onClick={onClose}>&times;</button>
+        <h2 style={{fontSize:18,fontWeight:700,marginBottom:4}}>Outreach to {lead.name}</h2>
+        <p style={{fontSize:12,color:"var(--muted)",fontFamily:"IBM Plex Mono",marginBottom:16}}>
+          {lead.email} {lead.emailVerified && <span className="email-verified">MX ✓</span>}
+        </p>
+        <div className="outreach-tabs">
+          {templates.map((t, i) => (
+            <button key={t.id} className={`outreach-tab ${i === activeTab ? "active" : ""}`} onClick={() => selectTemplate(i)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <input className="outreach-subject" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject line..." />
+        <textarea className="outreach-body" value={body} onChange={e => setBody(e.target.value)} />
+        <div className="outreach-actions">
+          <button className="btn btn-primary" onClick={handleMailto} style={{fontSize:13}}>
+            Open in Mail ↗
+          </button>
+          <button className="btn btn-outline" onClick={handleCopy} style={{fontSize:13}}>
+            {copied ? "Copied!" : "Copy to Clipboard"}
+          </button>
+          {copied && <span className="outreach-copied">✓ Copied</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function scoreToClass(score) {
   if (score >= 80) return "score-high";
   if (score >= 60) return "score-med";
@@ -455,9 +564,9 @@ function scoreToClass(score) {
 }
 
 function generateCSV(leads) {
-  const headers = ["Business Name", "Email", "Phone", "Website", "Address", "Rating", "Unclaimed", "LinkedIn", "Facebook", "Instagram", "Twitter", "Lead Score", "Insight"];
+  const headers = ["Business Name", "Email", "Email Verified", "Phone", "Website", "Address", "Rating", "Unclaimed", "LinkedIn", "Facebook", "Instagram", "Twitter", "Lead Score", "Insight"];
   const rows = leads.map(l => [
-    `"${l.name}"`, l.email || "", l.phone || "", l.website || "", `"${l.address || ""}"`,
+    `"${l.name}"`, l.email || "", l.emailVerified ? "Yes" : "No", l.phone || "", l.website || "", `"${l.address || ""}"`,
     l.rating || "", l.unclaimed ? "Yes" : "No",
     l.linkedinCompany || l.linkedinPerson || "", l.facebook || "", l.instagram || "", l.twitter || "",
     l.score, `"${(l.notes || "").replace(/"/g, '""')}"`
@@ -491,7 +600,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
   // Google Places Autocomplete for location input
   useEffect(() => {
-    const GMAPS_KEY = typeof window !== "undefined" && window.__LEADREAP_GMAPS_KEY;
+    const GMAPS_KEY = import.meta.env.VITE_GMAPS_KEY;
     if (!GMAPS_KEY || document.getElementById("gmaps-script")) return;
     const script = document.createElement("script");
     script.id = "gmaps-script";
@@ -554,6 +663,21 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [toast, setToast] = useState(false);
   const isPro = user && user.plan !== "free";
   const [searchDone, setSearchDone] = useState(false);
+
+  // Recent searches
+  const [recentSearches, setRecentSearches] = useState([]);
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/api/leads/history`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(r => r.json()).then(d => {
+      if (d.searches) setRecentSearches(d.searches);
+    }).catch(() => {});
+  }, [token, searchDone]);
+
+  // Outreach template modal
+  const [showOutreach, setShowOutreach] = useState(false);
+  const [outreachLead, setOutreachLead] = useState(null);
   const [batchNum, setBatchNum] = useState(1);
   const [searchError, setSearchError] = useState("");
   const [currentTip, setCurrentTip] = useState(0);
@@ -815,6 +939,22 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 FREE: 5 leads preview &middot; PRO: 40 leads + exports
               </span>
             </div>
+            {recentSearches.length > 0 && !searchDone && !loading && (
+              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>Recent:</span>
+                {recentSearches.slice(0, 5).map((s, i) => (
+                  <button key={i} onClick={() => { setNiche(s.niche); setLocation(s.location); }}
+                    style={{fontSize:11,fontFamily:"IBM Plex Mono",padding:"3px 10px",borderRadius:100,
+                      border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",
+                      cursor:"pointer",transition:"all 0.15s"}}
+                    onMouseEnter={e => { e.target.style.borderColor="var(--accent)"; e.target.style.color="var(--accent)"; }}
+                    onMouseLeave={e => { e.target.style.borderColor="var(--border)"; e.target.style.color="var(--muted)"; }}
+                  >
+                    {s.niche} · {s.location.split(",")[0]} ({s.leadCount})
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {loading && (
@@ -900,6 +1040,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                         <th>Rating</th>
                         <th>Lead Score</th>
                         <th>Insight</th>
+                        <th style={{minWidth:80}}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -919,7 +1060,9 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                               </div>
                             )}
                           </td>
-                          {includeEmail && <td className="email-cell">{lead.email || "\u2014"}</td>}
+                          {includeEmail && <td className="email-cell">
+                            {lead.email ? <>{lead.email}{lead.emailVerified ? <span className="email-verified">MX ✓</span> : <span className="email-unverified">unverified</span>}</> : "\u2014"}
+                          </td>}
                           {includePhone && <td className="phone-cell">{lead.phoneDisplay || lead.phone || "\u2014"}</td>}
                           <td className="site-cell">
                             {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "\u2014"}
@@ -936,6 +1079,18 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                             <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
                           </td>
                           <td style={{minWidth:180,maxWidth:260,fontSize:12,color:"var(--muted)",lineHeight:"1.5"}}>{lead.notes}</td>
+                          <td>
+                            {lead.email && lead.email !== "\u2014" ? (
+                              <button onClick={() => { setOutreachLead(lead); setShowOutreach(true); }}
+                                style={{fontSize:11,fontFamily:"IBM Plex Mono",padding:"4px 10px",borderRadius:6,
+                                  border:"1px solid var(--accent)",background:"rgba(240,180,41,0.08)",
+                                  color:"var(--accent)",cursor:"pointer",whiteSpace:"nowrap",fontWeight:600}}>
+                                Outreach ↗
+                              </button>
+                            ) : (
+                              <span style={{fontSize:11,color:"var(--border)"}}>—</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1086,6 +1241,17 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       {toast && (
         <div className="toast">{"\u2713"} {isPro && !leads ? "Upgraded to PRO!" : isPro ? "CSV downloaded!" : "Welcome to PRO!"}</div>
       )}
+
+      {showOutreach && outreachLead && (() => {
+        const templates = getOutreachTemplates(outreachLead);
+        return (
+          <OutreachModal
+            templates={templates}
+            lead={outreachLead}
+            onClose={() => { setShowOutreach(false); setOutreachLead(null); }}
+          />
+        );
+      })()}
 
       {showPrivacy && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowPrivacy(false)}>
