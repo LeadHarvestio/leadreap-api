@@ -492,7 +492,10 @@ async function enrichWebsite(context, lead) {
 
       // Strategy 1: mailto: links on homepage
       const mailtoEmails = await page.$$eval('a[href^="mailto:"]', els =>
-        els.map(l => l.href.replace("mailto:", "").split("?")[0].trim().toLowerCase())
+        els.map(l => {
+          try { return decodeURIComponent(l.href.replace("mailto:", "").split("?")[0]).trim().toLowerCase(); }
+          catch { return l.href.replace("mailto:", "").split("?")[0].trim().toLowerCase(); }
+        })
       ).catch(() => []);
 
       let email = mailtoEmails[0] || null;
@@ -527,7 +530,10 @@ async function enrichWebsite(context, lead) {
           try {
             await page.goto(contactHref, { timeout: 8000, waitUntil: "domcontentloaded" });
             const contactMailtos = await page.$$eval('a[href^="mailto:"]', els =>
-              els.map(l => l.href.replace("mailto:", "").split("?")[0].trim().toLowerCase())
+              els.map(l => {
+                try { return decodeURIComponent(l.href.replace("mailto:", "").split("?")[0]).trim().toLowerCase(); }
+                catch { return l.href.replace("mailto:", "").split("?")[0].trim().toLowerCase(); }
+              })
             ).catch(() => []);
             email = contactMailtos[0] || null;
 
@@ -541,6 +547,12 @@ async function enrichWebsite(context, lead) {
             }
           } catch (_) { /* contact page timed out, move on */ }
         }
+      }
+
+      // Final cleanup: decode URI, strip whitespace, remove trailing dots
+      if (email) {
+        try { email = decodeURIComponent(email); } catch {}
+        email = email.trim().replace(/\.$/, "").replace(/\s+/g, "");
       }
 
       const emailAssessment = assessEmail(email);
