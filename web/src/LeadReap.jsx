@@ -398,11 +398,29 @@ const STYLE = `
   .outreach-actions { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
   .outreach-copied { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #22c55e; }
 
+  /* MOBILE LEAD CARDS — shown below 768px instead of table */
+  .mobile-cards { display: none; flex-direction: column; gap: 12px; }
+  .mobile-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; cursor: pointer; transition: border-color 0.15s; }
+  .mobile-card:hover, .mobile-card.expanded { border-color: rgba(240,180,41,0.3); }
+  .mobile-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .mobile-card-name { font-weight: 700; font-size: 14px; line-height: 1.3; }
+  .mobile-card-addr { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+  .mobile-card-score { flex-shrink: 0; }
+  .mobile-card-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 12px; }
+  .mobile-card-field label { display: block; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-family: 'IBM Plex Mono', monospace; margin-bottom: 2px; }
+  .mobile-card-field span { font-size: 12px; word-break: break-all; }
+  .mobile-card-field a { font-size: 12px; color: var(--accent); text-decoration: none; word-break: break-all; }
+  .mobile-card-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .mobile-card-expand { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .mobile-card-insight { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .mobile-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mobile-card-socials { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
   /* MOBILE */
   @media (max-width: 768px) {
     .nav { padding: 12px 16px; gap: 8px; }
-    .nav-actions { gap: 8px; }
-    .nav-actions .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .nav-actions { gap: 6px; }
+    .nav-actions .btn-sm { padding: 5px 10px; font-size: 11px; }
     .nav-email { display: none; }
     .nav-beta { display: none; }
     .nav-cta { display: none; }
@@ -416,6 +434,7 @@ const STYLE = `
     .hero p { font-size: 13px; margin-bottom: 0; line-height: 1.5; max-width: 100%; }
     .hero-stats { display: none; }
     .hero::before { display: none; }
+    .niche-ticker { display: none; }
     .tool-section { padding: 0 16px 48px; }
     .search-card { padding: 20px 16px; border-radius: 12px; margin-bottom: 16px; }
     .search-label { font-size: 10px; margin-bottom: 14px; }
@@ -429,11 +448,9 @@ const STYLE = `
     .results-meta { flex-wrap: wrap; gap: 8px; }
     .results-actions { width: 100%; display: flex; gap: 8px; }
     .results-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 12px; }
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { min-width: 700px; }
-    th { padding: 10px 12px; font-size: 10px; }
-    td { padding: 10px 12px; font-size: 12px; }
-    .name-cell { font-size: 13px; }
+    /* Hide desktop table, show mobile cards */
+    .desktop-table { display: none; }
+    .mobile-cards { display: flex; }
     .upsell-banner { flex-direction: column !important; gap: 12px !important; text-align: center; padding: 14px 16px !important; }
     .upsell-banner .btn { width: 100%; justify-content: center; }
     .upgrade-bar { flex-direction: column; gap: 12px; padding: 18px 16px; }
@@ -452,10 +469,12 @@ const STYLE = `
     .empty-state { padding: 48px 16px; }
     .empty-title { font-size: 17px; }
     .empty-sub { font-size: 13px; }
-    .demo-header { flex-direction: column; gap: 6px; align-items: flex-start; }
-    .demo-cta p { font-size: 14px; }
-    .demo-cta .btn { font-size: 14px; }
+    .demo-section { display: none; }
     .footer { flex-direction: column; gap: 10px; padding: 20px 16px; text-align: center; }
+    .legal-modal { padding: 24px 18px; width: 95vw; }
+    .outreach-modal { padding: 24px 18px; width: 95vw; }
+    .outreach-actions { flex-wrap: wrap; }
+    .outreach-actions .btn { flex: 1; min-width: 120px; justify-content: center; }
   }
   .hero-mobile { display: none; }
   @media (max-width: 380px) {
@@ -624,7 +643,7 @@ function OutreachModal({ templates, lead, onClose }) {
         <button className="legal-close" onClick={onClose}>&times;</button>
         <h2 style={{fontSize:18,fontWeight:700,marginBottom:4}}>Outreach to {lead.name}</h2>
         <p style={{fontSize:12,color:"var(--muted)",fontFamily:"IBM Plex Mono",marginBottom:16}}>
-          {lead.email} {lead.emailVerified && <span className="email-verified">MX ✓</span>}
+          {lead.email} {lead.emailVerified && <span className="email-verified">Verified</span>}
         </p>
         <div className="outreach-tabs">
           {templates.map((t, i) => (
@@ -658,7 +677,7 @@ function scoreToClass(score) {
 function generateCSV(leads) {
   const headers = ["Business Name", "Email", "Email Verified", "Phone", "Website", "Address", "Rating", "Unclaimed", "LinkedIn", "Facebook", "Instagram", "Twitter", "Lead Score", "Insight"];
   const rows = leads.map(l => [
-    `"${l.name}"`, l.email || "", l.emailVerified ? "Yes" : "No", l.phone || "", l.website || "", `"${l.address || ""}"`,
+    `"${l.name}"`, l.email || "", l.emailVerified ? "Verified" : "", l.phone || "", l.website || "", `"${l.address || ""}"`,
     l.rating || "", l.unclaimed ? "Yes" : "No",
     l.linkedinCompany || l.linkedinPerson || "", l.facebook || "", l.instagram || "", l.twitter || "",
     l.score, `"${(l.notes || "").replace(/"/g, '""')}"`
@@ -886,6 +905,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       setLeads(job.leads || []);
       setTotalLeads(job.total || job.leads?.length || 0);
       setSearchDone(true);
+      setExpandedRow(0); // Auto-expand first result to show insight + outreach
     } catch (e) {
       console.error(e);
       setSearchDone(true);
@@ -1237,12 +1257,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 </div>
               </div>
 
-              <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:12,flexWrap:"wrap",fontSize:11,fontFamily:"IBM Plex Mono",color:"var(--muted)"}}>
-                <span>Click any row to expand details & outreach</span>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><span className="email-verified" style={{marginLeft:0}}>Verified ✓</span> Email domain accepts mail</span>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><span className="email-unverified" style={{marginLeft:0}}>Unverified</span> Could not confirm</span>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"#f59e0b22",color:"#f59e0b",fontWeight:600}}>UNCLAIMED</span> Google listing not claimed</span>
-              </div>
+              <div className="desktop-table">
 
               <div className={!isPro ? "lock-overlay" : ""}>
                 <div className="table-wrap">
@@ -1256,6 +1271,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                         <th>Website</th>
                         <th>Rating</th>
                         <th>Lead Score</th>
+                        <th style={{width:36}}></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1277,7 +1293,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                             )}
                           </td>
                           {includeEmail && <td className="email-cell">
-                            {lead.email ? <>{lead.email}{lead.emailVerified ? <span className="email-verified" title="Mail server verified — this domain accepts email">Verified ✓</span> : <span className="email-unverified" title="Could not verify mail server — email may still be valid">Unverified</span>}</> : "\u2014"}
+                            {lead.email ? <>{lead.email}{lead.emailVerified && <span className="email-verified" title="Mail server verified">Verified</span>}</> : "\u2014"}
                           </td>}
                           {includePhone && <td className="phone-cell">{lead.phoneDisplay || lead.phone || "\u2014"}</td>}
                           <td className="site-cell">
@@ -1294,6 +1310,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td>
                             <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
                           </td>
+                          <td style={{textAlign:"center",color:"var(--muted)",fontSize:14,transition:"transform 0.2s",transform:expandedRow === i ? "rotate(90deg)" : "rotate(0)"}}>&#9656;</td>
                         </tr>
                         {expandedRow === i && (
                           <tr className="expand-row">
@@ -1333,6 +1350,87 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                     </tbody>
                   </table>
                 </div>
+              </div>
+              </div>
+
+              {/* Mobile card layout */}
+              <div className={`mobile-cards ${!isPro ? "lock-overlay" : ""}`}>
+                {visibleLeads.map((lead, i) => (
+                  <div key={i} className={`mobile-card ${expandedRow === i ? "expanded" : ""}`} onClick={() => setExpandedRow(expandedRow === i ? null : i)}>
+                    <div className="mobile-card-top">
+                      <div>
+                        <div className="mobile-card-name">{lead.name}</div>
+                        <div className="mobile-card-addr">{lead.address}</div>
+                      </div>
+                      <div className="mobile-card-score">
+                        <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
+                        <span style={{display:"block",textAlign:"center",color:"var(--muted)",fontSize:12,marginTop:4,transition:"transform 0.2s",transform:expandedRow === i ? "rotate(90deg)" : "rotate(0)"}}>&#9656;</span>
+                      </div>
+                    </div>
+                    <div className="mobile-card-fields">
+                      {includeEmail && (
+                        <div className="mobile-card-field">
+                          <label>Email</label>
+                          <span style={{color: lead.email ? "var(--accent)" : "var(--muted)"}}>
+                            {lead.email || "\u2014"}
+                          </span>
+                          {lead.email && lead.emailVerified && (
+                            <span className="email-verified" style={{marginLeft:0,marginTop:3,display:"inline-block"}}>Verified</span>
+                          )}
+                        </div>
+                      )}
+                      {includePhone && (
+                        <div className="mobile-card-field">
+                          <label>Phone</label>
+                          <span>{lead.phoneDisplay || lead.phone || "\u2014"}</span>
+                        </div>
+                      )}
+                      <div className="mobile-card-field">
+                        <label>Website</label>
+                        {lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{lead.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : <span style={{color:"var(--muted)"}}>{"\u2014"}</span>}
+                      </div>
+                      <div className="mobile-card-field">
+                        <label>Rating</label>
+                        <span>{"\u2605"} {lead.rating || "\u2014"}</span>
+                      </div>
+                    </div>
+                    <div className="mobile-card-badges">
+                      {lead.unclaimed && <span style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:"#f59e0b22",color:"#f59e0b",fontWeight:600}}>UNCLAIMED</span>}
+                      {includeSocial && lead.facebook && <span style={{fontSize:10,color:"#1877f2"}}>Facebook</span>}
+                      {includeSocial && lead.instagram && <span style={{fontSize:10,color:"#e1306c"}}>Instagram</span>}
+                      {includeSocial && lead.linkedinCompany && <span style={{fontSize:10,color:"#0a66c2"}}>LinkedIn</span>}
+                    </div>
+                    {expandedRow === i && (
+                      <div className="mobile-card-expand">
+                        <div className="mobile-card-insight">
+                          <strong style={{color:"var(--text)"}}>Insight:</strong> {lead.notes}
+                        </div>
+                        <div className="mobile-card-actions">
+                          {lead.email && lead.email !== "\u2014" && (
+                            <button onClick={(e) => { e.stopPropagation(); setOutreachLead(lead); setShowOutreach(true); }}
+                              className="btn btn-primary btn-sm" style={{fontSize:12,flex:1,justifyContent:"center"}}>
+                              Outreach ↗
+                            </button>
+                          )}
+                          {lead.website && (
+                            <a href={lead.website} target="_blank" rel="noopener noreferrer"
+                              className="btn btn-outline btn-sm" style={{fontSize:12,textDecoration:"none",flex:1,justifyContent:"center"}}
+                              onClick={e => e.stopPropagation()}>
+                              Visit Site
+                            </a>
+                          )}
+                          {lead.mapsUrl && (
+                            <a href={lead.mapsUrl} target="_blank" rel="noopener noreferrer"
+                              className="btn btn-outline btn-sm" style={{fontSize:12,textDecoration:"none",flex:1,justifyContent:"center"}}
+                              onClick={e => e.stopPropagation()}>
+                              Maps
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
 
               {!isPro ? (
