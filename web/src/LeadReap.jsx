@@ -346,6 +346,42 @@ const STYLE = `
 
   /* Outreach modal */
   .outreach-modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; max-width: 680px; width: 95vw; max-height: 85vh; overflow-y: auto; padding: 32px; position: relative; }
+
+  /* Dashboard */
+  .dash { max-width: 900px; margin: 0 auto; padding: 40px 40px 80px; }
+  .dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; }
+  .dash-greeting { font-size: 24px; font-weight: 700; }
+  .dash-greeting span { color: var(--accent); }
+  .dash-plan { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 4px 12px; border-radius: 4px; font-weight: 600; letter-spacing: 0.05em; }
+  .dash-plan-free { background: rgba(240,180,41,0.12); color: var(--accent); border: 1px solid rgba(240,180,41,0.3); }
+  .dash-plan-pro { background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+  .dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 36px; }
+  .dash-stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+  .dash-stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .dash-stat-value { font-size: 28px; font-weight: 700; }
+  .dash-section { margin-bottom: 32px; }
+  .dash-section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .dash-niches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dash-niche { font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 6px 14px; border-radius: 100px; border: 1px solid var(--border); background: rgba(240,180,41,0.04); color: var(--muted); }
+  .dash-niche strong { color: var(--accent); margin-left: 4px; }
+  .dash-history { display: flex; flex-direction: column; gap: 8px; }
+  .dash-history-item { display: flex; justify-content: space-between; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; cursor: pointer; transition: border-color 0.15s; }
+  .dash-history-item:hover { border-color: var(--accent); }
+  .dash-history-niche { font-weight: 600; font-size: 14px; }
+  .dash-history-location { font-size: 12px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+  .dash-history-meta { text-align: right; }
+  .dash-history-leads { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--accent); font-weight: 600; }
+  .dash-history-time { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+  .dash-empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+  .dash-empty p { margin-bottom: 16px; font-size: 14px; }
+  .dash-actions { display: flex; gap: 12px; margin-bottom: 36px; }
+  .dash-back { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); cursor: pointer; transition: color 0.15s; margin-bottom: 24px; display: inline-block; }
+  .dash-back:hover { color: var(--accent); }
+  @media (max-width: 640px) {
+    .dash { padding: 20px 16px 60px; }
+    .dash-stats { grid-template-columns: 1fr; }
+    .dash-header { flex-direction: column; gap: 12px; }
+  }
   .outreach-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
   .outreach-tab { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 6px 14px; border-radius: 100px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
   .outreach-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.08); }
@@ -676,6 +712,29 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [showOutreach, setShowOutreach] = useState(false);
   const [outreachLead, setOutreachLead] = useState(null);
 
+  // Dashboard
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [dashData, setDashData] = useState(null);
+  const [dashLoading, setDashLoading] = useState(false);
+
+  function openDashboard() {
+    setShowDashboard(true);
+    setDashLoading(true);
+    fetch(`${API_BASE}/api/account`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(r => r.json()).then(d => {
+      setDashData(d);
+      setDashLoading(false);
+    }).catch(() => setDashLoading(false));
+  }
+
+  function dashRerun(search) {
+    setShowDashboard(false);
+    setNiche(INDUSTRIES.includes(search.niche) ? search.niche : "custom");
+    if (!INDUSTRIES.includes(search.niche)) setCustomNiche(search.niche);
+    setLocation(search.location);
+  }
+
   // Google Places Autocomplete for location input
   useEffect(() => {
     const GMAPS_KEY = import.meta.env.VITE_GMAPS_KEY;
@@ -908,7 +967,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 <span className="badge mono" style={{ background: isPro ? "rgba(34,197,94,0.12)" : undefined, color: isPro ? "#22c55e" : undefined, borderColor: isPro ? "rgba(34,197,94,0.3)" : undefined }}>
                   {user.plan.toUpperCase()}
                 </span>
-                <span className="nav-email" style={{ fontSize: 13, color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace" }}>{user.email}</span>
+                <button className="btn btn-ghost btn-sm" onClick={openDashboard} style={{fontFamily:"IBM Plex Mono",fontSize:12}}>Dashboard</button>
+                <span className="nav-email" style={{ fontSize: 13, color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace", cursor: "pointer" }} onClick={openDashboard}>{user.email}</span>
                 <button className="btn btn-ghost btn-sm" onClick={onLogout}>Log out</button>
               </>
             ) : (
@@ -920,6 +980,99 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           </div>
         </nav>
 
+        {showDashboard ? (
+          <div className="dash">
+            <span className="dash-back" onClick={() => setShowDashboard(false)}>&larr; Back to search</span>
+
+            {dashLoading ? (
+              <div style={{textAlign:"center",padding:"60px 0",color:"var(--muted)"}}>Loading dashboard...</div>
+            ) : dashData ? (
+              <>
+                <div className="dash-header">
+                  <div>
+                    <div className="dash-greeting">Welcome back<span>,</span> {dashData.email?.split("@")[0]}</div>
+                    <div style={{fontSize:13,color:"var(--muted)",fontFamily:"IBM Plex Mono",marginTop:4}}>{dashData.email}</div>
+                  </div>
+                  <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                    <span className={`dash-plan ${dashData.plan === "free" ? "dash-plan-free" : "dash-plan-pro"}`}>
+                      {dashData.plan?.toUpperCase()} PLAN
+                    </span>
+                    {dashData.plan === "free" && (
+                      <button className="btn btn-primary btn-sm" onClick={() => { setShowDashboard(false); setShowPricing(true); }}>Upgrade</button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="dash-stats">
+                  <div className="dash-stat">
+                    <div className="dash-stat-label">Total Searches</div>
+                    <div className="dash-stat-value">{dashData.stats?.totalSearches || 0}</div>
+                  </div>
+                  <div className="dash-stat">
+                    <div className="dash-stat-label">Leads Found</div>
+                    <div className="dash-stat-value" style={{color:"var(--accent)"}}>{dashData.stats?.totalLeads || 0}</div>
+                  </div>
+                  <div className="dash-stat">
+                    <div className="dash-stat-label">Searches Today</div>
+                    <div className="dash-stat-value">{dashData.searchesToday || 0}</div>
+                  </div>
+                </div>
+
+                <div className="dash-actions">
+                  <button className="btn btn-primary" onClick={() => { setShowDashboard(false); document.querySelector('.field select')?.focus(); }}>
+                    New Search &rarr;
+                  </button>
+                  {dashData.plan !== "free" && (
+                    <button className="btn btn-outline" onClick={() => { setShowDashboard(false); if (leads.length > 0) handleExport(); }}>
+                      Export Last Results
+                    </button>
+                  )}
+                </div>
+
+                {dashData.stats?.topNiches?.length > 0 && (
+                  <div className="dash-section">
+                    <div className="dash-section-title">Your Top Niches</div>
+                    <div className="dash-niches">
+                      {dashData.stats.topNiches.map((n, i) => (
+                        <span key={i} className="dash-niche" onClick={() => dashRerun({ niche: n.niche, location: "" })} style={{cursor:"pointer"}}>
+                          {n.niche}<strong>&times;{n.count}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="dash-section">
+                  <div className="dash-section-title">Search History</div>
+                  {dashData.stats?.recentSearches?.length > 0 ? (
+                    <div className="dash-history">
+                      {dashData.stats.recentSearches.map((s, i) => (
+                        <div key={i} className="dash-history-item" onClick={() => dashRerun(s)}>
+                          <div>
+                            <div className="dash-history-niche">{s.niche}</div>
+                            <div className="dash-history-location">{s.location}</div>
+                          </div>
+                          <div className="dash-history-meta">
+                            <div className="dash-history-leads">{s.leadCount} leads</div>
+                            <div className="dash-history-time">{new Date(s.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="dash-empty">
+                      <p>No searches yet. Run your first search to see history here.</p>
+                      <button className="btn btn-primary" onClick={() => setShowDashboard(false)}>Start Searching &rarr;</button>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div style={{textAlign:"center",padding:"60px 0",color:"var(--muted)"}}>Could not load dashboard data.</div>
+            )}
+          </div>
+        ) : (
+        <>
         <div className="hero">
           <div className="hero-tag"><div className="dot" /> AI-POWERED LEAD INTELLIGENCE</div>
           <h1 className="hero-desktop">Find <em>any</em> local business lead<br />in under 30 seconds</h1>
@@ -1222,6 +1375,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             </div>
           )}
         </div>
+        </>
+        )}
 
         <footer className="footer">
           <div className="footer-left">&copy; 2026 LeadReap</div>
