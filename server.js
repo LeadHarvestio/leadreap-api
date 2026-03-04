@@ -21,6 +21,10 @@ import {
   createMagicLink, verifyMagicLink, validateSession,
   destroySession, recordSearch, cleanupAuth,
   saveSearchHistory, getSearchHistory,
+  createSavedList, getUserLists, getList,
+  updateSavedList, deleteSavedList,
+  addLeadsToList, getListLeads,
+  updateLeadStatus, updateLeadNotes, removeLeadFromList,
 } from "./auth.js";
 import { createCheckout, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail } from "./email.js";
@@ -285,6 +289,103 @@ app.get("/api/leads/export/:jobId", requireAuth, async (req, res) => {
 
 
 // ═════════════════════════════════════════════════════════════
+// SAVED LISTS ROUTES
+// ═════════════════════════════════════════════════════════════
+
+// ── GET /api/lists — Get all user's lists ────────────────────
+app.get("/api/lists", requireAuth, (req, res) => {
+  const lists = getUserLists(req.user.id);
+  return res.json({ lists });
+});
+
+// ── POST /api/lists — Create a new list ──────────────────────
+app.post("/api/lists", requireAuth, (req, res) => {
+  const { name, description } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "List name required" });
+  }
+
+  // Limit: 50 lists per user
+  const existing = getUserLists(req.user.id);
+  if (existing.length >= 50) {
+    return res.status(400).json({ error: "Maximum 50 lists reached" });
+  }
+
+  const list = createSavedList(req.user.id, name, description);
+  return res.json({ list });
+});
+
+// ── PUT /api/lists/:id — Rename / update a list ─────────────
+app.put("/api/lists/:id", requireAuth, (req, res) => {
+  const list = getList(req.params.id, req.user.id);
+  if (!list) return res.status(404).json({ error: "List not found" });
+
+  const { name, description } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: "List name required" });
+
+  updateSavedList(req.params.id, req.user.id, name, description);
+  return res.json({ ok: true });
+});
+
+// ── DELETE /api/lists/:id — Delete a list ────────────────────
+app.delete("/api/lists/:id", requireAuth, (req, res) => {
+  const deleted = deleteSavedList(req.params.id, req.user.id);
+  if (!deleted) return res.status(404).json({ error: "List not found" });
+  return res.json({ ok: true });
+});
+
+// ── GET /api/lists/:id/leads — Get all leads in a list ──────
+app.get("/api/lists/:id/leads", requireAuth, (req, res) => {
+  const list = getList(req.params.id, req.user.id);
+  if (!list) return res.status(404).json({ error: "List not found" });
+
+  const leads = getListLeads(req.params.id);
+  return res.json({ list: { id: list.id, name: list.name, description: list.description }, leads });
+});
+
+// ── POST /api/lists/:id/leads — Add leads to a list ─────────
+app.post("/api/lists/:id/leads", requireAuth, (req, res) => {
+  const list = getList(req.params.id, req.user.id);
+  if (!list) return res.status(404).json({ error: "List not found" });
+
+  const { leads } = req.body;
+  if (!Array.isArray(leads) || leads.length === 0) {
+    return res.status(400).json({ error: "leads array required" });
+  }
+
+  // Limit: 2000 leads per list
+  const currentLeads = getListLeads(req.params.id);
+  if (currentLeads.length + leads.length > 2000) {
+    return res.status(400).json({ error: `Would exceed 2000 lead limit (currently ${currentLeads.length})` });
+  }
+
+  const added = addLeadsToList(req.params.id, leads);
+  return res.json({ added, total: currentLeads.length + added });
+});
+
+// ── PATCH /api/lists/:listId/leads/:leadId — Update status or notes ─
+app.patch("/api/lists/:listId/leads/:leadId", requireAuth, (req, res) => {
+  const list = getList(req.params.listId, req.user.id);
+  if (!list) return res.status(404).json({ error: "List not found" });
+
+  const { status, notes } = req.body;
+  if (status !== undefined) updateLeadStatus(req.params.listId, req.params.leadId, status);
+  if (notes !== undefined) updateLeadNotes(req.params.listId, req.params.leadId, notes);
+
+  return res.json({ ok: true });
+});
+
+// ── DELETE /api/lists/:listId/leads/:leadId — Remove a lead ─
+app.delete("/api/lists/:listId/leads/:leadId", requireAuth, (req, res) => {
+  const list = getList(req.params.listId, req.user.id);
+  if (!list) return res.status(404).json({ error: "List not found" });
+
+  removeLeadFromList(req.params.listId, req.params.leadId);
+  return res.json({ ok: true });
+});
+
+
+// ═════════════════════════════════════════════════════════════
 // SYSTEM ROUTES
 // ═════════════════════════════════════════════════════════════
 
@@ -336,6 +437,11 @@ app.listen(PORT, () => {
   POST /api/leads/search
   GET  /api/leads/job/:id
   GET  /api/leads/export/:id
+  GET  /api/lists
+  POST /api/lists
+  GET  /api/lists/:id/leads
+  POST /api/lists/:id/leads
+  PATCH /api/lists/:lid/leads/:id
   GET  /api/metrics
   GET  /health
   ────────────────────────────────
