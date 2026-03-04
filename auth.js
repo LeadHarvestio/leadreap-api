@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // AUTH — Email-based license system backed by SQLite
 // No passwords. User enters email → gets a magic link → session.
-// LemonSqueezy webhook activates their plan.
+// Stripe webhook activates their plan.
 // ─────────────────────────────────────────────────────────────
 
 import Database from "better-sqlite3";
@@ -373,7 +373,7 @@ export function destroySession(token) {
   stmts.deleteSession.run(token);
 }
 
-/** Upgrade a user's plan (called from LemonSqueezy webhook) */
+/** Upgrade a user's plan (called from Stripe webhook) */
 export function activateLicense(email, plan, customerId, orderId) {
   getOrCreateUser(email); // ensure user exists
   stmts.upgradePlan.run(plan, customerId, orderId, email.toLowerCase().trim());
