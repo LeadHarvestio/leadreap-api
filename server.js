@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// LeadReap API — v3.3 (Production)
+// LeadReap API — v3.4 (Production)
 // Express server with auth, Stripe payments, rate limiting, + scraper
+// v3.4: Search history persisted in SQLite
 // ─────────────────────────────────────────────────────────────
 
 import express from "express";
@@ -19,6 +20,7 @@ import { exportToBuffer } from "./scraper/exporter.js";
 import {
   createMagicLink, verifyMagicLink, validateSession,
   destroySession, recordSearch, cleanupAuth,
+  saveSearchHistory, getSearchHistory,
 } from "./auth.js";
 import { createCheckout, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail } from "./email.js";
@@ -28,25 +30,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
-// ── Search history (in-memory, per user) ─────────────────────
-const searchHistory = new Map(); // userId -> [{ niche, location, leadCount, timestamp, jobId }]
+// ── Search history: persisted in SQLite (see auth.js) ────────
 const deliveredJobs = new Set(); // track which jobs already saved to history
-
-function saveSearchHistory(userId, { niche, location, leadCount, jobId }) {
-  if (!userId) return;
-  const key = `${userId}`;
-  if (!searchHistory.has(key)) searchHistory.set(key, []);
-  const history = searchHistory.get(key);
-  // Avoid duplicates
-  if (history.some(h => h.jobId === jobId)) return;
-  history.unshift({ niche, location, leadCount, jobId, timestamp: Date.now() });
-  // Keep last 50 searches
-  if (history.length > 50) history.length = 50;
-}
-
-function getSearchHistory(userId) {
-  return searchHistory.get(`${userId}`) || [];
-}
 
 // ─────────────────────────────────────────────────────────────
 // GLOBAL MIDDLEWARE
@@ -341,7 +326,7 @@ cleanupAuth();
 
 app.listen(PORT, () => {
   console.log(`
-  LeadReap API v3.3 — port ${PORT}
+  LeadReap API v3.4 — port ${PORT}
   ────────────────────────────────
   POST /api/auth/magic
   POST /api/auth/verify
