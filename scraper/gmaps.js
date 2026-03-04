@@ -202,6 +202,83 @@ function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, sc
   return "Solid mid-tier lead with good local presence.";
 }
 
+/**
+ * Estimate enrichment data from available Google Maps signals.
+ * Revenue & employees are range estimates based on:
+ *   - Review volume (strong proxy for foot traffic / transaction volume)
+ *   - Rating (quality signal)
+ *   - Tech stack (ad spend = higher revenue, builder = smaller biz)
+ *   - Category heuristics
+ *   - Year opened (longevity)
+ */
+function estimateEnrichment({ rating, reviews, techStack, category, yearOpened, unclaimed, hasWebsite }) {
+  // ── Revenue estimation ────────────────────────────────────
+  let revenueMin = 100000, revenueMax = 500000; // default: $100K–$500K
+
+  if (reviews >= 1000)      { revenueMin = 2000000; revenueMax = 10000000; }
+  else if (reviews >= 500)  { revenueMin = 1000000; revenueMax = 5000000; }
+  else if (reviews >= 200)  { revenueMin = 500000;  revenueMax = 2000000; }
+  else if (reviews >= 100)  { revenueMin = 250000;  revenueMax = 1000000; }
+  else if (reviews >= 50)   { revenueMin = 150000;  revenueMax = 750000; }
+  else if (reviews >= 20)   { revenueMin = 100000;  revenueMax = 500000; }
+  else                      { revenueMin = 50000;   revenueMax = 250000; }
+
+  // High-revenue categories
+  const cat = (category || "").toLowerCase();
+  const highRevCats = ["hotel", "car dealer", "real estate", "medical", "dental", "hospital", "law", "attorney"];
+  const lowRevCats = ["food truck", "mobile", "freelance", "tutor", "cleaning"];
+  if (highRevCats.some(c => cat.includes(c))) { revenueMin *= 2; revenueMax *= 2; }
+  if (lowRevCats.some(c => cat.includes(c))) { revenueMin *= 0.5; revenueMax *= 0.5; }
+
+  // Ad spend = more revenue
+  if (techStack?.some(t => t.category === "Paid Ads")) { revenueMin *= 1.3; revenueMax *= 1.5; }
+
+  // ── Employee estimation ───────────────────────────────────
+  let employeeMin = 1, employeeMax = 10;
+
+  if (reviews >= 1000)      { employeeMin = 20; employeeMax = 100; }
+  else if (reviews >= 500)  { employeeMin = 10; employeeMax = 50; }
+  else if (reviews >= 200)  { employeeMin = 5;  employeeMax = 25; }
+  else if (reviews >= 100)  { employeeMin = 3;  employeeMax = 15; }
+  else if (reviews >= 50)   { employeeMin = 2;  employeeMax = 10; }
+  else                      { employeeMin = 1;  employeeMax = 5; }
+
+  // ── Years in business ─────────────────────────────────────
+  const currentYear = new Date().getFullYear();
+  const yearsInBusiness = yearOpened ? currentYear - yearOpened : null;
+
+  // ── Business signals ──────────────────────────────────────
+  const signals = [];
+  if (unclaimed) signals.push("Unclaimed listing");
+  if (reviews >= 200 && rating >= 4.5) signals.push("High authority");
+  if (reviews >= 100) signals.push("Established presence");
+  if (techStack?.some(t => t.category === "Paid Ads")) signals.push("Active ad spend");
+  if (techStack?.some(t => t.category === "Analytics")) signals.push("Uses analytics");
+  if (techStack?.some(t => t.name === "Shopify")) signals.push("E-commerce (Shopify)");
+  if (techStack?.some(t => t.name === "WordPress")) signals.push("WordPress site");
+  if (techStack?.some(t => t.name === "Wix" || t.name === "Squarespace" || t.name === "Weebly")) signals.push("DIY website builder");
+  if (!hasWebsite) signals.push("No website");
+  if (yearsInBusiness && yearsInBusiness >= 10) signals.push("10+ years in business");
+  else if (yearsInBusiness && yearsInBusiness <= 2) signals.push("New business (<2 yrs)");
+
+  // Format revenue as readable strings
+  const fmtRev = (n) => {
+    if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
+    return `$${Math.round(n / 1000)}K`;
+  };
+
+  return {
+    revenueRange: `${fmtRev(Math.round(revenueMin))} – ${fmtRev(Math.round(revenueMax))}`,
+    revenueMin: Math.round(revenueMin),
+    revenueMax: Math.round(revenueMax),
+    employeeRange: `${employeeMin} – ${employeeMax}`,
+    employeeMin,
+    employeeMax,
+    yearsInBusiness,
+    signals,
+  };
+}
+
 const CAPTCHA_SIGNALS = [
   'form#captcha-form', 'div.g-recaptcha',
   'iframe[src*="recaptcha"]', 'iframe[src*="captcha"]', '#recaptcha',
@@ -782,9 +859,19 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, offset = 0
       techStack: lead.techStack,
       unclaimed: lead.unclaimed,
     });
+    const enrichment = estimateEnrichment({
+      rating: lead.rating,
+      reviews: lead.reviews,
+      techStack: lead.techStack,
+      category: lead.category,
+      yearOpened: lead.yearOpened,
+      unclaimed: lead.unclaimed,
+      hasWebsite: !!lead.website,
+    });
     return {
       ...lead,
       score,
+      enrichment,
       notes: generateNote({
         rating: lead.rating,
         reviews: lead.reviews,
