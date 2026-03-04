@@ -10,14 +10,16 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, "data", "leadreap.db");
+const DB_DIR = process.env.DB_PATH || path.join(__dirname, "data");
+const DB_PATH = path.join(DB_DIR, "leadreap.db");
 
 // Ensure data directory exists
 import fs from "fs";
-fs.mkdirSync(path.join(__dirname, "data"), { recursive: true });
+fs.mkdirSync(DB_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
+console.log(`[Auth] SQLite database: ${DB_PATH}`);
 
 // ─────────────────────────────────────────────────────────────
 // SCHEMA
@@ -51,8 +53,21 @@ db.exec(`
     created_at  TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS search_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     TEXT NOT NULL,
+    niche       TEXT NOT NULL,
+    location    TEXT NOT NULL,
+    lead_count  INTEGER DEFAULT 0,
+    job_id      TEXT UNIQUE,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+  CREATE INDEX IF NOT EXISTS idx_search_history_user ON search_history(user_id);
+  CREATE INDEX IF NOT EXISTS idx_search_history_job ON search_history(job_id);
 `);
 
 // ─────────────────────────────────────────────────────────────
@@ -77,6 +92,10 @@ const stmts = {
   findMagicLink:    db.prepare("SELECT * FROM magic_links WHERE code = ? AND used = 0 AND expires_at > datetime('now')"),
   useMagicLink:     db.prepare("UPDATE magic_links SET used = 1 WHERE code = ?"),
   cleanMagicLinks:  db.prepare("DELETE FROM magic_links WHERE expires_at < datetime('now')"),
+
+  // Search history
+  insertSearch:     db.prepare("INSERT OR IGNORE INTO search_history (user_id, niche, location, lead_count, job_id) VALUES (?, ?, ?, ?, ?)"),
+  getUserHistory:   db.prepare("SELECT niche, location, lead_count AS leadCount, job_id AS jobId, created_at AS timestamp FROM search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 50"),
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -183,6 +202,25 @@ export function upgradeUser(email, plan) {
   getOrCreateUser(email);
   stmts.upgradePlan.run(plan, null, null, email.toLowerCase().trim());
   console.log(`[Auth] Upgraded ${email} to ${plan} via Stripe`);
+}
+
+/** Save a search to persistent history (deduped by jobId) */
+export function saveSearchHistory(userId, { niche, location, leadCount, jobId }) {
+  if (!userId || !jobId) return;
+  try {
+    stmts.insertSearch.run(userId, niche, location, leadCount || 0, jobId);
+  } catch (e) {
+    // UNIQUE constraint = already saved, ignore
+    if (!e.message.includes("UNIQUE")) {
+      console.error("[Auth] saveSearchHistory error:", e.message);
+    }
+  }
+}
+
+/** Get a user's search history (most recent 50) */
+export function getSearchHistory(userId) {
+  if (!userId) return [];
+  return stmts.getUserHistory.all(userId);
 }
 
 // Run cleanup every hour
