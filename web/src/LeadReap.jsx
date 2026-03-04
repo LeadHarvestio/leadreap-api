@@ -177,7 +177,43 @@ const STYLE = `
   .expand-row td { padding: 0 !important; border-bottom: 1px solid var(--border); background: var(--surface2); }
   .expand-content { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; }
   .expand-insight { flex: 1; font-size: 12px; color: var(--muted); line-height: 1.5; }
-  .expand-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .expand-actions { display: flex; gap: 12px; flex-shrink: 0; align-items: center; }
+
+  /* Sneak peek animation on first expanded row */
+  .expand-peek { animation: expandSlide 0.4s ease-out; }
+  .expand-peek .expand-content { animation: peekGlow 2s ease-out; }
+  @keyframes expandSlide {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes peekGlow {
+    0% { box-shadow: inset 0 0 0 1px rgba(240,180,41,0.4); }
+    100% { box-shadow: inset 0 0 0 1px transparent; }
+  }
+  .chevron-hint { animation: chevronPulse 1.5s ease-in-out 0.5s 2; }
+  @keyframes chevronPulse {
+    0%, 100% { color: var(--muted); }
+    50% { color: var(--accent); transform: scale(1.3); }
+  }
+  .btn-loading-sweep {
+    position: relative; overflow: hidden;
+    background: linear-gradient(90deg, transparent 30%, rgba(240,180,41,0.15) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: btnSweep 1.5s ease-in-out infinite;
+    border-color: rgba(240,180,41,0.4) !important;
+    color: var(--accent) !important;
+  }
+  @keyframes btnSweep {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+
+  /* Mobile sneak peek */
+  .mobile-card.peek-card { animation: cardPeek 2s ease-out; }
+  @keyframes cardPeek {
+    0% { border-color: rgba(240,180,41,0.5); box-shadow: 0 0 20px rgba(240,180,41,0.08); }
+    100% { border-color: rgba(240,180,41,0.3); box-shadow: none; }
+  }
   .phone-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
   .site-cell { color: #60a5fa; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .site-cell a { color: #60a5fa; text-decoration: none; }
@@ -1310,34 +1346,41 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <td>
                             <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span>
                           </td>
-                          <td style={{textAlign:"center",color:"var(--muted)",fontSize:14,transition:"transform 0.2s",transform:expandedRow === i ? "rotate(90deg)" : "rotate(0)"}}>&#9656;</td>
+                          <td style={{textAlign:"center",color:"var(--muted)",fontSize:14,transition:"transform 0.2s",transform:expandedRow === i ? "rotate(90deg)" : "rotate(0)"}} className={i === 0 && expandedRow === 0 ? "chevron-hint" : ""}>&#9656;</td>
                         </tr>
                         {expandedRow === i && (
-                          <tr className="expand-row">
+                          <tr className={`expand-row ${i === 0 ? "expand-peek" : ""}`}>
                             <td colSpan={99}>
                               <div className="expand-content">
                                 <div className="expand-insight">
                                   <strong style={{color:"var(--text)",fontSize:11,fontFamily:"IBM Plex Mono",letterSpacing:"0.03em"}}>INSIGHT:</strong> {lead.notes}
                                 </div>
                                 <div className="expand-actions">
-                                  {lead.email && lead.email !== "\u2014" && (
+                                  {lead.email && lead.email !== "\u2014" ? (
                                     <button onClick={(e) => { e.stopPropagation(); setOutreachLead(lead); setShowOutreach(true); }}
-                                      className="btn btn-primary btn-sm" style={{fontSize:11,whiteSpace:"nowrap"}}>
-                                      Outreach ↗
+                                      className="btn btn-primary btn-sm" style={{fontSize:12,whiteSpace:"nowrap"}}>
+                                      Send Outreach ↗
                                     </button>
+                                  ) : (
+                                    <span style={{fontSize:11,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>No email found</span>
                                   )}
+                                  <span style={{fontSize:11,color:"var(--border)"}}>|</span>
                                   {lead.website && (
                                     <a href={lead.website} target="_blank" rel="noopener noreferrer"
-                                      className="btn btn-outline btn-sm" style={{fontSize:11,whiteSpace:"nowrap",textDecoration:"none"}}
+                                      style={{fontSize:11,color:"var(--muted)",textDecoration:"none",fontFamily:"IBM Plex Mono"}}
+                                      onMouseEnter={e => e.target.style.color="var(--accent)"}
+                                      onMouseLeave={e => e.target.style.color="var(--muted)"}
                                       onClick={e => e.stopPropagation()}>
-                                      Visit Site
+                                      Website
                                     </a>
                                   )}
                                   {lead.mapsUrl && (
                                     <a href={lead.mapsUrl} target="_blank" rel="noopener noreferrer"
-                                      className="btn btn-outline btn-sm" style={{fontSize:11,whiteSpace:"nowrap",textDecoration:"none"}}
+                                      style={{fontSize:11,color:"var(--muted)",textDecoration:"none",fontFamily:"IBM Plex Mono"}}
+                                      onMouseEnter={e => e.target.style.color="var(--accent)"}
+                                      onMouseLeave={e => e.target.style.color="var(--muted)"}
                                       onClick={e => e.stopPropagation()}>
-                                      Maps
+                                      Google Maps
                                     </a>
                                   )}
                                 </div>
@@ -1356,7 +1399,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               {/* Mobile card layout */}
               <div className={`mobile-cards ${!isPro ? "lock-overlay" : ""}`}>
                 {visibleLeads.map((lead, i) => (
-                  <div key={i} className={`mobile-card ${expandedRow === i ? "expanded" : ""}`} onClick={() => setExpandedRow(expandedRow === i ? null : i)}>
+                  <div key={i} className={`mobile-card ${expandedRow === i ? "expanded" : ""} ${i === 0 && expandedRow === 0 ? "peek-card" : ""}`} onClick={() => setExpandedRow(expandedRow === i ? null : i)}>
                     <div className="mobile-card-top">
                       <div>
                         <div className="mobile-card-name">{lead.name}</div>
@@ -1406,24 +1449,28 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                           <strong style={{color:"var(--text)"}}>Insight:</strong> {lead.notes}
                         </div>
                         <div className="mobile-card-actions">
-                          {lead.email && lead.email !== "\u2014" && (
+                          {lead.email && lead.email !== "\u2014" ? (
                             <button onClick={(e) => { e.stopPropagation(); setOutreachLead(lead); setShowOutreach(true); }}
                               className="btn btn-primary btn-sm" style={{fontSize:12,flex:1,justifyContent:"center"}}>
-                              Outreach ↗
+                              Send Outreach ↗
                             </button>
+                          ) : (
+                            <span style={{fontSize:11,color:"var(--muted)",fontFamily:"IBM Plex Mono",padding:"8px 0"}}>No email found</span>
                           )}
+                        </div>
+                        <div style={{display:"flex",gap:16,marginTop:8}}>
                           {lead.website && (
                             <a href={lead.website} target="_blank" rel="noopener noreferrer"
-                              className="btn btn-outline btn-sm" style={{fontSize:12,textDecoration:"none",flex:1,justifyContent:"center"}}
+                              style={{fontSize:11,color:"var(--muted)",textDecoration:"none",fontFamily:"IBM Plex Mono"}}
                               onClick={e => e.stopPropagation()}>
-                              Visit Site
+                              Website ↗
                             </a>
                           )}
                           {lead.mapsUrl && (
                             <a href={lead.mapsUrl} target="_blank" rel="noopener noreferrer"
-                              className="btn btn-outline btn-sm" style={{fontSize:12,textDecoration:"none",flex:1,justifyContent:"center"}}
+                              style={{fontSize:11,color:"var(--muted)",textDecoration:"none",fontFamily:"IBM Plex Mono"}}
                               onClick={e => e.stopPropagation()}>
-                              Maps
+                              Google Maps ↗
                             </a>
                           )}
                         </div>
@@ -1441,7 +1488,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               ) : (
                 <div className="upgrade-bar">
                   <p style={{color:"var(--muted)"}}>Showing <strong style={{color:"var(--text)"}}>{leads.length} leads</strong> &middot; Batch {batchNum}</p>
-                  <button className="btn btn-outline btn-sm" onClick={handleLoadMore} disabled={loadingMore}>
+                  <button className={`btn btn-outline btn-sm ${loadingMore ? "btn-loading-sweep" : ""}`} onClick={handleLoadMore} disabled={loadingMore}>
                     {loadingMore ? "Loading more..." : "Load More Results"}
                   </button>
                 </div>
