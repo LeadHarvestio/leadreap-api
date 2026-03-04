@@ -6,6 +6,7 @@
 
 import express from "express";
 import cors from "cors";
+import crypto from "crypto";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -29,10 +30,17 @@ import {
   updateSequence, setSequenceStatus, deleteSequence,
   enrollLeads, getDueSends, markSendComplete, markSendFailed,
   setEnrollmentStatus,
+  createTeam, getUserTeam, getTeamMembers, createTeamInvite,
+  acceptTeamInvite, removeTeamMember, getPendingInvites,
+  getAccessibleLists,
+  createWebhook, getUserWebhooks, deleteWebhook, toggleWebhook,
+  getActiveWebhooks, touchWebhookTimestamp,
+  createApiKey, getUserApiKeys, deleteApiKey,
 } from "./auth.js";
 import { createCheckout, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail, sendSequenceEmail } from "./email.js";
-import { attachUser, requireAuth, requireSearchQuota, ipRateLimit } from "./middleware.js";
+import { generateReport } from "./reports.js";
+import { attachUser, requireAuth, requireSearchQuota, ipRateLimit, requireAgency, requirePro } from "./middleware.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -213,6 +221,12 @@ app.get("/api/leads/job/:jobId", (req, res) => {
     saveSearchHistory(req.user.id, {
       niche: job.niche, location: job.location,
       leadCount: job.leads.length, jobId: job.id,
+    });
+    // Trigger webhooks
+    triggerWebhooks(req.user.id, "search.completed", {
+      jobId: job.id, niche: job.niche, location: job.location,
+      leadCount: job.leads.length,
+      leads: job.leads.slice(0, 100),
     });
   }
 
@@ -478,6 +492,281 @@ app.patch("/api/sequences/enrollments/:id/status", requireAuth, (req, res) => {
 
 
 // ═════════════════════════════════════════════════════════════
+// WEBHOOK TRIGGER HELPER
+// ═════════════════════════════════════════════════════════════
+
+async function triggerWebhooks(userId, event, payload) {
+  try {
+    const hooks = getActiveWebhooks(userId);
+    for (const hook of hooks) {
+      const events = (hook.events || "").split(",").map(e => e.trim());
+      if (!events.includes(event) && !events.includes("*")) continue;
+
+      const body = JSON.stringify({ event, timestamp: new Date().toISOString(), data: payload });
+      const signature = crypto.createHmac("sha256", hook.secret).update(body).digest("hex");
+
+      fetch(hook.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-LeadReap-Signature": signature,
+          "X-LeadReap-Event": event,
+        },
+        body,
+      }).then(() => {
+        touchWebhookTimestamp(hook.id);
+      }).catch(err => {
+        console.error(`[Webhook] Failed ${hook.url}: ${err.message}`);
+      });
+    }
+  } catch (err) {
+    console.error("[Webhook] Trigger error:", err.message);
+  }
+}
+
+
+// ═════════════════════════════════════════════════════════════
+// TEAMS (Agency tier)
+// ═════════════════════════════════════════════════════════════
+
+// ── GET /api/team — Get user's team info ─────────────────────
+app.get("/api/team", requireAuth, (req, res) => {
+  const team = getUserTeam(req.user.id);
+  if (!team) return res.json({ team: null });
+  const members = getTeamMembers(team.id);
+  const invites = team.owner_id === req.user.id ? getPendingInvites(team.id) : [];
+  return res.json({ team: { ...team, members, invites, isOwner: team.owner_id === req.user.id } });
+});
+
+// ── POST /api/team — Create a team ──────────────────────────
+app.post("/api/team", requireAgency, (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: "Team name required" });
+  const team = createTeam(req.user.id, name);
+  return res.json({ ok: true, team });
+});
+
+// ── POST /api/team/invite — Invite a member ─────────────────
+app.post("/api/team/invite", requireAgency, (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email required" });
+
+  const team = getUserTeam(req.user.id);
+  if (!team || team.owner_id !== req.user.id) return res.status(403).json({ error: "Only team owners can invite" });
+
+  const members = getTeamMembers(team.id);
+  const invites = getPendingInvites(team.id);
+  if (members.length + invites.length >= 6) return res.status(400).json({ error: "Team is full (max 6 members including owner)" });
+
+  const invite = createTeamInvite(team.id, email);
+  // TODO: Send invite email via Resend
+  return res.json({ ok: true, invite });
+});
+
+// ── POST /api/team/join — Accept an invite ──────────────────
+app.post("/api/team/join", requireAuth, (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: "Invite token required" });
+  const result = acceptTeamInvite(token, req.user.id);
+  if (result.error) return res.status(400).json(result);
+  return res.json({ ok: true, teamId: result.teamId });
+});
+
+// ── DELETE /api/team/members/:userId — Remove a member ──────
+app.delete("/api/team/members/:userId", requireAgency, (req, res) => {
+  const team = getUserTeam(req.user.id);
+  if (!team) return res.status(404).json({ error: "No team" });
+  const ok = removeTeamMember(team.id, req.params.userId, req.user.id);
+  if (!ok) return res.status(400).json({ error: "Cannot remove" });
+  return res.json({ ok: true });
+});
+
+// ── GET /api/team/lists — Get shared lists across team ──────
+app.get("/api/team/lists", requireAuth, (req, res) => {
+  const lists = getAccessibleLists(req.user.id);
+  return res.json({ lists });
+});
+
+
+// ═════════════════════════════════════════════════════════════
+// WEBHOOKS
+// ═════════════════════════════════════════════════════════════
+
+// ── GET /api/webhooks — List user's webhooks ────────────────
+app.get("/api/webhooks", requirePro, (req, res) => {
+  const hooks = getUserWebhooks(req.user.id);
+  return res.json({ webhooks: hooks });
+});
+
+// ── POST /api/webhooks — Create a webhook ───────────────────
+app.post("/api/webhooks", requirePro, (req, res) => {
+  const { url, events } = req.body;
+  if (!url) return res.status(400).json({ error: "URL required" });
+
+  try { new URL(url); } catch { return res.status(400).json({ error: "Invalid URL" }); }
+
+  const existing = getUserWebhooks(req.user.id);
+  if (existing.length >= 5) return res.status(400).json({ error: "Maximum 5 webhooks" });
+
+  const validEvents = ["search.completed", "lead.status_changed", "lead.added", "sequence.completed", "*"];
+  const eventList = (events || "search.completed").split(",").map(e => e.trim());
+  if (eventList.some(e => !validEvents.includes(e))) return res.status(400).json({ error: "Invalid event type" });
+
+  const hook = createWebhook(req.user.id, url, eventList.join(","));
+  return res.json({ ok: true, webhook: hook });
+});
+
+// ── DELETE /api/webhooks/:id — Delete a webhook ─────────────
+app.delete("/api/webhooks/:id", requirePro, (req, res) => {
+  deleteWebhook(req.params.id, req.user.id);
+  return res.json({ ok: true });
+});
+
+// ── PATCH /api/webhooks/:id/toggle — Enable/disable ─────────
+app.patch("/api/webhooks/:id/toggle", requirePro, (req, res) => {
+  const { active } = req.body;
+  toggleWebhook(req.params.id, req.user.id, !!active);
+  return res.json({ ok: true });
+});
+
+
+// ═════════════════════════════════════════════════════════════
+// API KEYS
+// ═════════════════════════════════════════════════════════════
+
+// ── GET /api/keys — List user's API keys ────────────────────
+app.get("/api/keys", requirePro, (req, res) => {
+  const keys = getUserApiKeys(req.user.id);
+  return res.json({ keys });
+});
+
+// ── POST /api/keys — Create an API key ──────────────────────
+app.post("/api/keys", requirePro, (req, res) => {
+  const { name } = req.body;
+  const result = createApiKey(req.user.id, name || "Default");
+  if (result.error) return res.status(400).json(result);
+  return res.json({ ok: true, ...result });
+});
+
+// ── DELETE /api/keys/:id — Revoke an API key ────────────────
+app.delete("/api/keys/:id", requirePro, (req, res) => {
+  deleteApiKey(req.params.id, req.user.id);
+  return res.json({ ok: true });
+});
+
+
+// ═════════════════════════════════════════════════════════════
+// WHITE-LABEL REPORTS (Agency tier)
+// ═════════════════════════════════════════════════════════════
+
+// ── POST /api/reports/generate — Generate PDF report ────────
+app.post("/api/reports/generate", requireAgency, async (req, res) => {
+  const { listId, agencyName, clientName, subtitle, contactEmail, contactPhone, niche, location } = req.body;
+
+  let leads;
+  if (listId) {
+    const list = getList(listId, req.user.id);
+    if (!list) return res.status(404).json({ error: "List not found" });
+    const raw = getListLeads(listId);
+    leads = raw.map(l => JSON.parse(l.leadData || "{}"));
+  } else {
+    return res.status(400).json({ error: "listId required" });
+  }
+
+  if (!leads.length) return res.status(400).json({ error: "No leads in list" });
+
+  try {
+    const pdfBuffer = await generateReport({
+      agencyName: agencyName || "LeadReap",
+      clientName: clientName || "",
+      niche: niche || "Local Businesses",
+      location: location || "",
+      leads,
+      subtitle: subtitle || "",
+      contactEmail: contactEmail || "",
+      contactPhone: contactPhone || "",
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="report-${Date.now()}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error("[Reports] Generation failed:", err.message);
+    return res.status(500).json({ error: "Report generation failed" });
+  }
+});
+
+
+// ═════════════════════════════════════════════════════════════
+// PUBLIC API (v1)
+// ═════════════════════════════════════════════════════════════
+
+// ── POST /api/v1/search — Trigger a search via API ──────────
+app.post("/api/v1/search", requireAuth, requirePro, ipRateLimit, requireSearchQuota, (req, res) => {
+  const { niche, location, options = {} } = req.body;
+  if (!niche || !location) return res.status(400).json({ error: "niche and location required" });
+
+  const plan = req.user.plan || "free";
+  const jobId = createJob({
+    niche, location,
+    includeEmail: options.includeEmail !== false,
+    includePhone: options.includePhone !== false,
+    includeSocial: options.includeSocial === true,
+    plan,
+  });
+  recordSearch(req.user.id);
+
+  return res.json({ jobId, status: "queued", pollUrl: `/api/v1/search/${jobId}` });
+});
+
+// ── GET /api/v1/search/:id — Poll job status via API ────────
+app.get("/api/v1/search/:id", requireAuth, requirePro, (req, res) => {
+  const job = getJob(req.params.id);
+  if (!job) return res.status(404).json({ error: "Job not found" });
+
+  if (job.status === "completed" && job.leads?.length > 0) {
+    // Trigger webhook on first fetch of completed results
+    if (!job._webhookFired) {
+      job._webhookFired = true;
+      triggerWebhooks(req.user.id, "search.completed", {
+        jobId: job.id, niche: job.niche, location: job.location,
+        leadCount: job.leads.length,
+        leads: job.leads.slice(0, 100), // Cap at 100 for webhook payload
+      });
+    }
+
+    return res.json({
+      jobId: job.id, status: job.status,
+      niche: job.niche, location: job.location,
+      total: job.leads.length,
+      leads: job.leads,
+    });
+  }
+
+  return res.json({
+    jobId: job.id, status: job.status,
+    niche: job.niche, location: job.location,
+    error: job.error,
+  });
+});
+
+// ── GET /api/v1/lists — Get lists via API ───────────────────
+app.get("/api/v1/lists", requireAuth, requirePro, (req, res) => {
+  const lists = getUserLists(req.user.id);
+  return res.json({ lists });
+});
+
+// ── GET /api/v1/lists/:id/leads — Get leads from list via API
+app.get("/api/v1/lists/:id/leads", requireAuth, requirePro, (req, res) => {
+  const list = getList(req.params.id, req.user.id);
+  if (!list) return res.status(404).json({ error: "List not found" });
+  const raw = getListLeads(req.params.id);
+  const leads = raw.map(l => ({ ...JSON.parse(l.leadData || "{}"), status: l.status, notes: l.notes }));
+  return res.json({ listId: list.id, name: list.name, leads });
+});
+
+
+// ═════════════════════════════════════════════════════════════
 // SYSTEM ROUTES
 // ═════════════════════════════════════════════════════════════
 
@@ -566,7 +855,7 @@ processSequenceQueue(); // Run once on startup
 
 app.listen(PORT, () => {
   console.log(`
-  LeadReap API v3.5 — port ${PORT}
+  LeadReap API v4.0 — port ${PORT}
   ────────────────────────────────
   POST /api/auth/magic
   POST /api/auth/verify
@@ -581,13 +870,13 @@ app.listen(PORT, () => {
   GET  /api/lists/:id/leads
   POST /api/lists/:id/leads
   PATCH /api/lists/:lid/leads/:id
-  GET  /api/sequences
-  POST /api/sequences
-  GET  /api/sequences/:id
-  PUT  /api/sequences/:id
-  PATCH /api/sequences/:id/status
-  DELETE /api/sequences/:id
-  POST /api/sequences/:id/enroll
+  GET  /api/sequences (+CRUD)
+  GET  /api/team (+invite/join)
+  GET  /api/webhooks (+CRUD)
+  GET  /api/keys (+CRUD)
+  POST /api/reports/generate
+  POST /api/v1/search (Public API)
+  GET  /api/v1/lists (Public API)
   GET  /api/metrics
   GET  /health
   ────────────────────────────────
