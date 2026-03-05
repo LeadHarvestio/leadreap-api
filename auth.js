@@ -852,5 +852,14 @@ export function deleteApiKey(keyId, userId) {
   stmts.deleteApiKey.run(keyId, userId);
 }
 
+export function markWelcomeSent(email) {
+  stmts.markWelcomeSent.run(email.toLowerCase().trim());
+}
+export function markFollowupSent(email) {
+  stmts.markFollowupSent.run(email.toLowerCase().trim());
+}
+export function getPendingFollowups() {
+  return stmts.getPendingFollowups.all();
+}
 // Run cleanup every hour
 setInterval(cleanupAuth, 60 * 60 * 1000);
