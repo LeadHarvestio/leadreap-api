@@ -204,32 +204,16 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
   CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 `);
-// ── Auto-Migration: Add leads_json to search_history ──
-try {
-  db.exec("ALTER TABLE search_history ADD COLUMN leads_json TEXT");
-} catch (e) {
-  // Column already exists, safe to ignore
-}
-// ── Auto-Migration: Add drip campaign tracking ──
+
+// ── Auto-Migrations ──────────────────────────────────────────
+try { db.exec("ALTER TABLE search_history ADD COLUMN leads_json TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN welcome_sent INTEGER DEFAULT 0"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN followup_sent INTEGER DEFAULT 0"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"); } catch (e) {}
+try { db.exec("CREATE TABLE IF NOT EXISTS processed_webhooks (id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"); } catch (e) {}
 
 // ─────────────────────────────────────────────────────────────
-// USERS
-markWelcomeSent:  db.prepare("UPDATE users SET welcome_sent = 1 WHERE email = ?"),
-  markFollowupSent: db.prepare("UPDATE users SET followup_sent = 1 WHERE email = ?"),
-  getPendingFollowups: db.prepare("SELECT * FROM users WHERE plan = 'free' AND followup_sent = 0 AND created_at < datetime('now', '-3 days') LIMIT 50"),
-// ─────────────────────────────────────────────────────────────
-  // Stripe & Webhook Tracking
-  updateStripeInfo:     db.prepare("UPDATE users SET plan = ?, stripe_customer_id = ? WHERE email = ?"),
-  downgradeUserByEmail: db.prepare("UPDATE users SET plan = 'free' WHERE email = ?"),
-  checkWebhook:         db.prepare("SELECT 1 FROM processed_webhooks WHERE id = ?"),
-  markWebhookProcessed: db.prepare("INSERT INTO processed_webhooks (id) VALUES (?)"),
-  // ── Auto-Migration: Stripe Tracking & Idempotency ──
-try { db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"); } catch (e) {}
-try { 
-  db.exec("CREATE TABLE IF NOT EXISTS processed_webhooks (id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"); 
-} catch (e) {}
+// PREPARED STATEMENTS
 // ─────────────────────────────────────────────────────────────
 const stmts = {
   findUserByEmail:  db.prepare("SELECT * FROM users WHERE email = ?"),
@@ -238,7 +222,6 @@ const stmts = {
   upgradePlan:      db.prepare("UPDATE users SET plan = ?, lemon_customer_id = ?, lemon_order_id = ?, updated_at = datetime('now') WHERE email = ?"),
   incrementSearch:  db.prepare("UPDATE users SET searches_today = searches_today + 1, updated_at = datetime('now') WHERE id = ?"),
   resetSearchCount: db.prepare("UPDATE users SET searches_today = 0, searches_reset_at = datetime('now') WHERE id = ?"),
-  
 
   // Sessions
   createSession:    db.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)"),
@@ -252,11 +235,11 @@ const stmts = {
   useMagicLink:     db.prepare("UPDATE magic_links SET used = 1 WHERE code = ?"),
   cleanMagicLinks:  db.prepare("DELETE FROM magic_links WHERE expires_at < datetime('now')"),
 
- // Search history
+  // Search history
   insertSearch:     db.prepare("INSERT OR IGNORE INTO search_history (user_id, niche, location, lead_count, job_id, leads_json) VALUES (?, ?, ?, ?, ?, ?)"),
   getUserHistory:   db.prepare("SELECT niche, location, lead_count AS leadCount, job_id AS jobId, created_at AS timestamp FROM search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 50"),
   getHistoryJob:    db.prepare("SELECT * FROM search_history WHERE user_id = ? AND job_id = ?"),
-  
+
   // Saved lists
   createList:       db.prepare("INSERT INTO saved_lists (id, user_id, name, description) VALUES (?, ?, ?, ?)"),
   getUserLists:     db.prepare("SELECT l.id, l.name, l.description, l.created_at AS createdAt, l.updated_at AS updatedAt, (SELECT COUNT(*) FROM list_leads WHERE list_id = l.id) AS leadCount FROM saved_lists l WHERE l.user_id = ? ORDER BY l.updated_at DESC"),
@@ -337,6 +320,17 @@ const stmts = {
   getApiKeyByHash:   db.prepare("SELECT ak.*, u.email, u.plan, u.id AS uid FROM api_keys ak JOIN users u ON ak.user_id = u.id WHERE ak.key_hash = ?"),
   deleteApiKey:      db.prepare("DELETE FROM api_keys WHERE id = ? AND user_id = ?"),
   touchApiKey:       db.prepare("UPDATE api_keys SET last_used = datetime('now') WHERE id = ?"),
+
+  // Drip campaign tracking
+  markWelcomeSent:     db.prepare("UPDATE users SET welcome_sent = 1 WHERE email = ?"),
+  markFollowupSent:    db.prepare("UPDATE users SET followup_sent = 1 WHERE email = ?"),
+  getPendingFollowups: db.prepare("SELECT * FROM users WHERE plan = 'free' AND followup_sent = 0 AND created_at < datetime('now', '-3 days') LIMIT 50"),
+
+  // Stripe & webhook idempotency
+  updateStripeInfo:      db.prepare("UPDATE users SET plan = ?, stripe_customer_id = ? WHERE email = ?"),
+  downgradeUserByEmail:  db.prepare("UPDATE users SET plan = 'free' WHERE email = ?"),
+  checkWebhook:          db.prepare("SELECT 1 FROM processed_webhooks WHERE id = ?"),
+  markWebhookProcessed:  db.prepare("INSERT INTO processed_webhooks (id) VALUES (?)"),
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -452,6 +446,7 @@ export function saveSearchHistory(userId, { niche, location, leadCount, jobId, l
     const leadsJson = leads ? JSON.stringify(leads) : "[]";
     stmts.insertSearch.run(userId, niche, location, leadCount || 0, jobId, leadsJson);
   } catch (e) {
+    // UNIQUE constraint = already saved, ignore
     if (!e.message.includes("UNIQUE")) {
       console.error("[Auth] saveSearchHistory error:", e.message);
     }
@@ -864,28 +859,46 @@ export function deleteApiKey(keyId, userId) {
   stmts.deleteApiKey.run(keyId, userId);
 }
 
+// ─────────────────────────────────────────────────────────────
+// DRIP CAMPAIGN TRACKING
+// ─────────────────────────────────────────────────────────────
+
 export function markWelcomeSent(email) {
   stmts.markWelcomeSent.run(email.toLowerCase().trim());
 }
+
 export function markFollowupSent(email) {
   stmts.markFollowupSent.run(email.toLowerCase().trim());
 }
+
 export function getPendingFollowups() {
   return stmts.getPendingFollowups.all();
 }
-// Run cleanup every hour
-setInterval(cleanupAuth, 60 * 60 * 1000);
+
+// ─────────────────────────────────────────────────────────────
+// STRIPE HELPERS
+// ─────────────────────────────────────────────────────────────
+
+/** Check if a webhook event was already processed (idempotency) */
 export function processWebhookEvent(eventId) {
   const exists = stmts.checkWebhook.get(eventId);
-  if (exists) return true;
+  if (exists) return true; // already processed
   stmts.markWebhookProcessed.run(eventId);
   return false;
 }
 
+/** Upgrade user from Stripe payment */
 export function upgradeUserFromStripe(email, plan, customerId) {
+  getOrCreateUser(email);
   stmts.updateStripeInfo.run(plan, customerId, email.toLowerCase().trim());
+  console.log(`[Auth] Stripe upgrade: ${email} → ${plan}`);
 }
 
+/** Downgrade user on refund */
 export function handleRefund(email) {
   stmts.downgradeUserByEmail.run(email.toLowerCase().trim());
+  console.log(`[Auth] Refund: ${email} → free`);
 }
+
+// Run cleanup every hour
+setInterval(cleanupAuth, 60 * 60 * 1000);
