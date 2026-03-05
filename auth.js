@@ -210,9 +210,15 @@ try {
 } catch (e) {
   // Column already exists, safe to ignore
 }
+// ── Auto-Migration: Add drip campaign tracking ──
+try { db.exec("ALTER TABLE users ADD COLUMN welcome_sent INTEGER DEFAULT 0"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN followup_sent INTEGER DEFAULT 0"); } catch (e) {}
 
 // ─────────────────────────────────────────────────────────────
 // USERS
+markWelcomeSent:  db.prepare("UPDATE users SET welcome_sent = 1 WHERE email = ?"),
+  markFollowupSent: db.prepare("UPDATE users SET followup_sent = 1 WHERE email = ?"),
+  getPendingFollowups: db.prepare("SELECT * FROM users WHERE plan = 'free' AND followup_sent = 0 AND created_at < datetime('now', '-3 days') LIMIT 50"),
 // ─────────────────────────────────────────────────────────────
 const stmts = {
   findUserByEmail:  db.prepare("SELECT * FROM users WHERE email = ?"),
