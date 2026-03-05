@@ -234,10 +234,11 @@ const stmts = {
   useMagicLink:     db.prepare("UPDATE magic_links SET used = 1 WHERE code = ?"),
   cleanMagicLinks:  db.prepare("DELETE FROM magic_links WHERE expires_at < datetime('now')"),
 
-  // Search history
-  insertSearch:     db.prepare("INSERT OR IGNORE INTO search_history (user_id, niche, location, lead_count, job_id) VALUES (?, ?, ?, ?, ?)"),
+ // Search history
+  insertSearch:     db.prepare("INSERT OR IGNORE INTO search_history (user_id, niche, location, lead_count, job_id, leads_json) VALUES (?, ?, ?, ?, ?, ?)"),
   getUserHistory:   db.prepare("SELECT niche, location, lead_count AS leadCount, job_id AS jobId, created_at AS timestamp FROM search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 50"),
-
+  getHistoryJob:    db.prepare("SELECT * FROM search_history WHERE user_id = ? AND job_id = ?"),
+  
   // Saved lists
   createList:       db.prepare("INSERT INTO saved_lists (id, user_id, name, description) VALUES (?, ?, ?, ?)"),
   getUserLists:     db.prepare("SELECT l.id, l.name, l.description, l.created_at AS createdAt, l.updated_at AS updatedAt, (SELECT COUNT(*) FROM list_leads WHERE list_id = l.id) AS leadCount FROM saved_lists l WHERE l.user_id = ? ORDER BY l.updated_at DESC"),
@@ -427,16 +428,21 @@ export function upgradeUser(email, plan) {
 }
 
 /** Save a search to persistent history (deduped by jobId) */
-export function saveSearchHistory(userId, { niche, location, leadCount, jobId }) {
+export function saveSearchHistory(userId, { niche, location, leadCount, jobId, leads }) {
   if (!userId || !jobId) return;
   try {
-    stmts.insertSearch.run(userId, niche, location, leadCount || 0, jobId);
+    const leadsJson = leads ? JSON.stringify(leads) : "[]";
+    stmts.insertSearch.run(userId, niche, location, leadCount || 0, jobId, leadsJson);
   } catch (e) {
-    // UNIQUE constraint = already saved, ignore
     if (!e.message.includes("UNIQUE")) {
       console.error("[Auth] saveSearchHistory error:", e.message);
     }
   }
+}
+
+/** Get a specific past search with its full JSON results */
+export function getSearchHistoryJob(userId, jobId) {
+  return stmts.getHistoryJob.get(userId, jobId);
 }
 
 /** Get a user's search history (most recent 50) */
