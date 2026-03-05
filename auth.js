@@ -204,6 +204,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
   CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 `);
+// ── Auto-Migration: Add leads_json to search_history ──
+try {
+  db.exec("ALTER TABLE search_history ADD COLUMN leads_json TEXT");
+} catch (e) {
+  // Column already exists, safe to ignore
+}
 
 // ─────────────────────────────────────────────────────────────
 // USERS
