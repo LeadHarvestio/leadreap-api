@@ -102,9 +102,11 @@ export function constructWebhookEvent(rawBody, signature) {
 // ─────────────────────────────────────────────────────────────
 // HANDLE WEBHOOK EVENT — processes Stripe events
 // ─────────────────────────────────────────────────────────────
-export function handleWebhookEvent(event) {
+export async function handleWebhookEvent(event) {
   // 1) Idempotency check to ignore duplicate webhooks
-  if (processWebhookEvent(event.id)) {
+  // If processWebhookEvent is async (DB-backed), await it.
+  const isDuplicate = await Promise.resolve(processWebhookEvent(event.id));
+  if (isDuplicate) {
     console.log(`[Stripe] Skipping duplicate event: ${event.id}`);
     return { received: true, duplicate: true };
   }
@@ -132,7 +134,9 @@ export function handleWebhookEvent(event) {
           break;
         }
 
-        upgradeUserFromStripe(email, plan, customerId);
+        // If this writes to DB, await it so we only 200 OK after success.
+        await Promise.resolve(upgradeUserFromStripe(email, plan, customerId));
+
         console.log(`[Stripe] Upgraded ${email} to ${plan}`);
         break;
       }
@@ -150,7 +154,9 @@ export function handleWebhookEvent(event) {
           break;
         }
 
-        handleRefund(email);
+        // If this writes to DB, await it so Stripe retries on failure.
+        await Promise.resolve(handleRefund(email));
+
         console.log(
           `[Stripe] Access revoked for ${email} due to refund/dispute`
         );
