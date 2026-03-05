@@ -150,3 +150,55 @@ export async function sendTeamInviteEmail(email, teamName, inviteToken) {
   console.log(`╚══════════════════════════════════════════════╝\n`);
   return { sent: true, dev: true };
 }
+
+// ─── Automated Drip Sequences ───────────────────────────────
+
+export async function sendWelcomeEmail(email) {
+  const subject = "Welcome to LeadReap 🎯 Let's find your first clients";
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 500px; line-height: 1.6; color: #333;">
+      <p>Hey there,</p>
+      <p>Welcome to LeadReap! I built this tool because I was tired of paying $100/mo for stale database leads when the most accurate data is sitting right on Google Maps.</p>
+      <p><strong>To get the most out of your free searches today:</strong></p>
+      <ul>
+        <li>Keep your locations specific (e.g., "Plumbers in Austin, TX" instead of just "Texas")</li>
+        <li>Look for the amber <strong>UNCLAIMED</strong> badges — these are business owners who desperately need digital marketing help.</li>
+        <li>Check the "Social Profiles" toggle to easily spot businesses missing a Facebook or LinkedIn presence.</li>
+      </ul>
+      <p>Go run a search, grab your 5 free leads, and let me know what you think!</p>
+      <p>Best,<br>Steven<br>Founder, LeadReap</p>
+    </div>
+  `;
+
+  if (resend) {
+    try {
+      await resend.emails.send({ from: `Steven at LeadReap <${FROM_EMAIL}>`, to: email, subject, html });
+    } catch (err) { console.error("[Welcome Email Failed]", err.message); }
+  } else {
+    console.log(`[DEV EMAIL] Welcome sent to ${email}`);
+  }
+}
+
+export async function sendFollowUpEmail(email) {
+  const subject = "Unlocking unlimited leads + CSV exports";
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 500px; line-height: 1.6; color: #333;">
+      <p>Hey,</p>
+      <p>I noticed you've been testing out LeadReap over the last few days.</p>
+      <p>Right now, your free account caps out at 5 leads per search. But the real magic happens when you upgrade to <strong>PRO</strong>.</p>
+      <p>With a PRO account, a single search pulls up to 40 verified leads with direct emails, revenue estimates, and AI scoring — and you can instantly export them all to CSV for your CRM.</p>
+      <p>The best part? Unlike Apollo or ZoomInfo, LeadReap is a <strong>one-time payment</strong>. No monthly subscriptions, ever.</p>
+      <p><a href="${FRONTEND_URL}/compare/apollo" style="color: #f0b429; font-weight: bold;">Upgrade here to unlock unlimited leads →</a></p>
+      <p>Let me know if you have any questions before upgrading!</p>
+      <p>Best,<br>Steven</p>
+    </div>
+  `;
+
+  if (resend) {
+    try {
+      await resend.emails.send({ from: `Steven at LeadReap <${FROM_EMAIL}>`, to: email, subject, html });
+    } catch (err) { console.error("[Follow-up Email Failed]", err.message); }
+  } else {
+    console.log(`[DEV EMAIL] Day 3 Follow-up sent to ${email}`);
+  }
+}
