@@ -4,10 +4,16 @@
 // ─────────────────────────────────────────────────────────────
 
 import Stripe from "stripe";
-import { upgradeUser } from "./auth.js";
+import {
+  processWebhookEvent,
+  upgradeUserFromStripe,
+  handleRefund,
+} from "./auth.js";
 
+// Stripe client
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Frontend URL for redirects
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 // ─────────────────────────────────────────────────────────────
@@ -38,6 +44,10 @@ export async function createCheckout(plan, email) {
   const planConfig = PLANS[plan];
   if (!planConfig) throw new Error(`Unknown plan: ${plan}`);
 
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not set");
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
@@ -56,11 +66,14 @@ export async function createCheckout(plan, email) {
       plan,
       email,
     },
-    success_url: `${FRONTEND_URL}/?upgraded=${plan}`,
+    success_url: `${FRONTEND_URL}/?upgraded=${encodeURIComponent(plan)}`,
     cancel_url: `${FRONTEND_URL}/?canceled=true`,
   });
 
-  console.log(`[Payments] Checkout created: ${plan} for ${email} → ${session.id}`);
+  console.log(
+    `[Payments] Checkout created: ${plan} for ${email} → ${session.id}`
+  );
+
   return { checkoutUrl: session.url };
 }
 
@@ -69,6 +82,7 @@ export async function createCheckout(plan, email) {
 // ─────────────────────────────────────────────────────────────
 export function constructWebhookEvent(rawBody, signature) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
   if (!webhookSecret) {
     console.error("[Payments] STRIPE_WEBHOOK_SECRET not set");
     return null;
@@ -77,19 +91,19 @@ export function constructWebhookEvent(rawBody, signature) {
   try {
     return stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (err) {
-    console.error("[Payments] Webhook signature verification failed:", err.message);
+    console.error(
+      "[Payments] Webhook signature verification failed:",
+      err?.message || err
+    );
     return null;
   }
 }
 
 // ─────────────────────────────────────────────────────────────
-// HANDLE WEBHOOK EVENT — process completed checkout
+// HANDLE WEBHOOK EVENT — processes Stripe events
 // ─────────────────────────────────────────────────────────────
 export function handleWebhookEvent(event) {
-  import { processWebhookEvent, upgradeUserFromStripe, handleRefund } from "./auth.js";
-
-export function handleWebhookEvent(event) {
-  // 1. Idempotency Check to ignore duplicate webhooks
+  // 1) Idempotency check to ignore duplicate webhooks
   if (processWebhookEvent(event.id)) {
     console.log(`[Stripe] Skipping duplicate event: ${event.id}`);
     return { received: true, duplicate: true };
@@ -102,16 +116,24 @@ export function handleWebhookEvent(event) {
       // ── Happy Path: Initial One-Time Purchase ──
       case "checkout.session.completed": {
         const session = event.data.object;
-        if (session.payment_status === "paid") {
-          const email = session.customer_details?.email || session.customer_email;
-          const plan = session.metadata?.plan || "pro"; 
-          const customerId = session.customer;
 
-          if (email) {
-            upgradeUserFromStripe(email, plan, customerId);
-            console.log(`[Stripe] Upgraded ${email} to ${plan}`);
-          }
+        if (session.payment_status !== "paid") break;
+
+        const email =
+          session.customer_details?.email || session.customer_email;
+
+        const plan = session.metadata?.plan || "pro";
+        const customerId = session.customer;
+
+        if (!email) {
+          console.warn("[Stripe] checkout.session.completed missing email", {
+            sessionId: session.id,
+          });
+          break;
         }
+
+        upgradeUserFromStripe(email, plan, customerId);
+        console.log(`[Stripe] Upgraded ${email} to ${plan}`);
         break;
       }
 
@@ -120,11 +142,18 @@ export function handleWebhookEvent(event) {
       case "charge.dispute.created": {
         const charge = event.data.object;
         const email = charge.billing_details?.email || charge.receipt_email;
-        
-        if (email) {
-          handleRefund(email);
-          console.log(`[Stripe] Access revoked for ${email} due to refund/dispute`);
+
+        if (!email) {
+          console.warn(`[Stripe] ${event.type} missing email`, {
+            chargeId: charge.id,
+          });
+          break;
         }
+
+        handleRefund(email);
+        console.log(
+          `[Stripe] Access revoked for ${email} due to refund/dispute`
+        );
         break;
       }
 
@@ -132,8 +161,9 @@ export function handleWebhookEvent(event) {
         console.log(`[Stripe] Unhandled event type: ${event.type}`);
     }
   } catch (err) {
-    console.error(`[Stripe] Error handling ${event.type}:`, err.message);
-    throw err; // Throwing ensures Stripe retries if there was a server error
+    console.error(`[Stripe] Error handling ${event.type}:`, err);
+    // Throwing ensures Stripe retries if there was a server error
+    throw err;
   }
 
   return { received: true };
