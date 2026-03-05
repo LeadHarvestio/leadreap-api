@@ -221,6 +221,7 @@ app.get("/api/leads/job/:jobId", (req, res) => {
     saveSearchHistory(req.user.id, {
       niche: job.niche, location: job.location,
       leadCount: job.leads.length, jobId: job.id,
+      leads: job.leads // <-- ADD THIS LINE
     });
     // Trigger webhooks
     triggerWebhooks(req.user.id, "search.completed", {
@@ -243,11 +244,19 @@ app.get("/api/leads/job/:jobId", (req, res) => {
   });
 });
 
-// ── GET /api/leads/history — Recent searches ─────────────────
-app.get("/api/leads/history", (req, res) => {
-  if (!req.user) return res.status(401).json({ error: "Login required" });
-  const history = getSearchHistory(req.user.id);
-  return res.json({ searches: history });
+// ── GET /api/leads/history/:jobId — Instantly load a past search ──
+app.get("/api/leads/history/:jobId", requireAuth, (req, res) => {
+  const history = getSearchHistoryJob(req.user.id, req.params.jobId);
+  if (!history) return res.status(404).json({ error: "Saved search not found" });
+  
+  return res.json({
+    jobId: history.job_id,
+    status: "done",
+    niche: history.niche,
+    location: history.location,
+    total: history.lead_count,
+    leads: JSON.parse(history.leads_json || "[]")
+  });
 });
 
 // ── GET /api/account — Dashboard data ────────────────────────
