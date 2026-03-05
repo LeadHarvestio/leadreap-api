@@ -65,10 +65,11 @@ app.use(cors({
 }));
 
 // Parse JSON for all routes EXCEPT webhook (needs raw body for sig verification)
-app.use((req, res, next) => {
-  if (req.path === "/api/webhook/stripe") return next();
-  express.json()(req, res, next);
-});
+// 1) Webhook gets raw body
+app.use("/api/webhook/stripe", express.raw({ type: "application/json" }));
+
+// 2) Everything else gets JSON
+app.use(express.json());
 
 // Attach user from session token to all requests
 app.use(attachUser);
@@ -173,25 +174,22 @@ app.post("/api/checkout", async (req, res) => {
 });
 
 // ── POST /api/webhook/stripe — Handle Stripe webhooks ────────
-app.post("/api/webhook/stripe",
-  express.raw({ type: "application/json" }),
-  (req, res) => {
-    const signature = req.headers["stripe-signature"];
+app.post("/api/webhook/stripe", async (req, res) => {
+  const signature = req.headers["stripe-signature"];
 
-    const event = constructWebhookEvent(req.body, signature);
-    if (!event) {
-      return res.status(400).json({ error: "Invalid signature" });
-    }
-
-    try {
-      const result = handleWebhookEvent(event);
-      return res.json(result);
-    } catch (e) {
-      console.error("[Payments] Webhook error:", e);
-      return res.status(500).json({ error: "Webhook processing failed" });
-    }
+  const event = constructWebhookEvent(req.body, signature);
+  if (!event) {
+    return res.status(400).json({ error: "Invalid signature" });
   }
-);
+
+  try {
+    const result = await handleWebhookEvent(event);
+    return res.json(result);
+  } catch (e) {
+    console.error("[Payments] Webhook error:", e);
+    return res.status(500).json({ error: "Webhook processing failed" });
+  }
+});
 
 
 // ═════════════════════════════════════════════════════════════
