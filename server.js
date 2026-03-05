@@ -173,23 +173,24 @@ app.post("/api/checkout", async (req, res) => {
   }
 });
 
-// ── POST /api/webhook/stripe — Handle Stripe webhooks ────────
-app.post("/api/webhook/stripe", async (req, res) => {
-  const signature = req.headers["stripe-signature"];
+// /api/webhook/stripe
+app.post("/api/webhook/stripe",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const signature = req.headers["stripe-signature"];
 
-  const event = constructWebhookEvent(req.body, signature);
-  if (!event) {
-    return res.status(400).json({ error: "Invalid signature" });
-  }
+    const event = constructWebhookEvent(req.body, signature);
+    if (!event) return res.status(400).json({ error: "Invalid signature" });
 
-  try {
-    const result = await handleWebhookEvent(event);
-    return res.json(result);
-  } catch (e) {
-    console.error("[Payments] Webhook error:", e);
-    return res.status(500).json({ error: "Webhook processing failed" });
+    try {
+      const result = await handleWebhookEvent(event);
+      return res.json(result);
+    } catch (e) {
+      console.error("[Payments] Webhook error:", e);
+      return res.status(500).json({ error: "Webhook processing failed" });
+    }
   }
-});
+);
 
 
 // ═════════════════════════════════════════════════════════════
