@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import LeadReap from "./LeadReap";
+import NicheLandingPage from "./NicheLandingPage";
+import ApolloAlternative from "./ApolloAlternative"; // <-- ADD THIS LINE
+import { useState, useEffect, useCallback } from "react";
+import LeadReap from "./LeadReap";
 import NicheLandingPage from "./NicheLandingPage"; // <-- ADDED IMPORT
 
 // In dev, Vite proxies /api to localhost:3001
@@ -159,6 +163,13 @@ export default function App() {
 
   // ─── ROUTING LOGIC ADDED HERE ───
   const path = window.location.pathname;
+
+  // 1. Check for the Apollo Comparison Page
+  if (path === '/compare/apollo' || path === '/compare/apollo/') {
+    return <ApolloAlternative />;
+  }
+
+  // 2. Check for Niche Landing Pages
   if (path.startsWith('/leads/')) {
     const slug = path.replace('/leads/', '').replace(/\/$/, '');
     if (slug) {
