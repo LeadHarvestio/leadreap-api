@@ -86,36 +86,55 @@ export function constructWebhookEvent(rawBody, signature) {
 // HANDLE WEBHOOK EVENT — process completed checkout
 // ─────────────────────────────────────────────────────────────
 export function handleWebhookEvent(event) {
-  console.log(`[Payments] Webhook received: ${event.type}`);
+  import { processWebhookEvent, upgradeUserFromStripe, handleRefund } from "./auth.js";
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const email = session.metadata?.email || session.customer_email;
-    const plan = session.metadata?.plan || "pro";
-    const amountPaid = session.amount_total;
-
-    if (!email) {
-      console.error("[Payments] No email in checkout session");
-      return { received: true, error: "no email" };
-    }
-
-    // Upgrade user in auth system
-    const upgraded = upgradeUser(email, plan);
-    console.log(`[Payments] ✅ ${email} → ${plan} plan ($${(amountPaid / 100).toFixed(2)}) | Auth updated: ${upgraded}`);
-
-    return { received: true, email, plan, upgraded };
+export function handleWebhookEvent(event) {
+  // 1. Idempotency Check to ignore duplicate webhooks
+  if (processWebhookEvent(event.id)) {
+    console.log(`[Stripe] Skipping duplicate event: ${event.id}`);
+    return { received: true, duplicate: true };
   }
 
-  // Handle refunds
-  if (event.type === "charge.refunded") {
-    const charge = event.data.object;
-    const email = charge.billing_details?.email || charge.metadata?.email;
-    if (email) {
-      const downgraded = upgradeUser(email, "free");
-      console.log(`[Payments] ⚠ Refund for ${email} — downgraded to free: ${downgraded}`);
-      return { received: true, email, action: "downgraded" };
+  console.log(`[Stripe] Processing new event: ${event.type}`);
+
+  try {
+    switch (event.type) {
+      // ── Happy Path: Initial One-Time Purchase ──
+      case "checkout.session.completed": {
+        const session = event.data.object;
+        if (session.payment_status === "paid") {
+          const email = session.customer_details?.email || session.customer_email;
+          const plan = session.metadata?.plan || "pro"; 
+          const customerId = session.customer;
+
+          if (email) {
+            upgradeUserFromStripe(email, plan, customerId);
+            console.log(`[Stripe] Upgraded ${email} to ${plan}`);
+          }
+        }
+        break;
+      }
+
+      // ── Unhappy Path: Refund or Chargeback ──
+      case "charge.refunded":
+      case "charge.dispute.created": {
+        const charge = event.data.object;
+        const email = charge.billing_details?.email || charge.receipt_email;
+        
+        if (email) {
+          handleRefund(email);
+          console.log(`[Stripe] Access revoked for ${email} due to refund/dispute`);
+        }
+        break;
+      }
+
+      default:
+        console.log(`[Stripe] Unhandled event type: ${event.type}`);
     }
+  } catch (err) {
+    console.error(`[Stripe] Error handling ${event.type}:`, err.message);
+    throw err; // Throwing ensures Stripe retries if there was a server error
   }
 
-  return { received: true, event: event.type };
+  return { received: true };
 }
