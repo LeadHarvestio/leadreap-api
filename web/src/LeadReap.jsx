@@ -1442,33 +1442,52 @@ function FeatureCarousel({ onShowPricing }) {
 export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLogout, onCheckout, onRefreshAuth }) {
   const API_BASE = apiBase;
   const [niche, setNiche] = useState(() => {
-    const param = new URLSearchParams(window.location.search).get("niche");
+    // 1. Try to get it from ?niche=...
+    let param = new URLSearchParams(window.location.search).get("niche");
+    
+    // 2. If no query param, try to get it from the path (e.g. /plumbers)
+    if (!param && window.location.pathname !== "/" && !window.location.pathname.startsWith("/leads/")) {
+       param = decodeURIComponent(window.location.pathname.replace("/", "")); 
+    }
+
     if (!param) return "";
     
-    // Look for an exact match, or a match if one has an "s" at the end (plural/singular)
+    // Clean up dashes (e.g. "roofing-contractors" -> "roofing contractors")
+    const cleanParam = param.replace(/-/g, " ");
+
     const match = INDUSTRIES.find(i => 
-      i.toLowerCase() === param.toLowerCase() || 
-      i.toLowerCase() + "s" === param.toLowerCase() || 
-      param.toLowerCase() + "s" === i.toLowerCase()
+      i.toLowerCase() === cleanParam.toLowerCase() || 
+      i.toLowerCase() + "s" === cleanParam.toLowerCase() || 
+      cleanParam.toLowerCase() + "s" === i.toLowerCase()
     );
     
-    return match ? match : "custom"; // If no match in the 71 niches, select "Custom niche"
+    return match ? match : "custom";
   });
   
   const [location, setLocation] = useState("");
   const locationRef = useRef(null);
   
   const [customNiche, setCustomNiche] = useState(() => {
-    const param = new URLSearchParams(window.location.search).get("niche");
+    let param = new URLSearchParams(window.location.search).get("niche");
+    
+    if (!param && window.location.pathname !== "/" && !window.location.pathname.startsWith("/leads/")) {
+       param = decodeURIComponent(window.location.pathname.replace("/", "")); 
+    }
+
     if (!param) return "";
     
+    const cleanParam = param.replace(/-/g, " ");
+
     const match = INDUSTRIES.find(i => 
-      i.toLowerCase() === param.toLowerCase() || 
-      i.toLowerCase() + "s" === param.toLowerCase() || 
-      param.toLowerCase() + "s" === i.toLowerCase()
+      i.toLowerCase() === cleanParam.toLowerCase() || 
+      i.toLowerCase() + "s" === cleanParam.toLowerCase() || 
+      cleanParam.toLowerCase() + "s" === i.toLowerCase()
     );
     
-    return match ? "" : param; // If it's custom, auto-fill the custom text box
+    // Capitalize custom niches nicely
+    const formattedParam = cleanParam.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+    return match ? "" : formattedParam;
   });
   const [includeEmail, setIncludeEmail] = useState(true);
   const [includePhone, setIncludePhone] = useState(true);
