@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// LeadReap API — v3.4 (Production)
+// LeadReap API — v4.0 (Production)
 // Express server with auth, Stripe payments, rate limiting, + scraper
-// v3.4: Search history persisted in SQLite
+// v4.0: Search history persisted in SQLite + Drip Email Campaigns
 // ─────────────────────────────────────────────────────────────
 
 import express from "express";
@@ -21,7 +21,7 @@ import { exportToBuffer } from "./scraper/exporter.js";
 import {
   createMagicLink, verifyMagicLink, validateSession,
   destroySession, recordSearch, cleanupAuth,
-  saveSearchHistory, getSearchHistory,
+  saveSearchHistory, getSearchHistory, getSearchHistoryJob,
   createSavedList, getUserLists, getList,
   updateSavedList, deleteSavedList,
   addLeadsToList, getListLeads,
@@ -36,9 +36,10 @@ import {
   createWebhook, getUserWebhooks, deleteWebhook, toggleWebhook,
   getActiveWebhooks, touchWebhookTimestamp,
   createApiKey, getUserApiKeys, deleteApiKey,
+  markWelcomeSent, markFollowupSent, getPendingFollowups
 } from "./auth.js";
 import { createCheckout, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
-import { sendMagicLinkEmail, sendSequenceEmail, sendTeamInviteEmail } from "./email.js";
+import { sendMagicLinkEmail, sendSequenceEmail, sendTeamInviteEmail, sendWelcomeEmail, sendFollowUpEmail } from "./email.js";
 import { generateReport } from "./reports.js";
 import { attachUser, requireAuth, requireSearchQuota, ipRateLimit, requireAgency, requirePro } from "./middleware.js";
 
@@ -105,6 +106,12 @@ app.post("/api/auth/verify", (req, res) => {
   const result = verifyMagicLink(code);
   if (!result) {
     return res.status(401).json({ error: "Invalid or expired code" });
+  }
+
+  // Send welcome email if they've never received it
+  if (result.user.welcome_sent === 0) {
+    sendWelcomeEmail(result.user.email);
+    markWelcomeSent(result.user.email);
   }
 
   return res.json({
@@ -221,7 +228,7 @@ app.get("/api/leads/job/:jobId", (req, res) => {
     saveSearchHistory(req.user.id, {
       niche: job.niche, location: job.location,
       leadCount: job.leads.length, jobId: job.id,
-      leads: job.leads // <-- ADD THIS LINE
+      leads: job.leads
     });
     // Trigger webhooks
     triggerWebhooks(req.user.id, "search.completed", {
@@ -843,7 +850,7 @@ app.get("/health", (req, res) => {
 
 
 // ─────────────────────────────────────────────────────────────
-// STARTUP
+// STARTUP & SCHEDULERS
 // ─────────────────────────────────────────────────────────────
 clearExpired();
 setInterval(clearExpired, 6 * 60 * 60 * 1000);
@@ -892,9 +899,28 @@ async function processSequenceQueue() {
   }
 }
 
-// Process queue every 60 seconds
+// Process sequence queue every 60 seconds
 setInterval(processSequenceQueue, 60 * 1000);
 processSequenceQueue(); // Run once on startup
+
+// ── Drip Campaign Scheduler ─────────────────────────────────
+async function processDripCampaigns() {
+  try {
+    const pending = getPendingFollowups();
+    if (pending.length > 0) {
+      console.log(`[Drip] Sending Day-3 follow-ups to ${pending.length} users`);
+      for (const user of pending) {
+        await sendFollowUpEmail(user.email);
+        markFollowupSent(user.email);
+      }
+    }
+  } catch (err) {
+    console.error("[Drip] Error processing follow-ups:", err.message);
+  }
+}
+
+// Check for follow-ups every hour
+setInterval(processDripCampaigns, 60 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`
@@ -907,6 +933,7 @@ app.listen(PORT, () => {
   POST /api/webhook/stripe
   POST /api/leads/search
   GET  /api/leads/job/:id
+  GET  /api/leads/history/:jobId
   GET  /api/leads/export/:id
   GET  /api/lists
   POST /api/lists
