@@ -1611,11 +1611,38 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     }
   }
 
-  function dashRerun(search) {
+  async function dashRerun(search) {
     setShowDashboard(false);
     setNiche(INDUSTRIES.includes(search.niche) ? search.niche : "custom");
     if (!INDUSTRIES.includes(search.niche)) setCustomNiche(search.niche);
     setLocation(search.location);
+
+    // If it has a jobId, fetch it instantly from permanent history!
+    if (search.jobId) {
+      setLoading(true);
+      setSearchError("");
+      try {
+        const res = await fetch(`${API_BASE}/api/leads/history/${search.jobId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLeads(data.leads || []);
+          setTotalLeads(data.total || data.leads?.length || 0);
+          setSearchDone(true);
+          setExpandedRow(0);
+          setLoading(false);
+          return; // Exit early so we don't trigger a new scrape
+        }
+      } catch (e) {
+        console.warn("Could not load from history, falling back to new search");
+      }
+    }
+
+    // Fallback: Run a new search if history fetch failed or no jobId exists
+    setTimeout(() => {
+      handleSearch();
+    }, 100);
   }
 
   // Google Places Autocomplete for location input
