@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import LeadReap from "./LeadReap";
+import NicheLandingPage from "./NicheLandingPage"; // <-- ADDED IMPORT
 
 // In dev, Vite proxies /api to localhost:3001
 // In production, set this to your Railway URL
@@ -121,7 +122,7 @@ export default function App() {
     setUser(null);
   }
 
-  // ─── Checkout (redirect to LemonSqueezy) ───────────────────
+  // ─── Checkout (redirect to LemonSqueezy / Stripe) ───────────────────
   async function handleCheckout(plan) {
     try {
       const res = await fetch(`${API_BASE}/api/checkout`, {
@@ -156,6 +157,17 @@ export default function App() {
     );
   }
 
+  // ─── ROUTING LOGIC ADDED HERE ───
+  const path = window.location.pathname;
+  if (path.startsWith('/leads/')) {
+    const slug = path.replace('/leads/', '').replace(/\/$/, '');
+    if (slug) {
+      // Show the SEO Landing Page
+      return <NicheLandingPage slug={slug} />;
+    }
+  }
+
+  // ─── MAIN APP RENDER ───
   return (
     <>
       <LeadReap
