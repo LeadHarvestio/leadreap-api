@@ -220,6 +220,17 @@ markWelcomeSent:  db.prepare("UPDATE users SET welcome_sent = 1 WHERE email = ?"
   markFollowupSent: db.prepare("UPDATE users SET followup_sent = 1 WHERE email = ?"),
   getPendingFollowups: db.prepare("SELECT * FROM users WHERE plan = 'free' AND followup_sent = 0 AND created_at < datetime('now', '-3 days') LIMIT 50"),
 // ─────────────────────────────────────────────────────────────
+  // Stripe & Webhook Tracking
+  updateStripeInfo:     db.prepare("UPDATE users SET plan = ?, stripe_customer_id = ? WHERE email = ?"),
+  downgradeUserByEmail: db.prepare("UPDATE users SET plan = 'free' WHERE email = ?"),
+  checkWebhook:         db.prepare("SELECT 1 FROM processed_webhooks WHERE id = ?"),
+  markWebhookProcessed: db.prepare("INSERT INTO processed_webhooks (id) VALUES (?)"),
+  // ── Auto-Migration: Stripe Tracking & Idempotency ──
+try { db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"); } catch (e) {}
+try { 
+  db.exec("CREATE TABLE IF NOT EXISTS processed_webhooks (id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"); 
+} catch (e) {}
+// ─────────────────────────────────────────────────────────────
 const stmts = {
   findUserByEmail:  db.prepare("SELECT * FROM users WHERE email = ?"),
   findUserById:     db.prepare("SELECT * FROM users WHERE id = ?"),
@@ -227,6 +238,7 @@ const stmts = {
   upgradePlan:      db.prepare("UPDATE users SET plan = ?, lemon_customer_id = ?, lemon_order_id = ?, updated_at = datetime('now') WHERE email = ?"),
   incrementSearch:  db.prepare("UPDATE users SET searches_today = searches_today + 1, updated_at = datetime('now') WHERE id = ?"),
   resetSearchCount: db.prepare("UPDATE users SET searches_today = 0, searches_reset_at = datetime('now') WHERE id = ?"),
+  
 
   // Sessions
   createSession:    db.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)"),
@@ -863,3 +875,17 @@ export function getPendingFollowups() {
 }
 // Run cleanup every hour
 setInterval(cleanupAuth, 60 * 60 * 1000);
+export function processWebhookEvent(eventId) {
+  const exists = stmts.checkWebhook.get(eventId);
+  if (exists) return true;
+  stmts.markWebhookProcessed.run(eventId);
+  return false;
+}
+
+export function upgradeUserFromStripe(email, plan, customerId) {
+  stmts.updateStripeInfo.run(plan, customerId, email.toLowerCase().trim());
+}
+
+export function handleRefund(email) {
+  stmts.downgradeUserByEmail.run(email.toLowerCase().trim());
+}
