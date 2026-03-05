@@ -1441,7 +1441,10 @@ function FeatureCarousel({ onShowPricing }) {
 
 export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLogout, onCheckout, onRefreshAuth }) {
   const API_BASE = apiBase;
-  const [niche, setNiche] = useState("");
+  const [niche, setNiche] = useState(() => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("niche") || "";
+});
   const [location, setLocation] = useState("");
   const locationRef = useRef(null);
   const [customNiche, setCustomNiche] = useState("");
