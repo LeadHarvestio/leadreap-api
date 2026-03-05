@@ -200,4 +200,113 @@ export default function App() {
         >
           <div style={{
             background: "#111114", border: "1px solid #2a2a35",
-            borderRadius: 20,
+            borderRadius: 20, padding: 48, maxWidth: 440, width: "100%",
+            position: "relative", fontFamily: "Syne, sans-serif", color: "#e8e8f0",
+          }}>
+            <button
+              onClick={() => setShowLogin(false)}
+              style={{
+                position: "absolute", top: 16, right: 16, background: "#18181d",
+                border: "1px solid #2a2a35", color: "#6b6b80", width: 32, height: 32,
+                borderRadius: 8, cursor: "pointer", fontSize: 18,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >×</button>
+
+            <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: -1 }}>
+              {loginStep === "email" ? "Log in to LeadReap" : "Enter your code"}
+            </h2>
+            <p style={{ color: "#6b6b80", marginBottom: 32, fontSize: 14 }}>
+              {loginStep === "email"
+                ? "We'll send you a magic login link — no password needed."
+                : `We sent a code to ${loginEmail}. Check your email (and spam).`
+              }
+            </p>
+
+            {loginError && (
+              <div style={{
+                background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
+                color: "#f87171", padding: "10px 16px", borderRadius: 8, marginBottom: 16,
+                fontSize: 13, fontFamily: "IBM Plex Mono, monospace",
+              }}>{loginError}</div>
+            )}
+
+            {loginStep === "email" ? (
+              <>
+                <input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && requestMagicLink()}
+                  style={{
+                    width: "100%", background: "#18181d", border: "1px solid #2a2a35",
+                    borderRadius: 10, padding: "14px 16px", fontSize: 15,
+                    fontFamily: "IBM Plex Mono, monospace", color: "#e8e8f0",
+                    outline: "none", marginBottom: 16, boxSizing: "border-box",
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={requestMagicLink}
+                  disabled={loginLoading}
+                  style={{
+                    width: "100%", background: "#f0b429", color: "#000",
+                    border: "none", borderRadius: 10, padding: "14px 0",
+                    fontSize: 15, fontWeight: 700, cursor: loginLoading ? "wait" : "pointer",
+                    fontFamily: "Syne, sans-serif",
+                  }}
+                >
+                  {loginLoading ? "Sending..." : "Send Login Code →"}
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="Enter 8-character code"
+                  value={loginCode}
+                  onChange={e => setLoginCode(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === "Enter" && verifyCode()}
+                  maxLength={8}
+                  style={{
+                    width: "100%", background: "#18181d", border: "1px solid #2a2a35",
+                    borderRadius: 10, padding: "14px 16px", fontSize: 22,
+                    fontFamily: "IBM Plex Mono, monospace", color: "#f0b429",
+                    outline: "none", marginBottom: 16, letterSpacing: 4,
+                    textAlign: "center", boxSizing: "border-box",
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={() => verifyCode()}
+                  disabled={loginLoading || loginCode.length < 6}
+                  style={{
+                    width: "100%", background: "#f0b429", color: "#000",
+                    border: "none", borderRadius: 10, padding: "14px 0",
+                    fontSize: 15, fontWeight: 700, cursor: loginLoading ? "wait" : "pointer",
+                    fontFamily: "Syne, sans-serif",
+                    opacity: loginCode.length < 6 ? 0.5 : 1,
+                  }}
+                >
+                  {loginLoading ? "Verifying..." : "Verify & Log In →"}
+                </button>
+                <button
+                  onClick={() => { setLoginStep("email"); setLoginError(""); }}
+                  style={{
+                    width: "100%", background: "transparent", border: "1px solid #2a2a35",
+                    color: "#6b6b80", borderRadius: 10, padding: "12px 0",
+                    fontSize: 13, cursor: "pointer", marginTop: 10,
+                    fontFamily: "Syne, sans-serif",
+                  }}
+                >
+                  ← Try a different email
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
