@@ -8,7 +8,7 @@ Google Maps lead scraper SaaS with auth, payments, and export.
 leadreap/
 ├── server.js            ← Express API (auth + payments + scraper)
 ├── auth.js              ← SQLite-backed user/session management
-├── payments.js          ← LemonSqueezy checkout + webhooks
+├── payments.js          ← Stripe checkout + webhooks
 ├── email.js             ← Magic link email sender
 ├── middleware.js         ← Auth + rate limiting middleware
 ├── scraper/
