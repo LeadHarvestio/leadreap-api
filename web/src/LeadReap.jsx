@@ -1442,12 +1442,34 @@ function FeatureCarousel({ onShowPricing }) {
 export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLogout, onCheckout, onRefreshAuth }) {
   const API_BASE = apiBase;
   const [niche, setNiche] = useState(() => {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("niche") || "";
-});
+    const param = new URLSearchParams(window.location.search).get("niche");
+    if (!param) return "";
+    
+    // Look for an exact match, or a match if one has an "s" at the end (plural/singular)
+    const match = INDUSTRIES.find(i => 
+      i.toLowerCase() === param.toLowerCase() || 
+      i.toLowerCase() + "s" === param.toLowerCase() || 
+      param.toLowerCase() + "s" === i.toLowerCase()
+    );
+    
+    return match ? match : "custom"; // If no match in the 71 niches, select "Custom niche"
+  });
+  
   const [location, setLocation] = useState("");
   const locationRef = useRef(null);
-  const [customNiche, setCustomNiche] = useState("");
+  
+  const [customNiche, setCustomNiche] = useState(() => {
+    const param = new URLSearchParams(window.location.search).get("niche");
+    if (!param) return "";
+    
+    const match = INDUSTRIES.find(i => 
+      i.toLowerCase() === param.toLowerCase() || 
+      i.toLowerCase() + "s" === param.toLowerCase() || 
+      param.toLowerCase() + "s" === i.toLowerCase()
+    );
+    
+    return match ? "" : param; // If it's custom, auto-fill the custom text box
+  });
   const [includeEmail, setIncludeEmail] = useState(true);
   const [includePhone, setIncludePhone] = useState(true);
   const [includeSocial, setIncludeSocial] = useState(false);
