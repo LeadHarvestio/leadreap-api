@@ -123,7 +123,7 @@ export default function App() {
     setUser(null);
   }
 
-  // ─── Checkout (redirect to LemonSqueezy / Stripe) ───────────────────
+  // ─── Checkout (redirect to Stripe) ───────────────────
   async function handleCheckout(plan) {
     try {
       const res = await fetch(`${API_BASE}/api/checkout`, {
