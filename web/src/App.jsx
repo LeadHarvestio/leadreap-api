@@ -1,32 +1,29 @@
 import { useState, useEffect, useCallback } from "react";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import LeadReap from "./LeadReap";
 import NicheLandingPage from "./NicheLandingPage";
 import ApolloAlternative from "./ApolloAlternative";
 
+// In dev, Vite proxies /api to localhost:3001
+// In production, set this to your Railway URL
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
-// ENSURE THIS LINE SAYS "export default" to fix your Vercel build error
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("lh_token"));
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Login State
   const [showLogin, setShowLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginCode, setLoginCode] = useState("");
-  const [loginStep, setLoginStep] = useState("email");
+  const [loginStep, setLoginStep] = useState("email"); // email | code | done
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Audit State
+  // Audit state
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditData, setAuditData] = useState(null);
   const [showAuditModal, setShowAuditModal] = useState(false);
 
-  // ─── Auth Logic ───────────────────────────────────────────
+  // ─── Check session on mount ────────────────────────────────
   const checkAuth = useCallback(async () => {
     if (!token) { setLoading(false); return; }
     try {
@@ -40,20 +37,34 @@ export default function App() {
         localStorage.removeItem("lh_token");
         setToken(null);
       }
-    } catch (e) {
-      console.warn("Auth check failed");
+    } catch {
+      // API not reachable — keep token, will retry
     }
     setLoading(false);
   }, [token]);
 
   useEffect(() => { checkAuth(); }, [checkAuth]);
 
-  // ─── Login Handlers ───────────────────────────────────────
-  async function handleSendCode() {
-    if (!loginEmail || !loginEmail.includes("@")) {
-      setLoginError("Please enter a valid email address.");
-      return;
+  // ─── Handle magic link from URL (e.g. /login?code=ABC123) ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const plan = params.get("plan"); // from post-payment redirect
+
+    if (code) {
+      verifyCode(code);
+      window.history.replaceState({}, "", "/");
     }
+    if (plan) {
+      // User returned from successful payment — refresh their auth
+      checkAuth();
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
+
+  // ─── Request magic link ────────────────────────────────────
+  async function requestMagicLink() {
+    if (!loginEmail.includes("@")) { setLoginError("Enter a valid email"); return; }
     setLoginLoading(true);
     setLoginError("");
     try {
@@ -63,54 +74,80 @@ export default function App() {
         body: JSON.stringify({ email: loginEmail }),
       });
       const data = await res.json();
-      if (res.ok) {
+      if (data.ok) {
         setLoginStep("code");
       } else {
-        setLoginError(data.error || "Failed to send login code.");
+        setLoginError(data.error || "Failed to send login email");
       }
     } catch {
-      setLoginError("Network error. Please try again.");
+      setLoginError("Network error — is the backend running?");
     }
     setLoginLoading(false);
   }
 
-  async function handleVerifyCode() {
-    if (!loginCode.trim()) {
-      setLoginError("Please enter the code from your email.");
-      return;
-    }
+  // ─── Verify magic code ─────────────────────────────────────
+  async function verifyCode(codeOverride) {
+    const code = codeOverride || loginCode;
+    if (!code) return;
     setLoginLoading(true);
     setLoginError("");
     try {
       const res = await fetch(`${API_BASE}/api/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: loginCode.trim() }),
+        body: JSON.stringify({ code }),
       });
       const data = await res.json();
-      if (res.ok && data.token) {
+      if (data.token) {
         localStorage.setItem("lh_token", data.token);
         setToken(data.token);
         setUser(data.user);
         setShowLogin(false);
         setLoginStep("email");
-        setLoginEmail("");
         setLoginCode("");
+        setLoginEmail("");
       } else {
-        setLoginError(data.error || "Invalid or expired code. Please try again.");
+        setLoginError(data.error || "Invalid code");
       }
     } catch {
-      setLoginError("Network error. Please try again.");
+      setLoginError("Network error");
     }
     setLoginLoading(false);
   }
 
-  function handleCloseLogin() {
-    setShowLogin(false);
-    setLoginStep("email");
-    setLoginEmail("");
-    setLoginCode("");
-    setLoginError("");
+  // ─── Logout ────────────────────────────────────────────────
+  async function logout() {
+    if (token) {
+      fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
+    localStorage.removeItem("lh_token");
+    setToken(null);
+    setUser(null);
+  }
+
+  // ─── Checkout (redirect to Stripe) ───────────────────
+  async function handleCheckout(plan) {
+    try {
+      const res = await fetch(`${API_BASE}/api/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ plan, email: user?.email || loginEmail }),
+      });
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        alert(data.error || "Checkout failed — try again");
+      }
+    } catch {
+      alert("Network error — is the backend running?");
+    }
   }
 
   // ─── Audit Engine ─────────────────────────────────────────
@@ -119,15 +156,11 @@ export default function App() {
     setAuditLoading(true);
     setAuditData(null);
     setShowAuditModal(true);
-
     try {
       const res = await fetch(`${API_BASE}/api/audit`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ url })
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ url }),
       });
       const data = await res.json();
       if (data.error) {
@@ -136,88 +169,44 @@ export default function App() {
       } else {
         setAuditData(data);
       }
-    } catch (err) {
-      alert("Audit failed. Site may be blocking requests.");
+    } catch {
+      alert("Audit failed. The site may be down or blocking requests.");
       setShowAuditModal(false);
     }
     setAuditLoading(false);
   }
 
-  // ─── PDF Export ───────────────────────────────────────────
-  async function exportAuditToPDF() {
-    const element = document.getElementById("audit-report-content");
-    const canvas = await html2canvas(element, {
-      backgroundColor: "#111114",
-      scale: 2,
-    });
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`LeadReap-Audit-${auditData.url.replace(/[^a-z0-9]/gi, "_")}.pdf`);
+  // ─── Render ────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: "100vh", display: "flex", alignItems: "center",
+        justifyContent: "center", background: "#0a0a0b", color: "#f0b429",
+        fontFamily: "Syne, sans-serif", fontSize: 20,
+      }}>
+        Loading...
+      </div>
+    );
   }
 
-  // ─── Navigation & Routing ─────────────────────────────────
+  // ─── ROUTING LOGIC ADDED HERE ───
   const path = window.location.pathname;
-  if (path === "/compare/apollo" || path === "/compare/apollo/") return <ApolloAlternative />;
-  if (path.startsWith("/leads/")) {
-    const slug = path.replace("/leads/", "").replace(/\/$/, "");
-    if (slug) return <NicheLandingPage slug={slug} />;
+  
+  // 1. The Apollo Alternative page
+  if (path === '/compare/apollo' || path === '/compare/apollo/') {
+    return <ApolloAlternative />;
   }
 
-  if (loading) return <div style={{ background: "#0a0a0b", height: "100vh" }} />;
+  // 2. The SEO Niche pages
+  if (path.startsWith('/leads/')) {
+    const slug = path.replace('/leads/', '').replace(/\/$/, '');
+    if (slug) {
+      // Show the SEO Landing Page
+      return <NicheLandingPage slug={slug} />;
+    }
+  }
 
-  const s = {
-    overlay: {
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      zIndex: 500, padding: 20, backdropFilter: "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)", animation: "fadeIn 0.15s ease",
-    },
-    modal: {
-      background: "#111114", border: "1px solid #2a2a35",
-      borderRadius: 20, padding: "40px 36px", maxWidth: 420, width: "100%",
-      position: "relative", fontFamily: "Syne, sans-serif", color: "#e8e8f0",
-    },
-    close: {
-      position: "absolute", top: 16, right: 16, background: "#18181d",
-      border: "1px solid #2a2a35", color: "#6b6b80", width: 30, height: 30,
-      borderRadius: 8, cursor: "pointer", fontSize: 18, display: "flex",
-      alignItems: "center", justifyContent: "center",
-    },
-    label: {
-      display: "block", fontSize: 12, color: "#6b6b80",
-      marginBottom: 6, fontFamily: "IBM Plex Mono, monospace",
-    },
-    input: {
-      width: "100%", background: "#18181d", border: "1px solid #2a2a35",
-      borderRadius: 10, padding: "12px 16px", color: "#e8e8f0",
-      fontSize: 14, fontFamily: "IBM Plex Mono, monospace",
-      outline: "none", boxSizing: "border-box", marginBottom: 14,
-    },
-    btn: {
-      width: "100%", background: "#f0b429", color: "#000",
-      border: "none", borderRadius: 10, padding: "13px 20px",
-      fontSize: 14, fontWeight: 700, cursor: "pointer",
-      fontFamily: "Syne, sans-serif", marginBottom: 10,
-    },
-    btnDisabled: {
-      width: "100%", background: "#333", color: "#666",
-      border: "none", borderRadius: 10, padding: "13px 20px",
-      fontSize: 14, fontWeight: 700, cursor: "not-allowed",
-      fontFamily: "Syne, sans-serif", marginBottom: 10,
-    },
-    err: { fontSize: 12, color: "#f87171", marginBottom: 10, textAlign: "center" },
-    back: {
-      background: "none", border: "none", color: "#6b6b80",
-      fontSize: 12, cursor: "pointer", fontFamily: "IBM Plex Mono, monospace",
-      display: "block", margin: "0 auto", padding: "4px 8px",
-    },
-  };
-
+  // ─── MAIN APP RENDER ───
   return (
     <>
       <LeadReap
@@ -225,248 +214,246 @@ export default function App() {
         token={token}
         user={user}
         onLoginClick={() => setShowLogin(true)}
-        onLogout={() => { localStorage.removeItem("lh_token"); setToken(null); setUser(null); }}
+        onLogout={logout}
+        onCheckout={handleCheckout}
         onRefreshAuth={checkAuth}
         onRunAudit={handleRunAudit}
       />
 
-      {/* ── LOGIN MODAL ── */}
-      {showLogin && (
-        <div style={s.overlay} onClick={e => e.target === e.currentTarget && handleCloseLogin()}>
-          <div style={s.modal}>
-            <button style={s.close} onClick={handleCloseLogin}>×</button>
+      {/* AUDIT RESULTS MODAL */}
+      {showAuditModal && (
+        <div style={{
+          position:"fixed", inset:0, background:"rgba(0,0,0,0.9)",
+          display:"flex", alignItems:"flex-start", justifyContent:"center",
+          zIndex:1000, padding:"40px 20px", backdropFilter:"blur(10px)",
+          WebkitBackdropFilter:"blur(10px)", overflowY:"auto",
+        }} onClick={e => e.target === e.currentTarget && setShowAuditModal(false)}>
+          <div style={{
+            background:"#111114", border:"1px solid #2a2a35",
+            borderRadius:20, padding:"40px", maxWidth:680, width:"100%",
+            position:"relative", fontFamily:"Syne, sans-serif", color:"#e8e8f0",
+            flexShrink:0,
+          }}>
+            <button onClick={() => setShowAuditModal(false)} style={{
+              position:"absolute",top:20,right:20,background:"#18181d",
+              border:"1px solid #2a2a35",color:"#6b6b80",width:32,height:32,
+              borderRadius:8,cursor:"pointer",fontSize:18,display:"flex",
+              alignItems:"center",justifyContent:"center",
+            }}>×</button>
 
-            <div style={{ textAlign: "center", marginBottom: 28 }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>⚡</div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4, letterSpacing: "-0.5px" }}>
-                {loginStep === "email" ? "Sign in to LeadReap" : "Check your inbox"}
-              </h2>
-              <p style={{ fontSize: 13, color: "#6b6b80", lineHeight: 1.5 }}>
-                {loginStep === "email"
-                  ? "Enter your email and we'll send you a magic login code — no password needed."
-                  : `We sent a 6-digit code to ${loginEmail}. Enter it below to log in.`}
-              </p>
+            {auditLoading ? (
+              <div style={{textAlign:"center",padding:"60px 0"}}>
+                <div style={{fontSize:32,marginBottom:12}}>🔍</div>
+                <h2 style={{fontSize:20,fontWeight:700,marginBottom:8}}>Analyzing site...</h2>
+                <p style={{color:"#6b6b80",fontSize:14}}>Running a 6-point SEO &amp; tech diagnostic</p>
+              </div>
+            ) : auditData ? (
+              <div id="audit-report-content">
+                <div style={{display:"flex",alignItems:"center",gap:20,marginBottom:28}}>
+                  <div style={{
+                    width:72,height:72,borderRadius:36,
+                    border:`4px solid ${auditData.score >= 70 ? "#22c55e" : auditData.score >= 40 ? "#f0b429" : "#ef4444"}`,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:24,fontWeight:800,flexShrink:0,
+                  }}>{auditData.score}</div>
+                  <div>
+                    <h2 style={{fontSize:20,fontWeight:800,marginBottom:4}}>Site Audit Report</h2>
+                    <p style={{color:"#6b6b80",fontSize:13,fontFamily:"IBM Plex Mono, monospace",wordBreak:"break-all"}}>{auditData.url}</p>
+                  </div>
+                </div>
+
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
+                  {[
+                    { label: "SSL Security", pass: auditData.tech.ssl },
+                    { label: "H1 Header", pass: auditData.seo.h1 },
+                    { label: "SEO Title", pass: auditData.seo.title },
+                    { label: "Meta Description", pass: auditData.seo.description },
+                    { label: "Facebook Pixel", pass: auditData.tech.pixel },
+                    { label: "Google Analytics", pass: auditData.tech.analytics },
+                  ].map((item, i) => (
+                    <div key={i} style={{
+                      padding:"12px 16px",background:"#18181d",border:"1px solid #2a2a35",
+                      borderRadius:10,display:"flex",alignItems:"center",justifyContent:"space-between",
+                    }}>
+                      <span style={{fontSize:13,color:"#a1a1aa"}}>{item.label}</span>
+                      <span style={{color:item.pass ? "#22c55e" : "#ef4444",fontWeight:700,fontSize:12,fontFamily:"IBM Plex Mono"}}>
+                        {item.pass ? "✓ PASS" : "✕ FAIL"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {auditData.salesAngles?.length > 0 && (
+                  <div style={{
+                    background:"rgba(240,180,41,0.04)",border:"1px solid rgba(240,180,41,0.15)",
+                    borderRadius:14,padding:20,marginBottom:20,
+                  }}>
+                    <h3 style={{fontSize:14,fontWeight:700,color:"#f0b429",marginBottom:12,fontFamily:"IBM Plex Mono"}}>
+                      SALES ANGLES
+                    </h3>
+                    {auditData.salesAngles.map((angle, i) => (
+                      <div key={i} style={{marginBottom:i < auditData.salesAngles.length - 1 ? 12 : 0}}>
+                        <div style={{fontSize:13,fontWeight:600,color:"#e8e8f0",marginBottom:2}}>{angle.issue}</div>
+                        <div style={{fontSize:12,color:"#a1a1aa",lineHeight:1.6,fontStyle:"italic"}}>"{angle.hook}"</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{fontSize:11,color:"#6b6b80",textAlign:"center",fontFamily:"IBM Plex Mono",marginTop:8}}>
+                  Audited {new Date(auditData.checkedAt).toLocaleString()}
+                </div>
+              </div>
+
+                <button onClick={async () => {
+                  try {
+                    const html2canvas = (await import("html2canvas")).default;
+                    const jsPDF = (await import("jspdf")).default;
+                    const el = document.getElementById("audit-report-content");
+                    if (!el) return;
+                    const canvas = await html2canvas(el, { backgroundColor: "#111114", scale: 2 });
+                    const imgData = canvas.toDataURL("image/png");
+                    const pdf = new jsPDF("p", "mm", "a4");
+                    const w = pdf.internal.pageSize.getWidth();
+                    const h = (canvas.height * w) / canvas.width;
+                    pdf.addImage(imgData, "PNG", 0, 0, w, h);
+                    pdf.save(`LeadReap-Audit-${auditData.url.replace(/[^a-z0-9]/gi, "_").slice(0, 40)}.pdf`);
+                  } catch (e) {
+                    console.error("PDF export failed:", e);
+                    alert("PDF export failed — try right-click → Print → Save as PDF instead.");
+                  }
+                }} style={{
+                  width:"100%",background:"#f0b429",color:"#000",border:"none",
+                  borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,
+                  cursor:"pointer",fontFamily:"Syne, sans-serif",marginTop:16,
+                }}>
+                  📥 Download PDF Report
+                </button>
+            ) : null}
             </div>
-
-            {loginError && <div style={s.err}>{loginError}</div>}
-
-            {loginStep === "email" ? (
-              <>
-                <label style={s.label}>EMAIL ADDRESS</label>
-                <input
-                  style={s.input}
-                  type="email"
-                  placeholder="you@example.com"
-                  value={loginEmail}
-                  onChange={e => setLoginEmail(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleSendCode()}
-                  autoFocus
-                />
-                <button
-                  style={loginLoading ? s.btnDisabled : s.btn}
-                  onClick={handleSendCode}
-                  disabled={loginLoading}
-                >
-                  {loginLoading ? "Sending..." : "Send Login Code →"}
-                </button>
-                <p style={{ fontSize: 11, color: "#6b6b80", textAlign: "center", fontFamily: "IBM Plex Mono, monospace" }}>
-                  New users get a free account automatically.
-                </p>
-              </>
-            ) : (
-              <>
-                <label style={s.label}>LOGIN CODE</label>
-                <input
-                  style={s.input}
-                  type="text"
-                  placeholder="Enter 6-digit code"
-                  value={loginCode}
-                  onChange={e => setLoginCode(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleVerifyCode()}
-                  autoFocus
-                  maxLength={8}
-                />
-                <button
-                  style={loginLoading ? s.btnDisabled : s.btn}
-                  onClick={handleVerifyCode}
-                  disabled={loginLoading}
-                >
-                  {loginLoading ? "Verifying..." : "Verify & Log In →"}
-                </button>
-                <button style={s.back} onClick={() => { setLoginStep("email"); setLoginError(""); }}>
-                  ← Use a different email
-                </button>
-              </>
-            )}
           </div>
         </div>
       )}
 
-      {/* ── AUDIT RESULTS MODAL ── */}
-      {showAuditModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1000, padding: 20, backdropFilter: "blur(10px)",
-        }}>
+      {/* LOGIN MODAL */}
+      {showLogin && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 999, padding: 20,
+          }}
+          onClick={e => e.target === e.currentTarget && setShowLogin(false)}
+        >
           <div style={{
             background: "#111114", border: "1px solid #2a2a35",
-            borderRadius: 24, padding: 40, maxWidth: 700, width: "100%",
-            maxHeight: "90vh", overflowY: "auto", position: "relative",
-            fontFamily: "Syne, sans-serif", color: "#e8e8f0",
+            borderRadius: 20, padding: 48, maxWidth: 440, width: "100%",
+            position: "relative", fontFamily: "Syne, sans-serif", color: "#e8e8f0",
           }}>
             <button
-              onClick={() => setShowAuditModal(false)}
+              onClick={() => setShowLogin(false)}
               style={{
-                position: "absolute", top: 24, right: 24, background: "#18181d",
-                border: "1px solid #2a2a35", color: "#6b6b80", width: 36, height: 36,
-                borderRadius: 10, cursor: "pointer", fontSize: 20,
+                position: "absolute", top: 16, right: 16, background: "#18181d",
+                border: "1px solid #2a2a35", color: "#6b6b80", width: 32, height: 32,
+                borderRadius: 8, cursor: "pointer", fontSize: 18,
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}
             >×</button>
 
-            <div id="audit-report-content">
-              {auditLoading ? (
-                <div style={{ textAlign: "center", padding: "60px 0" }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: "50%",
-                    background: "radial-gradient(circle at 30% 30%, #f0b429, #e85d04)",
-                    margin: "0 auto 24px", animation: "orbPulse 2s ease-in-out infinite",
-                  }} />
-                  <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Analyzing Site...</h2>
-                  <p style={{ color: "#6b6b80" }}>LeadReap is performing a 5-point SEO &amp; Tech diagnostic.</p>
-                </div>
-              ) : auditData && (
-                <>
-                  {/* Header */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-                    <div style={{
-                      width: 80, height: 80, borderRadius: 40, flexShrink: 0,
-                      border: `4px solid ${auditData.score >= 80 ? "#10b981" : auditData.score >= 40 ? "#f0b429" : "#ef4444"}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 28, fontWeight: 800,
-                    }}>
-                      {auditData.score}
-                    </div>
-                    <div>
-                      <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Site Audit Report</h2>
-                      <p style={{ color: "#6b6b80", fontSize: 14 }}>{auditData.url}</p>
-                      <p style={{ color: "#6b6b80", fontSize: 12, fontFamily: "IBM Plex Mono, monospace", marginTop: 4 }}>
-                        {auditData.score >= 80 ? "✓ Technically healthy site" : auditData.score >= 40 ? "⚠ Several issues found" : "✕ Major issues found — high opportunity"}
-                      </p>
-                    </div>
-                  </div>
+            <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: -1 }}>
+              {loginStep === "email" ? "Log in to LeadReap" : "Enter your code"}
+            </h2>
+            <p style={{ color: "#6b6b80", marginBottom: 32, fontSize: 14 }}>
+              {loginStep === "email"
+                ? "We'll send you a magic login link — no password needed."
+                : `We sent a code to ${loginEmail}. Check your email (and spam).`
+              }
+            </p>
 
-                  {/* Audit Checks Grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 28 }}>
-                    <AuditItemDisplay label="SSL Security" pass={auditData.tech.ssl}
-                      failMsg="Site uses HTTP — shows 'Not Secure' to visitors" />
-                    <AuditItemDisplay label="H1 Header Tag" pass={auditData.seo.h1}
-                      failMsg="No H1 found — Google can't determine primary topic" />
-                    <AuditItemDisplay label="SEO Title Tag" pass={auditData.seo.title}
-                      failMsg="Missing title tag — invisible in search results" />
-                    <AuditItemDisplay label="Meta Description" pass={auditData.seo.description}
-                      failMsg="No meta description — hurts click-through rate" />
-                    <AuditItemDisplay label="Facebook Pixel" pass={auditData.tech.pixel}
-                      failMsg="No pixel installed — can't retarget website visitors" />
-                    <AuditItemDisplay label="Google Analytics" pass={auditData.tech.analytics}
-                      failMsg="No analytics — flying blind on traffic data" />
-                  </div>
+            {loginError && (
+              <div style={{
+                background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
+                color: "#f87171", padding: "10px 16px", borderRadius: 8, marginBottom: 16,
+                fontSize: 13, fontFamily: "IBM Plex Mono, monospace",
+              }}>{loginError}</div>
+            )}
 
-                  {/* Sales Angles */}
-                  {(!auditData.tech.pixel || !auditData.seo.h1 || !auditData.tech.ssl || !auditData.seo.description || !auditData.seo.title) && (
-                    <div style={{
-                      background: "rgba(240, 180, 41, 0.05)", border: "1px solid rgba(240, 180, 41, 0.2)",
-                      borderRadius: 16, padding: 24,
-                    }}>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "#f0b429", marginBottom: 14 }}>
-                        💡 The Sales Angle — Use These in Your Cold Outreach
-                      </h3>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {!auditData.tech.pixel && (
-                          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 10, padding: "12px 16px" }}>
-                            <strong style={{ fontSize: 13, color: "#e8e8f0", display: "block", marginBottom: 4 }}>🎯 No Retargeting Pixel</strong>
-                            <p style={{ fontSize: 13, color: "#a1a1aa", lineHeight: 1.6, margin: 0 }}>
-                              "I noticed you don't have a Facebook Pixel on your site. That means 98% of your visitors leave and you have no way to bring them back. We can fix this in about 10 minutes."
-                            </p>
-                          </div>
-                        )}
-                        {!auditData.seo.h1 && (
-                          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 10, padding: "12px 16px" }}>
-                            <strong style={{ fontSize: 13, color: "#e8e8f0", display: "block", marginBottom: 4 }}>🔍 SEO Structure Gap</strong>
-                            <p style={{ fontSize: 13, color: "#a1a1aa", lineHeight: 1.6, margin: 0 }}>
-                              "Google doesn't know exactly what you sell because your H1 tags are missing. This alone could be costing you dozens of organic leads per month."
-                            </p>
-                          </div>
-                        )}
-                        {!auditData.tech.ssl && (
-                          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 10, padding: "12px 16px" }}>
-                            <strong style={{ fontSize: 13, color: "#e8e8f0", display: "block", marginBottom: 4 }}>🔒 Security Warning</strong>
-                            <p style={{ fontSize: 13, color: "#a1a1aa", lineHeight: 1.6, margin: 0 }}>
-                              "Your site shows 'Not Secure' in Chrome. This warning causes roughly 85% of visitors to immediately leave — and Google penalizes non-HTTPS sites in rankings."
-                            </p>
-                          </div>
-                        )}
-                        {!auditData.seo.description && (
-                          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 10, padding: "12px 16px" }}>
-                            <strong style={{ fontSize: 13, color: "#e8e8f0", display: "block", marginBottom: 4 }}>📋 Missing Meta Description</strong>
-                            <p style={{ fontSize: 13, color: "#a1a1aa", lineHeight: 1.6, margin: 0 }}>
-                              "Your search result listing has no description. Google auto-generates one — often poorly. Writing a compelling description can double your click-through rate."
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Branding footer for PDF */}
-                  <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #2a2a35", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 11, color: "#6b6b80" }}>
-                      Generated by LeadReap · {new Date().toLocaleDateString()}
-                    </span>
-                    <span style={{ fontSize: 11, color: "#6b6b80" }}>leadreap.com</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {!auditLoading && auditData && (
-              <button
-                onClick={exportAuditToPDF}
-                style={{
-                  width: "100%", background: "#f0b429", color: "#000",
-                  border: "none", borderRadius: "12px", padding: "16px",
-                  fontSize: "15px", fontWeight: "700", cursor: "pointer", marginTop: "24px",
-                  fontFamily: "Syne, sans-serif",
-                }}
-              >
-                📥 Download Branded PDF Report
-              </button>
+            {loginStep === "email" ? (
+              <>
+                <input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && requestMagicLink()}
+                  style={{
+                    width: "100%", background: "#18181d", border: "1px solid #2a2a35",
+                    borderRadius: 10, padding: "14px 16px", fontSize: 15,
+                    fontFamily: "IBM Plex Mono, monospace", color: "#e8e8f0",
+                    outline: "none", marginBottom: 16, boxSizing: "border-box",
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={requestMagicLink}
+                  disabled={loginLoading}
+                  style={{
+                    width: "100%", background: "#f0b429", color: "#000",
+                    border: "none", borderRadius: 10, padding: "14px 0",
+                    fontSize: 15, fontWeight: 700, cursor: loginLoading ? "wait" : "pointer",
+                    fontFamily: "Syne, sans-serif",
+                  }}
+                >
+                  {loginLoading ? "Sending..." : "Send Login Code →"}
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="Enter 8-character code"
+                  value={loginCode}
+                  onChange={e => setLoginCode(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === "Enter" && verifyCode()}
+                  maxLength={8}
+                  style={{
+                    width: "100%", background: "#18181d", border: "1px solid #2a2a35",
+                    borderRadius: 10, padding: "14px 16px", fontSize: 22,
+                    fontFamily: "IBM Plex Mono, monospace", color: "#f0b429",
+                    outline: "none", marginBottom: 16, letterSpacing: 4,
+                    textAlign: "center", boxSizing: "border-box",
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={() => verifyCode()}
+                  disabled={loginLoading || loginCode.length < 6}
+                  style={{
+                    width: "100%", background: "#f0b429", color: "#000",
+                    border: "none", borderRadius: 10, padding: "14px 0",
+                    fontSize: 15, fontWeight: 700, cursor: loginLoading ? "wait" : "pointer",
+                    fontFamily: "Syne, sans-serif",
+                    opacity: loginCode.length < 6 ? 0.5 : 1,
+                  }}
+                >
+                  {loginLoading ? "Verifying..." : "Verify & Log In →"}
+                </button>
+                <button
+                  onClick={() => { setLoginStep("email"); setLoginError(""); }}
+                  style={{
+                    width: "100%", background: "transparent", border: "1px solid #2a2a35",
+                    color: "#6b6b80", borderRadius: 10, padding: "12px 0",
+                    fontSize: 13, cursor: "pointer", marginTop: 10,
+                    fontFamily: "Syne, sans-serif",
+                  }}
+                >
+                  ← Try a different email
+                </button>
+              </>
             )}
           </div>
         </div>
       )}
     </>
-  );
-}
-
-// ── Helper Components ─────────────────────────────────────────
-function AuditItemDisplay({ label, pass, failMsg }) {
-  return (
-    <div style={{
-      padding: "12px 16px", background: "#18181d",
-      border: `1px solid ${pass ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
-      borderRadius: 12,
-    }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: pass ? 0 : 4 }}>
-        <span style={{ fontSize: 13, color: "#a1a1aa", fontWeight: 600 }}>{label}</span>
-        <span style={{ color: pass ? "#10b981" : "#f87171", fontWeight: 700, fontSize: 12, fontFamily: "IBM Plex Mono, monospace" }}>
-          {pass ? "✓ PASS" : "✕ FAIL"}
-        </span>
-      </div>
-      {!pass && failMsg && (
-        <p style={{ fontSize: 11, color: "#6b6b80", margin: 0, lineHeight: 1.4 }}>{failMsg}</p>
-      )}
-    </div>
   );
 }
