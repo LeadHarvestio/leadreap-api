@@ -2646,8 +2646,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         <>
         <div className="hero">
           <div className="hero-tag"><div className="dot" /> AI-POWERED LOCAL LEAD PLATFORM</div>
-          <h1 className="hero-desktop"><em>Find</em>, <em>score</em>, and <em>close</em> local leads<br />— all in one place</h1>
-          <h1 className="hero-mobile"><em>Find</em>, <em>score</em> &amp; <em>close</em><br />local leads</h1>
+          <h1 className="hero-desktop"><em>Find</em>, <em>score</em>, <em>close</em>.<br />Millions of local leads — all in one place</h1>
+          <h1 className="hero-mobile"><em>Find</em>, <em>score</em>, <em>close</em>.<br />Millions of local leads</h1>
           <p>Search any niche, any city. Get verified contacts, AI-written pitches, site audits, and buy-ready intent signals &mdash; one platform, one payment.</p>
           <div className="hero-stats">
             <div className="stat"><div className="stat-num">$2.4k+</div><div className="stat-label">Worth of tools, one price</div></div>
