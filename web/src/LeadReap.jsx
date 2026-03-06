@@ -1192,3 +1192,4 @@ function SequenceBuilder({ apiBase, token, existing, onClose, onSaved }) {
       { stepNumber: 1, subject: "Quick question about {{business}}", body: "Hi,\n\nI came across {{business}} and was impressed by your {{rating}}-star rating.\n\nI help businesses like yours get more customers through [your service]. Would you be open to a quick chat this week?\n\nBest,\n[Your name]", delayHours: 0 },
       { stepNumber: 2, subject: "Following up — {{business}}", body: "Hi,\n\nJust wanted to follow up on my last email. I know you're busy running {{business}}, so I'll keep this short.\n\n[One sentence value prop]. Can I send over a quick example?\n\nBest,\n[Your name]", delayHours: 48 },
       { stepNumber: 3, subject: "Last note — {{business}}", body: "Hi,\n\nI don't want to be a pest, so this will be my last note. If you're ever looking for help with [your service], feel free to reach out.\n\nWishing {{
+      }
