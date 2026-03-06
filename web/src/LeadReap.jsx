@@ -2646,14 +2646,14 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         <>
         <div className="hero">
           <div className="hero-tag"><div className="dot" /> AI-POWERED LOCAL LEAD PLATFORM</div>
-          <h1 className="hero-desktop">Find, score, and close<br /><em>local business</em> leads</h1>
-          <h1 className="hero-mobile">Find &amp; close <em>local</em> leads faster</h1>
-          <p>Search any niche, any city. Get verified emails, AI-written pitches, site audits, intent signals from Reddit, and revenue estimates &mdash; all in one platform.</p>
+          <h1 className="hero-desktop">Local leads, <em>closed</em> faster.</h1>
+          <h1 className="hero-mobile">Local leads, <em>closed</em> faster.</h1>
+          <p>Search any niche, any city. Get verified contacts, AI-written pitches, site audits, and buy-ready intent signals &mdash; one platform, one payment.</p>
           <div className="hero-stats">
-            <div className="stat"><div className="stat-num">80+</div><div className="stat-label">Built-in niches</div></div>
-            <div className="stat"><div className="stat-num">94%</div><div className="stat-label">Email accuracy</div></div>
-            <div className="stat"><div className="stat-num">$0/mo</div><div className="stat-label">No subscriptions</div></div>
-            <div className="stat"><div className="stat-num">30s</div><div className="stat-label">Avg search time</div></div>
+            <div className="stat"><div className="stat-num">$2,400+</div><div className="stat-label">Worth of tools, one price</div></div>
+            <div className="stat"><div className="stat-num">AI</div><div className="stat-label">Writes your cold emails</div></div>
+            <div className="stat"><div className="stat-num">Reddit</div><div className="stat-label">Live buyer-intent signals</div></div>
+            <div className="stat"><div className="stat-num">$0/mo</div><div className="stat-label">Pay once, own it forever</div></div>
           </div>
         </div>
 
@@ -3087,16 +3087,16 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               {/* Social proof numbers */}
               <div className="m-proof">
                 <div className="m-proof-item">
-                  <div className="m-proof-num">80+</div>
-                  <div className="m-proof-label">Niches</div>
+                  <div className="m-proof-num">12+</div>
+                  <div className="m-proof-label">Built-in tools</div>
                 </div>
                 <div className="m-proof-item">
-                  <div className="m-proof-num">94%</div>
-                  <div className="m-proof-label">Email accuracy</div>
+                  <div className="m-proof-num">AI</div>
+                  <div className="m-proof-label">Pitch writer</div>
                 </div>
                 <div className="m-proof-item">
-                  <div className="m-proof-num">30s</div>
-                  <div className="m-proof-label">Avg search</div>
+                  <div className="m-proof-num">$0/mo</div>
+                  <div className="m-proof-label">No subscriptions</div>
                 </div>
               </div>
 
