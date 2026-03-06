@@ -78,6 +78,69 @@ export async function createCheckout(plan, email) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// UPGRADE CHECKOUT — pro-rated one-time payment for plan upgrades
+// ─────────────────────────────────────────────────────────────
+export async function createUpgradeCheckout(newPlan, email, currentPlan) {
+  const newConfig = PLANS[newPlan];
+  const currentConfig = PLANS[currentPlan];
+  if (!newConfig) throw new Error(`Unknown plan: ${newPlan}`);
+  if (!currentConfig) throw new Error(`Unknown current plan: ${currentPlan}`);
+
+  if (newConfig.amount <= currentConfig.amount) {
+    throw new Error("Can only upgrade to a higher plan");
+  }
+
+  const upgradeAmount = newConfig.amount - currentConfig.amount;
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not set");
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    payment_method_types: ["card"],
+    customer_email: email,
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product: newConfig.productId,
+          unit_amount: upgradeAmount,
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      plan: newPlan,
+      email,
+      upgrade_from: currentPlan,
+    },
+    success_url: `${FRONTEND_URL}/?upgraded=${encodeURIComponent(newPlan)}`,
+    cancel_url: `${FRONTEND_URL}/?canceled=true`,
+  });
+
+  console.log(
+    `[Payments] Upgrade checkout: ${currentPlan} → ${newPlan} for ${email} ($${(upgradeAmount / 100).toFixed(2)}) → ${session.id}`
+  );
+
+  return { checkoutUrl: session.url, amount: upgradeAmount };
+}
+
+/** Get the price difference for an upgrade */
+export function getUpgradePrice(currentPlan, newPlan) {
+  const current = PLANS[currentPlan];
+  const target = PLANS[newPlan];
+  if (!current || !target) return null;
+  if (target.amount <= current.amount) return null;
+  return {
+    amount: target.amount - current.amount,
+    display: `$${((target.amount - current.amount) / 100).toFixed(0)}`,
+    from: currentPlan,
+    to: newPlan,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
 // VERIFY WEBHOOK — validates Stripe webhook signature
 // ─────────────────────────────────────────────────────────────
 export function constructWebhookEvent(rawBody, signature) {
