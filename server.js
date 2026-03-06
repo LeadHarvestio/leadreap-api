@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// LeadReap API — v4.1 (Production)
+// LeadReap API — v4.0 (Production)
 // Express server with auth, Stripe payments, rate limiting, + scraper
-// v4.1: Search history persisted in SQLite + Drip Email Campaigns + Professional Site Audit
+// v4.0: Search history persisted in SQLite + Drip Email Campaigns
 // ─────────────────────────────────────────────────────────────
 
 import express from "express";
@@ -16,7 +16,6 @@ import { createJob, getJob, listJobs } from "./scraper/queue.js";
 import { metrics } from "./scraper/gmaps.js";
 import { getCacheStats, clearCache, clearExpired } from "./scraper/cache.js";
 import { exportToBuffer } from "./scraper/exporter.js";
-import { runSiteAudit } from "./scraper/audit.js"; // <── ADDED THIS IMPORT
 
 // Auth & Payments
 import {
@@ -39,7 +38,7 @@ import {
   createApiKey, getUserApiKeys, deleteApiKey,
   markWelcomeSent, markFollowupSent, getPendingFollowups
 } from "./auth.js";
-import { createCheckout, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
+import { createCheckout, createUpgradeCheckout, getUpgradePrice, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail, sendSequenceEmail, sendTeamInviteEmail, sendWelcomeEmail, sendFollowUpEmail } from "./email.js";
 import { generateReport } from "./reports.js";
 import { attachUser, requireAuth, requireSearchQuota, ipRateLimit, requireAgency, requirePro } from "./middleware.js";
@@ -166,12 +165,36 @@ app.post("/api/checkout", async (req, res) => {
   }
 
   try {
+    // If user already has a paid plan, create an upgrade checkout with prorated price
+    const currentPlan = req.user?.plan;
+    if (currentPlan && currentPlan !== "free" && currentPlan !== plan) {
+      const upgrade = getUpgradePrice(currentPlan, plan);
+      if (upgrade) {
+        const { checkoutUrl } = await createUpgradeCheckout(plan, email, currentPlan);
+        return res.json({ checkoutUrl });
+      }
+    }
+
     const { checkoutUrl } = await createCheckout(plan, email);
     return res.json({ checkoutUrl });
   } catch (e) {
     console.error("[Payments] Checkout error:", e);
     return res.status(500).json({ error: e.message });
   }
+});
+
+// ── GET /api/upgrade-pricing — Get prorated prices for current user ──
+app.get("/api/upgrade-pricing", requireAuth, (req, res) => {
+  const current = req.user.plan;
+  if (!current || current === "free") {
+    return res.json({ upgrades: [] });
+  }
+  const upgrades = [];
+  for (const target of ["starter", "pro", "agency"]) {
+    const price = getUpgradePrice(current, target);
+    if (price) upgrades.push(price);
+  }
+  return res.json({ currentPlan: current, upgrades });
 });
 
 // /api/webhook/stripe
@@ -705,23 +728,8 @@ app.delete("/api/keys/:id", requirePro, (req, res) => {
 
 
 // ═════════════════════════════════════════════════════════════
-// WHITE-LABEL REPORTS & AUDITS (Agency tier)
+// WHITE-LABEL REPORTS (Agency tier)
 // ═════════════════════════════════════════════════════════════
-
-// ── POST /api/audit — Perform high-value site diagnostic ──
-app.post("/api/audit", requireAgency, async (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).json({ error: "Website URL required" });
-
-  try {
-    const report = await runSiteAudit(url);
-    if (report.error) return res.status(422).json(report);
-    return res.json(report);
-  } catch (err) {
-    console.error("[Audit API] Error:", err.message);
-    return res.status(500).json({ error: "Audit failed" });
-  }
-});
 
 // ── POST /api/reports/generate — Generate PDF report ────────
 app.post("/api/reports/generate", requireAgency, async (req, res) => {
@@ -938,7 +946,7 @@ setInterval(processDripCampaigns, 60 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`
-  LeadReap API v4.1 — port ${PORT}
+  LeadReap API v4.0 — port ${PORT}
   ────────────────────────────────
   POST /api/auth/magic
   POST /api/auth/verify
@@ -958,7 +966,6 @@ app.listen(PORT, () => {
   GET  /api/team (+invite/join)
   GET  /api/webhooks (+CRUD)
   GET  /api/keys (+CRUD)
-  POST /api/audit
   POST /api/reports/generate
   POST /api/v1/search (Public API)
   GET  /api/v1/lists (Public API)
