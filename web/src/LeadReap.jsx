@@ -508,26 +508,36 @@ const STYLE = `
   .mobile-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .mobile-card-socials { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 
+  /* Mobile-only elements — hidden by default, shown in mobile media query */
+  .hero-mobile { display: none; }
+  .m-landing { display: none; }
+
   /* MOBILE */
   @media (max-width: 768px) {
     .nav { padding: 12px 16px; gap: 8px; }
     .nav-actions { gap: 6px; }
-    .nav-actions .btn-sm { padding: 5px 10px; font-size: 11px; }
+    .nav-actions .btn-sm { padding: 6px 12px; font-size: 12px; }
     .nav-email { display: none; }
     .nav-beta { display: none; }
-    .nav-cta { display: none; }
     .badge { padding: 3px 8px; font-size: 10px; }
-    .hero { padding: 32px 20px 24px; }
-    .hero-tag { display: none; }
+    .hero { padding: 28px 20px 20px; }
+    .hero-tag { font-size: 9px; padding: 4px 12px; margin-bottom: 16px; }
     .hero h1 { font-size: 26px; letter-spacing: -0.8px; margin-bottom: 10px; line-height: 1.2; }
     .hero h1 br { display: none; }
     .hero-desktop { display: none; }
     .hero-mobile { display: block; }
     .hero p { font-size: 13px; margin-bottom: 0; line-height: 1.5; max-width: 100%; }
-    .hero-stats { display: none; }
-    .hero::before { display: none; }
+    .hero-stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+      margin-top: 20px; padding-top: 16px;
+      border-top: 1px solid var(--border); padding-bottom: 0;
+    }
+    .stat { padding: 10px 0; }
+    .stat-num { font-size: 18px; }
+    .stat-label { font-size: 10px; }
+    .hero::before { opacity: 0.5; }
     .niche-ticker { display: none; }
-    .tool-section { padding: 0 16px 48px; }
+    .tool-section { padding: 0 16px 32px; }
     .search-card { padding: 20px 16px; border-radius: 12px; margin-bottom: 16px; }
     .search-label { font-size: 10px; margin-bottom: 14px; }
     .search-row { grid-template-columns: 1fr; gap: 10px; }
@@ -540,10 +550,9 @@ const STYLE = `
     .results-meta { flex-wrap: wrap; gap: 8px; }
     .results-actions { width: 100%; display: flex; gap: 8px; }
     .results-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 12px; }
-    /* Hide desktop table, show mobile cards */
     .desktop-table { display: none; }
     .mobile-cards { display: flex; }
-    .upsell-banner { flex-direction: column !important; gap: 12px !important; text-align: center; padding: 14px 16px !important; }
+    .upsell-banner { flex-direction: column !important; gap: 10px !important; text-align: center; padding: 14px 16px !important; }
     .upsell-banner .btn { width: 100%; justify-content: center; }
     .upgrade-bar { flex-direction: column; gap: 12px; padding: 18px 16px; }
     .upgrade-bar .btn { width: 100%; justify-content: center; }
@@ -567,8 +576,86 @@ const STYLE = `
     .outreach-modal { padding: 24px 18px; width: 95vw; }
     .outreach-actions { flex-wrap: wrap; }
     .outreach-actions .btn { flex: 1; min-width: 120px; justify-content: center; }
+
+    /* ── Mobile Landing Content ── */
+    .m-landing { display: flex; flex-direction: column; gap: 0; padding: 0 16px 32px; }
+
+    .m-section-label {
+      font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+      color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 14px; text-align: center;
+    }
+
+    .m-how { display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px; }
+    .m-how-step {
+      display: flex; gap: 14px; align-items: flex-start;
+      padding: 14px 16px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .m-how-num {
+      font-family: 'IBM Plex Mono', monospace; font-size: 18px;
+      font-weight: 800; color: var(--accent); flex-shrink: 0; line-height: 1;
+      width: 28px; text-align: center;
+    }
+    .m-how-text { flex: 1; }
+    .m-how-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .m-how-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    .m-niches { margin-bottom: 32px; }
+    .m-niche-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+    }
+    .m-niche-chip {
+      padding: 10px 8px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 11px; font-weight: 600; text-align: center;
+      cursor: pointer; transition: all 0.15s; color: var(--text);
+    }
+    .m-niche-chip:active { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.04); }
+
+    .m-demo { margin-bottom: 32px; }
+    .m-demo-cards { display: flex; flex-direction: column; gap: 8px; }
+    .m-demo-card {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 14px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .m-demo-card-left { flex: 1; min-width: 0; }
+    .m-demo-card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .m-demo-card-meta { font-size: 10px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+    .m-demo-card-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .m-demo-card-email { font-size: 10px; color: var(--accent); font-family: 'IBM Plex Mono', monospace; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .m-features { margin-bottom: 32px; }
+    .m-feat-list { display: flex; flex-direction: column; gap: 8px; }
+    .m-feat {
+      display: flex; gap: 12px; align-items: center;
+      padding: 12px 14px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .m-feat-icon { font-size: 20px; flex-shrink: 0; width: 32px; text-align: center; }
+    .m-feat-text { flex: 1; }
+    .m-feat-title { font-size: 13px; font-weight: 600; }
+    .m-feat-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    .m-proof {
+      display: flex; gap: 10px; margin-bottom: 32px;
+    }
+    .m-proof-item {
+      flex: 1; text-align: center; padding: 14px 8px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    }
+    .m-proof-num { font-size: 20px; font-weight: 800; color: var(--accent); }
+    .m-proof-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .m-bottom-cta {
+      text-align: center; padding: 24px 16px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    }
+    .m-bottom-cta h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.5px; }
+    .m-bottom-cta p { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+    .m-bottom-cta .btn { width: 100%; justify-content: center; }
+    .m-bottom-cta .m-sub { font-size: 11px; color: var(--muted); margin-top: 10px; font-family: 'IBM Plex Mono', monospace; }
   }
-  .hero-mobile { display: none; }
   @media (max-width: 380px) {
     .hero h1 { font-size: 23px; }
     .logo { font-size: 17px; }
@@ -2694,6 +2781,139 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 </div>
               )}
             </>
+          )}
+
+          {/* ── Mobile Landing Content (hidden on desktop via CSS) ── */}
+          {!loading && !searchDone && (
+            <div className="m-landing">
+
+              {/* Social proof numbers */}
+              <div className="m-proof">
+                <div className="m-proof-item">
+                  <div className="m-proof-num">47+</div>
+                  <div className="m-proof-label">Niches</div>
+                </div>
+                <div className="m-proof-item">
+                  <div className="m-proof-num">94%</div>
+                  <div className="m-proof-label">Email accuracy</div>
+                </div>
+                <div className="m-proof-item">
+                  <div className="m-proof-num">30s</div>
+                  <div className="m-proof-label">Avg search</div>
+                </div>
+              </div>
+
+              {/* How it works */}
+              <div className="m-section-label">How it works</div>
+              <div className="m-how">
+                <div className="m-how-step">
+                  <div className="m-how-num">1</div>
+                  <div className="m-how-text">
+                    <div className="m-how-title">Pick a niche + city</div>
+                    <div className="m-how-desc">Choose from 47 built-in niches or enter a custom one</div>
+                  </div>
+                </div>
+                <div className="m-how-step">
+                  <div className="m-how-num">2</div>
+                  <div className="m-how-text">
+                    <div className="m-how-title">We scrape Google Maps live</div>
+                    <div className="m-how-desc">Real-time data — emails, phones, websites, ratings, and more</div>
+                  </div>
+                </div>
+                <div className="m-how-step">
+                  <div className="m-how-num">3</div>
+                  <div className="m-how-text">
+                    <div className="m-how-title">Export and start outreach</div>
+                    <div className="m-how-desc">Download CSV, send email sequences, or push to your CRM</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Popular niches */}
+              <div className="m-niches">
+                <div className="m-section-label">Popular niches</div>
+                <div className="m-niche-grid">
+                  {["Plumber", "Dentist", "Roofer", "HVAC", "Real Estate", "Chiropractor", "Law Firm", "Med Spa", "Restaurant"].map(n => (
+                    <div key={n} className="m-niche-chip" onClick={() => {
+                      const match = INDUSTRIES.find(ind => ind.toLowerCase().includes(n.toLowerCase()));
+                      if (match) setNiche(match);
+                      else { setNiche("custom"); setCustomNiche(n); }
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}>{n}</div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sample results preview */}
+              <div className="m-demo">
+                <div className="m-section-label">Example results</div>
+                <div className="m-demo-cards">
+                  {currentDemo.leads.slice(0, 3).map((lead, i) => (
+                    <div key={i} className="m-demo-card">
+                      <div className="m-demo-card-left">
+                        <div className="m-demo-card-name">{lead.name}</div>
+                        <div className="m-demo-card-meta">
+                          {lead.email !== "\u2014" ? lead.email : lead.phone}
+                          {lead.unclaimed && " · UNCLAIMED"}
+                        </div>
+                      </div>
+                      <div className="m-demo-card-right">
+                        <span className={`score-pill ${scoreToClass(lead.score)}`} style={{fontSize:11}}>{lead.score}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{textAlign:"center",padding:"6px 0",fontSize:11,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>
+                    + {currentDemo.leads.length - 3} more results...
+                  </div>
+                </div>
+              </div>
+
+              {/* Feature highlights */}
+              <div className="m-features">
+                <div className="m-section-label">What you get</div>
+                <div className="m-feat-list">
+                  <div className="m-feat">
+                    <div className="m-feat-icon">📧</div>
+                    <div className="m-feat-text">
+                      <div className="m-feat-title">Verified emails</div>
+                      <div className="m-feat-desc">Live MX-checked, not scraped from stale databases</div>
+                    </div>
+                  </div>
+                  <div className="m-feat">
+                    <div className="m-feat-icon">🤖</div>
+                    <div className="m-feat-text">
+                      <div className="m-feat-title">AI lead scoring</div>
+                      <div className="m-feat-desc">Every lead scored 0–100 based on online signals</div>
+                    </div>
+                  </div>
+                  <div className="m-feat">
+                    <div className="m-feat-icon">📊</div>
+                    <div className="m-feat-text">
+                      <div className="m-feat-title">Revenue estimates</div>
+                      <div className="m-feat-desc">Employee count, tech stack, and business signals</div>
+                    </div>
+                  </div>
+                  <div className="m-feat">
+                    <div className="m-feat-icon">📧</div>
+                    <div className="m-feat-text">
+                      <div className="m-feat-title">Email sequences</div>
+                      <div className="m-feat-desc">3-step automated outreach with personalization</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom CTA */}
+              <div className="m-bottom-cta">
+                <h3>Try it now — it's free</h3>
+                <p>Search any niche in any city. No credit card, no signup required for your first search.</p>
+                <button className="btn btn-primary" onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => document.querySelector('.field select')?.focus(), 400); }}>
+                  Start Your First Search &rarr;
+                </button>
+                <div className="m-sub">One-time purchase &middot; No subscription &middot; 30-day guarantee</div>
+              </div>
+
+            </div>
           )}
 
           {!loading && !searchDone && (
