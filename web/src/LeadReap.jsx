@@ -1017,7 +1017,7 @@ const STATUS_OPTIONS = [
   { value: "closed", label: "Closed", className: "status-closed" },
 ];
 
-function ListDetailView({ listId, apiBase, token, onBack, onOutreach }) {
+function ListDetailView({ listId, apiBase, token, onBack, onOutreach, onRunAudit }) {
   const [list, setList] = useState(null);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1166,6 +1166,14 @@ function ListDetailView({ listId, apiBase, token, onBack, onOutreach }) {
                     Website ↗
                   </a>
                 )}
+        {onRunAudit && lead.website && (
+          <button
+            onClick={() => { const u = lead.website.startsWith("http") ? lead.website : "https://" + lead.website; onRunAudit(u); }}
+            style={{fontSize:11,color:"var(--accent)",background:"none",border:"1px solid rgba(240,180,41,0.3)",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontFamily:"IBM Plex Mono"}}
+          >
+            🔍 Audit
+          </button>
+        )}
                 {lead.mapsUrl && (
                   <a href={lead.mapsUrl} target="_blank" rel="noopener noreferrer"
                     style={{fontSize:11,color:"var(--muted)",textDecoration:"none",fontFamily:"IBM Plex Mono",display:"flex",alignItems:"center"}}>
@@ -1181,15 +1189,1541 @@ function ListDetailView({ listId, apiBase, token, onBack, onOutreach }) {
   );
 }
 
+
 // ─── Sequence Builder (Create / Edit) ─────────────────────────
 function SequenceBuilder({ apiBase, token, existing, onClose, onSaved }) {
-  const [name, setName] = useState(existing?.name || "");
-  const [fromName, setFromName] = useState(existing?.from_name || "");
-  const [steps, setSteps] = useState(
-    existing?.steps?.length ? existing.steps.map(s => ({
-      stepNumber: s.step_number, subject: s.subject, body: s.body, delayHours: s.delay_hours
-    })) : [
-      { stepNumber: 1, subject: "Quick question about {{business}}", body: "Hi,\n\nI came across {{business}} and was impressed by your {{rating}}-star rating.\n\nI help businesses like yours get more customers through [your service]. Would you be open to a quick chat this week?\n\nBest,\n[Your name]", delayHours: 0 },
-      { stepNumber: 2, subject: "Following up — {{business}}", body: "Hi,\n\nJust wanted to follow up on my last email. I know you're busy running {{business}}, so I'll keep this short.\n\n[One sentence value prop]. Can I send over a quick example?\n\nBest,\n[Your name]", delayHours: 48 },
-      { stepNumber: 3, subject: "Last note — {{business}}", body: "Hi,\n\nI don't want to be a pest, so this will be my last note. If you're ever looking for help with [your service], feel free to reach out.\n\nWishing {{
+  const [name, setName] = useState(existing?.name || "");
+  const [fromName, setFromName] = useState(existing?.from_name || "");
+  const [steps, setSteps] = useState(
+    existing?.steps?.length ? existing.steps.map(s => ({
+      stepNumber: s.step_number, subject: s.subject, body: s.body, delayHours: s.delay_hours
+    })) : [
+      { stepNumber: 1, subject: "Quick question about {{business}}", body: "Hi,\n\nI came across {{business}} and was impressed by your {{rating}}-star rating.\n\nI help businesses like yours get more customers through [your service]. Would you be open to a quick chat this week?\n\nBest,\n[Your name]", delayHours: 0 },
+      { stepNumber: 2, subject: "Following up — {{business}}", body: "Hi,\n\nJust wanted to follow up on my last email. I know you're busy running {{business}}, so I'll keep this short.\n\n[One sentence value prop]. Can I send over a quick example?\n\nBest,\n[Your name]", delayHours: 48 },
+      { stepNumber: 3, subject: "Last note — {{business}}", body: "Hi,\n\nI don't want to be a pest, so this will be my last note. If you're ever looking for help with [your service], feel free to reach out.\n\nWishing {{business}} all the best.\n\nBest,\n[Your name]", delayHours: 120 },
+    ]
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function updateStep(idx, field, val) {
+    setSteps(prev => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s));
+  }
+
+  function addStep() {
+    if (steps.length >= 5) return;
+    setSteps(prev => [...prev, {
+      stepNumber: prev.length + 1,
+      subject: "Follow-up {{business}}",
+      body: "Hi,\n\nJust checking in...\n\nBest,\n[Your name]",
+      delayHours: 72,
+    }]);
+  }
+
+  function removeStep(idx) {
+    if (steps.length <= 1) return;
+    setSteps(prev => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, stepNumber: i + 1 })));
+  }
+
+  async function handleSave() {
+    if (!name.trim()) { setError("Sequence name is required."); return; }
+    for (const s of steps) {
+      if (!s.subject.trim() || !s.body.trim()) { setError("All steps need a subject and body."); return; }
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const method = existing ? "PUT" : "POST";
+      const url = existing ? `${apiBase}/api/sequences/${existing.id}` : `${apiBase}/api/sequences`;
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, fromName, steps }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onSaved?.(data.sequence);
+        onClose?.();
+      } else {
+        setError(data.error || "Failed to save sequence.");
       }
+    } catch { setError("Network error. Please try again."); }
+    setSaving(false);
+  }
+
+  const DELAY_OPTIONS = [
+    { label: "Send immediately", value: 0 },
+    { label: "After 24 hours", value: 24 },
+    { label: "After 48 hours", value: 48 },
+    { label: "After 3 days", value: 72 },
+    { label: "After 5 days", value: 120 },
+    { label: "After 7 days", value: 168 },
+  ];
+
+  return (
+    <div className="seq-builder">
+      <div className="seq-builder-header">
+        <h3>{existing ? "Edit Sequence" : "New Email Sequence"}</h3>
+        <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <div className="field">
+          <label>Sequence Name</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Website Redesign Outreach" />
+        </div>
+        <div className="field">
+          <label>From Name (optional)</label>
+          <input value={fromName} onChange={e => setFromName(e.target.value)} placeholder="e.g. Alex from YourAgency" />
+        </div>
+      </div>
+
+      <div className="seq-builder-fields" style={{ marginBottom: 12, fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+        <strong style={{ color: "var(--accent)" }}>Available variables:</strong>{" "}
+        <code>{"{{business}}"}</code> <code>{"{{email}}"}</code> <code>{"{{phone}}"}</code> <code>{"{{rating}}"}</code> <code>{"{{address}}"}</code>
+      </div>
+
+      <div className="seq-steps">
+        {steps.map((step, idx) => (
+          <div key={idx} className="seq-step-card">
+            <div className="seq-step-header">
+              <span className="seq-step-num">Step {step.stepNumber}</span>
+              {idx > 0 && (
+                <div className="field" style={{ flex: 1 }}>
+                  <select
+                    style={{ padding: "6px 10px", fontSize: 12, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontFamily: "IBM Plex Mono, monospace" }}
+                    value={step.delayHours}
+                    onChange={e => updateStep(idx, "delayHours", Number(e.target.value))}
+                  >
+                    {DELAY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+              )}
+              {idx === 0 && <span className="seq-step-delay">Sends immediately on enrollment</span>}
+              {steps.length > 1 && (
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: "2px 8px", color: "var(--red)" }} onClick={() => removeStep(idx)}>✕</button>
+              )}
+            </div>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label>Subject Line</label>
+              <input value={step.subject} onChange={e => updateStep(idx, "subject", e.target.value)} placeholder="Subject line..." />
+            </div>
+            <div className="field">
+              <label>Email Body</label>
+              <textarea
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px", color: "var(--text)", fontSize: 13, width: "100%", minHeight: 120, resize: "vertical", outline: "none", fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif", lineHeight: 1.6 }}
+                value={step.body}
+                onChange={e => updateStep(idx, "body", e.target.value)}
+                placeholder="Email body..."
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {steps.length < 5 && (
+        <button className="btn btn-outline btn-sm" style={{ marginTop: 12, fontSize: 12 }} onClick={addStep}>
+          + Add Step {steps.length + 1}
+        </button>
+      )}
+
+      {error && <div style={{ color: "var(--red)", fontSize: 13, marginTop: 12 }}>{error}</div>}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
+        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving..." : (existing ? "Save Changes" : "Create Sequence")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sequence Detail View ──────────────────────────────────────
+function SequenceDetail({ seqId, apiBase, token, onBack, onEdit }) {
+  const [seq, setSeq] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { loadSeq(); }, [seqId]);
+
+  async function loadSeq() {
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/api/sequences/${seqId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setSeq(data.sequence);
+    } catch {}
+    setLoading(false);
+  }
+
+  async function toggleStatus() {
+    const newStatus = seq.status === "active" ? "paused" : "active";
+    await fetch(`${apiBase}/api/sequences/${seqId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    setSeq(prev => ({ ...prev, status: newStatus }));
+  }
+
+  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>Loading sequence...</div>;
+  if (!seq) return <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>Sequence not found.</div>;
+
+  return (
+    <>
+      <span className="dash-back" onClick={onBack}>&larr; Back to sequences</span>
+      <div className="seq-detail-header">
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{seq.name}</h2>
+          {seq.from_name && <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>From: {seq.from_name}</div>}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span className={`score-pill ${seq.status === "active" ? "score-high" : "score-low"}`}>{seq.status.toUpperCase()}</span>
+          <button className="btn btn-outline btn-sm" style={{ fontSize: 12 }} onClick={toggleStatus}>
+            {seq.status === "active" ? "Pause" : "Activate"}
+          </button>
+          <button className="btn btn-outline btn-sm" style={{ fontSize: 12 }} onClick={onEdit}>Edit</button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: "var(--muted)" }}>EMAIL STEPS</h3>
+        <div className="seq-steps-preview">
+          {(seq.steps || []).map((step, i) => (
+            <div key={i} className="seq-step-preview">
+              <div className="seq-step-preview-num">
+                Step {step.step_number} {i > 0 ? `· After ${step.delay_hours >= 24 ? `${Math.round(step.delay_hours / 24)} day(s)` : `${step.delay_hours}h`}` : "· Immediate"}
+              </div>
+              <div className="seq-step-preview-subject">{step.subject}</div>
+              <div className="seq-step-preview-body">{step.body?.slice(0, 120)}{(step.body?.length || 0) > 120 ? "..." : ""}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {(seq.enrollments?.length > 0) && (
+        <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: "var(--muted)" }}>ACTIVE ENROLLMENTS ({seq.enrollments.length})</h3>
+          <div className="seq-enrollments">
+            {seq.enrollments.slice(0, 20).map(e => (
+              <div key={e.id} className="seq-enrollment-row">
+                <div>
+                  <div style={{ fontFamily: "IBM Plex Mono", fontSize: 12, color: "var(--accent)" }}>{e.lead_email}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Step {e.current_step} of {seq.steps?.length} · {e.status}</div>
+                </div>
+                <span className={`score-pill ${e.status === "active" ? "score-high" : "score-med"}`} style={{ fontSize: 10 }}>{e.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Settings Panel ────────────────────────────────────────────
+function SettingsPanel({ apiBase, token, user }) {
+  const [tab, setTab] = useState("keys");
+  const [keys, setKeys] = useState([]);
+  const [webhooks, setWebhooks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyVal, setNewKeyVal] = useState(null);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookEvents, setWebhookEvents] = useState("search.completed");
+
+  useEffect(() => {
+    if (tab === "keys") loadKeys();
+    if (tab === "webhooks") loadWebhooks();
+  }, [tab]);
+
+  async function loadKeys() {
+    setLoading(true);
+    try {
+      const r = await fetch(`${apiBase}/api/keys`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      setKeys(d.keys || []);
+    } catch {}
+    setLoading(false);
+  }
+
+  async function loadWebhooks() {
+    setLoading(true);
+    try {
+      const r = await fetch(`${apiBase}/api/webhooks`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      setWebhooks(d.webhooks || []);
+    } catch {}
+    setLoading(false);
+  }
+
+  async function createKey() {
+    if (!newKeyName.trim()) return;
+    const r = await fetch(`${apiBase}/api/keys`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: newKeyName }),
+    });
+    const d = await r.json();
+    if (r.ok) { setNewKeyVal(d.key); setNewKeyName(""); loadKeys(); }
+    else alert(d.error || "Failed to create key");
+  }
+
+  async function deleteKey(id) {
+    if (!confirm("Delete this API key? This cannot be undone.")) return;
+    await fetch(`${apiBase}/api/keys/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    loadKeys();
+  }
+
+  async function createWebhook() {
+    if (!webhookUrl.trim()) return;
+    const r = await fetch(`${apiBase}/api/webhooks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ url: webhookUrl, events: webhookEvents }),
+    });
+    const d = await r.json();
+    if (r.ok) { setWebhookUrl(""); loadWebhooks(); }
+    else alert(d.error || "Failed to create webhook");
+  }
+
+  async function deleteWebhook(id) {
+    await fetch(`${apiBase}/api/webhooks/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    loadWebhooks();
+  }
+
+  return (
+    <div className="settings-panel">
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20 }}>Settings</h2>
+      <div className="settings-tabs">
+        <button className={`settings-tab ${tab === "keys" ? "active" : ""}`} onClick={() => setTab("keys")}>API Keys</button>
+        <button className={`settings-tab ${tab === "webhooks" ? "active" : ""}`} onClick={() => setTab("webhooks")}>Webhooks</button>
+        <button className={`settings-tab ${tab === "account" ? "active" : ""}`} onClick={() => setTab("account")}>Account</button>
+      </div>
+
+      {tab === "keys" && (
+        <div className="settings-section">
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16, lineHeight: 1.6 }}>
+            Use API keys to access the LeadReap API from your own applications. Keep them secret.
+          </p>
+          {newKeyVal && (
+            <div style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: "var(--green)", fontWeight: 700, marginBottom: 8 }}>✓ New key created — copy it now, it won't be shown again:</div>
+              <div style={{ fontFamily: "IBM Plex Mono", fontSize: 12, color: "var(--text)", wordBreak: "break-all", background: "var(--surface2)", padding: "8px 12px", borderRadius: 6 }}>{newKeyVal}</div>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            <input
+              style={{ flex: 1, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", color: "var(--text)", fontSize: 13, fontFamily: "IBM Plex Mono", outline: "none" }}
+              placeholder="Key name (e.g. My App)"
+              value={newKeyName}
+              onChange={e => setNewKeyName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && createKey()}
+            />
+            <button className="btn btn-primary btn-sm" onClick={createKey} disabled={!newKeyName.trim()}>+ Create Key</button>
+          </div>
+          <div className="settings-list">
+            {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Loading...</div> :
+              keys.length === 0 ? <div style={{ color: "var(--muted)", fontSize: 13 }}>No API keys yet.</div> :
+              keys.map(k => (
+                <div key={k.id} className="settings-list-item">
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{k.name}</div>
+                    <div style={{ fontFamily: "IBM Plex Mono", fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                      {k.key_prefix}...  · Created {new Date(k.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--red)", fontSize: 12 }} onClick={() => deleteKey(k.id)}>Revoke</button>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {tab === "webhooks" && (
+        <div className="settings-section">
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16, lineHeight: 1.6 }}>
+            Receive real-time POST requests to your endpoint when events happen in LeadReap.
+          </p>
+          <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+            <input
+              style={{ flex: 1, minWidth: 200, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", color: "var(--text)", fontSize: 13, fontFamily: "IBM Plex Mono", outline: "none" }}
+              placeholder="https://your-server.com/webhook"
+              value={webhookUrl}
+              onChange={e => setWebhookUrl(e.target.value)}
+            />
+            <select
+              style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text)", fontSize: 12, fontFamily: "IBM Plex Mono", outline: "none" }}
+              value={webhookEvents}
+              onChange={e => setWebhookEvents(e.target.value)}
+            >
+              <option value="search.completed">search.completed</option>
+              <option value="lead.added">lead.added</option>
+              <option value="*">All events (*)</option>
+            </select>
+            <button className="btn btn-primary btn-sm" onClick={createWebhook} disabled={!webhookUrl.trim()}>+ Add</button>
+          </div>
+          <div className="settings-list">
+            {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Loading...</div> :
+              webhooks.length === 0 ? <div style={{ color: "var(--muted)", fontSize: 13 }}>No webhooks yet.</div> :
+              webhooks.map(w => (
+                <div key={w.id} className="settings-list-item">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "IBM Plex Mono", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.url}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{w.events} · {w.active ? "Active" : "Disabled"}</div>
+                  </div>
+                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--red)", fontSize: 12 }} onClick={() => deleteWebhook(w.id)}>Delete</button>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {tab === "account" && (
+        <div className="settings-section">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono", marginBottom: 4 }}>EMAIL</div>
+              <div style={{ fontWeight: 600 }}>{user?.email}</div>
+            </div>
+            <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono", marginBottom: 4 }}>CURRENT PLAN</div>
+              <div style={{ fontWeight: 600, textTransform: "capitalize" }}>{user?.plan || "Free"}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Score helper ─────────────────────────────────────────────
+function scoreToClass(score) {
+  if (!score && score !== 0) return "score-med";
+  if (score >= 80) return "score-high";
+  if (score >= 50) return "score-med";
+  return "score-low";
+}
+
+// ─── Main Export ──────────────────────────────────────────────
+export default function LeadReap({ apiBase, token, user, onLoginClick, onLogout, onRefreshAuth, onRunAudit }) {
+  // View routing
+  const [view, setView] = useState("search"); // search | loading | results | dashboard | list-detail | seq-list | seq-detail | seq-builder | settings
+  const [selectedListId, setSelectedListId] = useState(null);
+  const [selectedSeqId, setSelectedSeqId] = useState(null);
+  const [editingSeq, setEditingSeq] = useState(null);
+
+  // Search
+  const [niche, setNiche] = useState("");
+  const [location, setLocation] = useState("");
+  const [limitChoice, setLimitChoice] = useState(20);
+  const [scrapeEmails, setScrapeEmails] = useState(true);
+
+  // Results
+  const [jobId, setJobId] = useState(null);
+  const [leads, setLeads] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [isGated, setIsGated] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("Initializing...");
+  const [loadingPct, setLoadingPct] = useState(0);
+  const [loadingStep, setLoadingStep] = useState(0);
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [selectedLeads, setSelectedLeads] = useState(new Set());
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [outreachLead, setOutreachLead] = useState(null);
+  const [showLegal, setShowLegal] = useState(null); // "privacy" | "terms"
+  const [dashData, setDashData] = useState(null);
+  const [sequences, setSequences] = useState([]);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [expandedCard, setExpandedCard] = useState(null);
+  const [peekDone, setPeekDone] = useState(false);
+  const [firstPeekDone, setFirstPeekDone] = useState(false);
+
+  const LOADING_TIPS = [
+    { icon: "💡", text: <><strong>Pro tip:</strong> Leads with a 4.5+ star rating and an email address are your highest-converting prospects.</> },
+    { icon: "⚡", text: <><strong>Speed trick:</strong> Businesses with fewer than 50 reviews are often hungry for help but harder to reach. An audit report breaks the ice.</> },
+    { icon: "🔎", text: <><strong>Did you know?</strong> Over 60% of local businesses have never verified their Google listing. That's your opening.</> },
+    { icon: "📊", text: <><strong>Agency tip:</strong> Sort leads by LeadReap Score. Low scores = low technical maturity = easiest to sell web services to.</> },
+  ];
+  const [tipIdx, setTipIdx] = useState(0);
+
+  const LOADING_STEPS_LIST = [
+    { label: "Connecting to Google Maps..." },
+    { label: "Scanning local business listings..." },
+    { label: "Extracting contact details..." },
+    { label: "Verifying email addresses..." },
+    { label: "Calculating lead scores..." },
+  ];
+
+  const pollRef = useRef(null);
+  const tipRef = useRef(null);
+
+  useEffect(() => {
+    if (view === "loading") {
+      tipRef.current = setInterval(() => setTipIdx(i => (i + 1) % LOADING_TIPS.length), 4000);
+      return () => clearInterval(tipRef.current);
+    }
+  }, [view]);
+
+  useEffect(() => {
+    if (view === "results" && leads.length > 0 && !firstPeekDone) {
+      setExpandedRow(0);
+      setFirstPeekDone(true);
+      setTimeout(() => setExpandedRow(null), 3000);
+    }
+  }, [view, leads.length]);
+
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2800);
+  }
+
+  async function handleSearch(e) {
+    e?.preventDefault();
+    if (!niche || !location) return;
+
+    setView("loading");
+    setLeads([]);
+    setTotal(0);
+    setExpandedRow(null);
+    setSelectedLeads(new Set());
+    setLoadingPct(5);
+    setLoadingStep(0);
+    setFirstPeekDone(false);
+
+    try {
+      const plan = user?.plan || "free";
+      const safeLimit = plan === "free" ? 20 : limitChoice;
+
+      const res = await fetch(`${apiBase}/api/leads/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ niche, location, limit: safeLimit, scrapeEmails }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 429) { setView("search"); alert("Too many searches. Please wait a moment."); return; }
+        if (res.status === 403) { setView("search"); setShowPricing(true); return; }
+        throw new Error(data.error || "Search failed");
+      }
+      setJobId(data.jobId);
+      startPolling(data.jobId);
+    } catch (err) {
+      setView("search");
+      alert(err.message || "Search failed. Please try again.");
+    }
+  }
+
+  function startPolling(jid) {
+    let attempts = 0;
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${apiBase}/api/leads/job/${jid}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await res.json();
+
+        attempts++;
+        const pct = Math.min(90, 5 + attempts * 8);
+        setLoadingPct(pct);
+        setLoadingStep(Math.min(4, Math.floor(attempts * 0.8)));
+
+        if (data.leads?.length > 0) setLoadingMsg(`Found ${data.leads.length} leads so far...`);
+
+        if (data.status === "done" || data.status === "error") {
+          clearInterval(pollRef.current);
+          setLoadingPct(100);
+          if (data.status === "error") {
+            setView("search");
+            alert(data.error || "Scrape failed. Please try again.");
+          } else {
+            setLeads(data.leads || []);
+            setTotal(data.total || 0);
+            setIsGated(data.gated || false);
+            setView("results");
+          }
+        }
+      } catch {}
+    }, 2200);
+  }
+
+  async function handleStartCheckout(plan) {
+    setCheckoutLoading(true);
+    try {
+      const email = user?.email || prompt("Enter your email to continue:");
+      if (!email) { setCheckoutLoading(false); return; }
+      const res = await fetch(`${apiBase}/api/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ plan, email }),
+      });
+      const data = await res.json();
+      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+      else alert(data.error || "Failed to create checkout session");
+    } catch { alert("Payment system error. Please try again."); }
+    setCheckoutLoading(false);
+  }
+
+  async function handleExport() {
+    if (!jobId) return;
+    try {
+      const res = await fetch(`${apiBase}/api/leads/export/${jobId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { const d = await res.json(); alert(d.error || "Export failed"); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = `leads-${niche.replace(/\s+/g, "-")}.xlsx`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert("Export failed"); }
+  }
+
+  function toggleSelect(idx) {
+    setSelectedLeads(prev => {
+      const n = new Set(prev);
+      n.has(idx) ? n.delete(idx) : n.add(idx);
+      return n;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedLeads(prev => prev.size === leads.length ? new Set() : new Set(leads.map((_, i) => i)));
+  }
+
+  async function loadDashboard() {
+    try {
+      const res = await fetch(`${apiBase}/api/account`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setDashData(data);
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (view === "dashboard") loadDashboard();
+    if (view === "seq-list") loadSequences();
+  }, [view]);
+
+  async function loadSequences() {
+    try {
+      const res = await fetch(`${apiBase}/api/sequences`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setSequences(data.sequences || []);
+    } catch {}
+  }
+
+  async function deleteSeq(id) {
+    if (!confirm("Delete this sequence?")) return;
+    await fetch(`${apiBase}/api/sequences/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    loadSequences();
+  }
+
+  async function loadHistoryJob(jobId) {
+    try {
+      const res = await fetch(`${apiBase}/api/leads/history/${jobId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (res.ok) {
+        setLeads(data.leads || []);
+        setTotal(data.total || 0);
+        setIsGated(false);
+        setJobId(data.jobId);
+        setNiche(data.niche || "");
+        setLocation(data.location || "");
+        setView("results");
+      }
+    } catch {}
+  }
+
+  const selectedLeadObjects = [...selectedLeads].map(i => leads[i]).filter(Boolean);
+
+  // ─── RENDER ───────────────────────────────────────────────
+
+  // ── Dashboard ──
+  if (view === "dashboard") {
+    return (
+      <div className="app">
+        <Nav user={user} onLoginClick={onLoginClick} onLogout={onLogout}
+          onDash={() => setView("dashboard")} onSearch={() => setView("search")} activePlan={user?.plan} />
+        <div className="dash">
+          <div className="dash-header">
+            <div>
+              <div className="dash-greeting">Welcome back, <span>{user?.email?.split("@")[0]}</span></div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Your LeadReap command center</div>
+            </div>
+            <span className={`dash-plan ${user?.plan === "pro" || user?.plan === "agency" ? "dash-plan-pro" : "dash-plan-free"}`}>
+              {(user?.plan || "FREE").toUpperCase()}
+            </span>
+          </div>
+
+          {dashData && (
+            <div className="dash-stats">
+              <div className="dash-stat">
+                <div className="dash-stat-label">SEARCHES TODAY</div>
+                <div className="dash-stat-value">{dashData.searchesToday || 0}</div>
+              </div>
+              <div className="dash-stat">
+                <div className="dash-stat-label">TOTAL LEADS FOUND</div>
+                <div className="dash-stat-value">{dashData.stats?.totalLeads?.toLocaleString() || 0}</div>
+              </div>
+              <div className="dash-stat">
+                <div className="dash-stat-label">TOTAL SEARCHES</div>
+                <div className="dash-stat-value">{dashData.stats?.totalSearches || 0}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="dash-actions">
+            <button className="btn btn-primary" onClick={() => setView("search")}>⚡ New Search</button>
+            <button className="btn btn-outline" onClick={() => setView("lists")}>📋 Saved Lists</button>
+            <button className="btn btn-outline" onClick={() => setView("seq-list")}>✉ Sequences</button>
+            <button className="btn btn-outline" onClick={() => setView("settings")}>⚙ Settings</button>
+          </div>
+
+          {dashData?.stats?.topNiches?.length > 0 && (
+            <div className="dash-section">
+              <div className="dash-section-title">Top Niches</div>
+              <div className="dash-niches">
+                {dashData.stats.topNiches.map(n => (
+                  <span key={n.niche} className="dash-niche">
+                    {n.niche} <strong>{n.count}x</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {dashData?.stats?.recentSearches?.length > 0 && (
+            <div className="dash-section">
+              <div className="dash-section-title">Recent Searches</div>
+              <div className="dash-history">
+                {dashData.stats.recentSearches.map(h => (
+                  <div key={h.jobId || h.id} className="dash-history-item"
+                    onClick={() => h.jobId && loadHistoryJob(h.jobId)}>
+                    <div>
+                      <div className="dash-history-niche">{h.niche}</div>
+                      <div className="dash-history-location">{h.location}</div>
+                    </div>
+                    <div className="dash-history-meta">
+                      <div className="dash-history-leads">{h.leadCount} leads</div>
+                      <div className="dash-history-time">{new Date(h.timestamp || h.createdAt).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <Footer onLegal={setShowLegal} />
+        {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+      </div>
+    );
+  }
+
+  // ── Saved Lists ──
+  if (view === "lists" || view === "list-detail") {
+    return (
+      <div className="app">
+        <Nav user={user} onLoginClick={onLoginClick} onLogout={onLogout}
+          onDash={() => setView("dashboard")} onSearch={() => setView("search")} activePlan={user?.plan} />
+        <div className="dash">
+          <span className="dash-back" onClick={() => setView("dashboard")}>&larr; Back to dashboard</span>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>
+            {view === "list-detail" ? "" : "Saved Lead Lists"}
+          </h2>
+          {view === "list-detail" && selectedListId ? (
+            <ListDetailView
+              listId={selectedListId}
+              apiBase={apiBase}
+              token={token}
+              onBack={() => setView("lists")}
+              onOutreach={lead => setOutreachLead(lead)}
+              onRunAudit={onRunAudit}
+            />
+          ) : (
+            <SavedListsGrid
+              apiBase={apiBase}
+              token={token}
+              onSelectList={id => { setSelectedListId(id); setView("list-detail"); }}
+            />
+          )}
+        </div>
+        {outreachLead && (
+          <OutreachModal templates={getOutreachTemplates(outreachLead)} lead={outreachLead} onClose={() => setOutreachLead(null)} />
+        )}
+        <Footer onLegal={setShowLegal} />
+        {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+      </div>
+    );
+  }
+
+  // ── Sequences ──
+  if (view === "seq-list" || view === "seq-detail" || view === "seq-builder") {
+    return (
+      <div className="app">
+        <Nav user={user} onLoginClick={onLoginClick} onLogout={onLogout}
+          onDash={() => setView("dashboard")} onSearch={() => setView("search")} activePlan={user?.plan} />
+        <div className="dash">
+          {view === "seq-list" && (
+            <>
+              <span className="dash-back" onClick={() => setView("dashboard")}>&larr; Back to dashboard</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700 }}>Email Sequences</h2>
+                <button className="btn btn-primary btn-sm" onClick={() => { setEditingSeq(null); setView("seq-builder"); }}>
+                  + New Sequence
+                </button>
+              </div>
+              {sequences.length === 0 ? (
+                <div className="dash-empty">
+                  <p>No sequences yet. Create your first drip campaign.</p>
+                  <button className="btn btn-primary" onClick={() => setView("seq-builder")}>+ New Sequence</button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {sequences.map(s => (
+                    <div key={s.id} style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                      <div style={{ cursor: "pointer", flex: 1 }} onClick={() => { setSelectedSeqId(s.id); setView("seq-detail"); }}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono", marginTop: 2 }}>
+                          {s.stepCount || 0} steps · {s.enrollmentCount || 0} active · {s.status}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                        <span className={`score-pill ${s.status === "active" ? "score-high" : "score-low"}`} style={{ fontSize: 10 }}>{s.status}</span>
+                        <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => { setEditingSeq(s); setView("seq-builder"); }}>Edit</button>
+                        <button className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "var(--red)" }} onClick={() => deleteSeq(s.id)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+          {view === "seq-detail" && selectedSeqId && (
+            <SequenceDetail
+              seqId={selectedSeqId}
+              apiBase={apiBase}
+              token={token}
+              onBack={() => setView("seq-list")}
+              onEdit={() => { setView("seq-builder"); }}
+            />
+          )}
+          {view === "seq-builder" && (
+            <SequenceBuilder
+              apiBase={apiBase}
+              token={token}
+              existing={editingSeq}
+              onClose={() => setView(editingSeq ? "seq-detail" : "seq-list")}
+              onSaved={() => { loadSequences(); setView("seq-list"); }}
+            />
+          )}
+        </div>
+        <Footer onLegal={setShowLegal} />
+        {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+      </div>
+    );
+  }
+
+  // ── Settings ──
+  if (view === "settings") {
+    return (
+      <div className="app">
+        <Nav user={user} onLoginClick={onLoginClick} onLogout={onLogout}
+          onDash={() => setView("dashboard")} onSearch={() => setView("search")} activePlan={user?.plan} />
+        <div className="dash">
+          <span className="dash-back" onClick={() => setView("dashboard")}>&larr; Back to dashboard</span>
+          <SettingsPanel apiBase={apiBase} token={token} user={user} />
+        </div>
+        <Footer onLegal={setShowLegal} />
+        {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+      </div>
+    );
+  }
+
+  // ── Loading ──
+  if (view === "loading") {
+    const tip = LOADING_TIPS[tipIdx];
+    return (
+      <div className="app">
+        <Nav user={user} onLoginClick={onLoginClick} onLogout={onLogout}
+          onDash={() => setView("dashboard")} onSearch={() => setView("search")} activePlan={user?.plan} />
+        <div className="tool-section" style={{ maxWidth: 560, padding: "60px 40px" }}>
+          <div className="loading-state">
+            <div className="loading-orb" />
+            <div className="loading-title">Finding {niche} leads in {location}...</div>
+            <div className="loading-sub">{loadingMsg}</div>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${loadingPct}%` }} />
+            </div>
+            <div className="loading-steps">
+              {LOADING_STEPS_LIST.map((s, i) => (
+                <div key={i} className={`loading-step ${i < loadingStep ? "done" : i === loadingStep ? "active" : ""}`}>
+                  <span>{i < loadingStep ? "✓" : i === loadingStep ? "→" : "·"}</span>
+                  <span>{s.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="loading-tip">
+              <span style={{ marginRight: 8 }}>{tip.icon}</span>{tip.text}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Results ──
+  if (view === "results" && leads.length > 0) {
+    const plan = user?.plan || "free";
+    const canExport = plan !== "free";
+    const canSave = !!token;
+
+    return (
+      <div className="app">
+        <Nav user={user} onLoginClick={onLoginClick} onLogout={onLogout}
+          onDash={() => setView("dashboard")} onSearch={() => setView("search")} activePlan={user?.plan} />
+        <div className="tool-section">
+          <div className="results-header">
+            <div className="results-meta">
+              <span className="count-tag">{total} leads found</span>
+              <span style={{ fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono" }}>{niche} · {location}</span>
+            </div>
+            <div className="results-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {selectedLeads.size > 0 && canSave && (
+                <button className="btn btn-green btn-sm" onClick={() => setShowSaveModal(true)} style={{ fontSize: 12 }}>
+                  💾 Save {selectedLeads.size} lead{selectedLeads.size !== 1 ? "s" : ""}
+                </button>
+              )}
+              {canExport ? (
+                <button className="btn btn-outline btn-sm" onClick={handleExport} style={{ fontSize: 12 }}>
+                  ↓ Export XLSX
+                </button>
+              ) : (
+                <button className="btn btn-outline btn-sm" onClick={() => setShowPricing(true)} style={{ fontSize: 12 }}>
+                  ↓ Export XLSX
+                </button>
+              )}
+              <button className="btn btn-ghost btn-sm" onClick={() => setView("search")} style={{ fontSize: 12 }}>
+                ← New Search
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop Table */}
+          <div className={`desktop-table ${isGated ? "lock-overlay" : ""}`}>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: 36 }}>
+                      <input type="checkbox" checked={selectedLeads.size === leads.length} onChange={toggleSelectAll} style={{ accentColor: "var(--accent)" }} />
+                    </th>
+                    <th>Business</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Website</th>
+                    <th>Rating</th>
+                    <th>Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leads.map((lead, idx) => (
+                    <React.Fragment key={idx}>
+                      <tr className="row-expandable"
+                        onClick={() => setExpandedRow(expandedRow === idx ? null : idx)}>
+                        <td onClick={e => { e.stopPropagation(); toggleSelect(idx); }}>
+                          <input type="checkbox" checked={selectedLeads.has(idx)} onChange={() => {}} style={{ accentColor: "var(--accent)" }} />
+                        </td>
+                        <td>
+                          <div className="name-cell">{lead.name}</div>
+                          <div style={{ fontSize: 11, color: "var(--muted)", fontFamily: "IBM Plex Mono", marginTop: 2 }}>{lead.address}</div>
+                        </td>
+                        <td className="email-cell">
+                          {lead.email && lead.email !== "—" ? (
+                            <div>
+                              {lead.email}
+                              {lead.emailVerified ? (
+                                <span className="email-verified" title="Verified by SMTP check">VERIFIED</span>
+                              ) : lead.emailUnverified ? (
+                                <span className="email-unverified" title="Unverified">UNVERIFIED</span>
+                              ) : null}
+                            </div>
+                          ) : "—"}
+                        </td>
+                        <td className="phone-cell">{lead.phone || "—"}</td>
+                        <td className="site-cell">
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                            {lead.website ? (
+                              <a href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
+                                target="_blank" rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}>
+                                {lead.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                              </a>
+                            ) : "—"}
+                            {onRunAudit && lead.website && (
+                              <button
+                                className="audit-badge"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  const url = lead.website.startsWith("http") ? lead.website : `https://${lead.website}`;
+                                  onRunAudit(url);
+                                }}
+                                title="Run a free SEO & tech audit on this site"
+                              >
+                                AUDIT
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="rating-cell">
+                          {lead.rating ? <><span className="star">★</span>{lead.rating}</> : "—"}
+                          {lead.reviewCount ? <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>({lead.reviewCount})</span> : null}
+                        </td>
+                        <td>
+                          <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score || 0}/100</span>
+                        </td>
+                      </tr>
+
+                      {/* Expand row */}
+                      {expandedRow === idx && (
+                        <tr className={`expand-row ${!peekDone ? "expand-peek" : ""}`}
+                          onAnimationEnd={() => setPeekDone(true)}>
+                          <td colSpan={7}>
+                            <div className="expand-content">
+                              <div className="expand-insight">
+                                {lead.categories?.length ? (
+                                  <span style={{ marginRight: 12 }}>📍 {lead.categories.join(", ")}</span>
+                                ) : null}
+                                {lead.unclaimed && <span style={{ color: "var(--accent)", marginRight: 12 }}>⚠ Unclaimed listing</span>}
+                                {lead.techStackSummary && (
+                                  <span>🛠 {lead.techStackSummary}</span>
+                                )}
+                                {!lead.techStackSummary && !lead.categories?.length && (
+                                  <span>Click to view full details, send outreach, or save to a list.</span>
+                                )}
+                              </div>
+                              <div className="expand-actions">
+                                {lead.email && lead.email !== "—" && (
+                                  <button className="btn btn-outline btn-sm" style={{ fontSize: 11 }}
+                                    onClick={() => setOutreachLead(lead)}>
+                                    ✉ Outreach
+                                  </button>
+                                )}
+                                {onRunAudit && lead.website && (
+                                  <button className="btn btn-outline btn-sm" style={{ fontSize: 11 }}
+                                    onClick={() => {
+                                      const url = lead.website.startsWith("http") ? lead.website : `https://${lead.website}`;
+                                      onRunAudit(url);
+                                    }}>
+                                    🔍 Audit Site
+                                  </button>
+                                )}
+                                {canSave && (
+                                  <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }}
+                                    onClick={() => { setSelectedLeads(new Set([idx])); setShowSaveModal(true); }}>
+                                    + Save
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="mobile-cards">
+            {leads.map((lead, idx) => (
+              <div key={idx}
+                className={`mobile-card ${expandedCard === idx ? "expanded" : ""} ${idx === 0 && !peekDone ? "peek-card" : ""}`}
+                onAnimationEnd={() => setPeekDone(true)}
+                onClick={() => setExpandedCard(expandedCard === idx ? null : idx)}>
+                <div className="mobile-card-top">
+                  <div>
+                    <div className="mobile-card-name">{lead.name}</div>
+                    <div className="mobile-card-addr">{lead.address}</div>
+                  </div>
+                  <div className="mobile-card-score">
+                    <span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score || 0}/100</span>
+                  </div>
+                </div>
+
+                {expandedCard === idx && (
+                  <div className="mobile-card-expand">
+                    <div className="mobile-card-fields">
+                      {lead.email && lead.email !== "—" && (
+                        <div className="mobile-card-field">
+                          <label>Email</label>
+                          <a href={`mailto:${lead.email}`}>{lead.email}</a>
+                        </div>
+                      )}
+                      {lead.phone && (
+                        <div className="mobile-card-field">
+                          <label>Phone</label>
+                          <a href={`tel:${lead.phone}`} style={{ color: "var(--text)" }}>{lead.phone}</a>
+                        </div>
+                      )}
+                      {lead.website && (
+                        <div className="mobile-card-field">
+                          <label>Website</label>
+                          <a href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
+                            target="_blank" rel="noopener noreferrer">
+                            {lead.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                          </a>
+                        </div>
+                      )}
+                      {lead.rating && (
+                        <div className="mobile-card-field">
+                          <label>Rating</label>
+                          <span>★ {lead.rating} {lead.reviewCount ? `(${lead.reviewCount})` : ""}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mobile-card-actions" style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {lead.email && lead.email !== "—" && (
+                        <button className="btn btn-outline btn-sm" style={{ fontSize: 11 }}
+                          onClick={e => { e.stopPropagation(); setOutreachLead(lead); }}>
+                          ✉ Outreach
+                        </button>
+                      )}
+                      {onRunAudit && lead.website && (
+                        <button className="btn btn-outline btn-sm" style={{ fontSize: 11 }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            const url = lead.website.startsWith("http") ? lead.website : `https://${lead.website}`;
+                            onRunAudit(url);
+                          }}>
+                          🔍 Run Site Audit
+                        </button>
+                      )}
+                      {canSave && (
+                        <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }}
+                          onClick={e => { e.stopPropagation(); setSelectedLeads(new Set([idx])); setShowSaveModal(true); }}>
+                          + Save
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Gated upsell */}
+          {isGated && (
+            <div className="upgrade-bar">
+              <p>🔒 Showing 5 of {total} leads. Unlock all results with a paid plan.</p>
+              <button className="btn btn-primary" onClick={() => setShowPricing(true)}>Unlock All Leads</button>
+            </div>
+          )}
+        </div>
+
+        {/* Modals */}
+        {showSaveModal && (
+          <SaveToListModal
+            leads={selectedLeadObjects}
+            apiBase={apiBase}
+            token={token}
+            onClose={() => setShowSaveModal(false)}
+            onSaved={(_, name) => { showToast(`✓ Saved to "${name}"`); setSelectedLeads(new Set()); }}
+          />
+        )}
+        {showPricing && (
+          <PricingModal onClose={() => setShowPricing(false)} onCheckout={handleStartCheckout} loading={checkoutLoading} />
+        )}
+        {outreachLead && (
+          <OutreachModal templates={getOutreachTemplates(outreachLead)} lead={outreachLead} onClose={() => setOutreachLead(null)} />
+        )}
+        {toast && <div className="toast">✓ {toast}</div>}
+        <Footer onLegal={setShowLegal} />
+        {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+      </div>
+    );
+  }
+
+  // ── Search / Landing ──
+  const demoNiche = DEMO_NICHES[0];
+  const demoLeads = DEMO_DATA[demoNiche]?.leads || [];
+
+  return (
+    <div className="app">
+      <Nav user={user} onLoginClick={onLoginClick} onLogout={onLogout}
+        onDash={() => setView("dashboard")} onSearch={() => setView("search")} activePlan={user?.plan} />
+
+      <div className="hero">
+        <div className="hero-tag"><span className="dot" /> LIVE · REAL-TIME LEAD DATA</div>
+        <h1>
+          <span className="hero-desktop">Find any local business,<br />their email, <em>in 60 seconds.</em></span>
+          <span className="hero-mobile">Find local businesses &amp; their emails. <em>Fast.</em></span>
+        </h1>
+        <p>LeadReap scrapes Google Maps to deliver verified leads — with email, phone, website, and lead score — for any niche, any city.</p>
+        <div className="hero-stats">
+          <div className="stat"><div className="stat-num">60s</div><div className="stat-label">Avg. scrape time</div></div>
+          <div className="stat"><div className="stat-num">4.8★</div><div className="stat-label">User rating</div></div>
+          <div className="stat"><div className="stat-num">500+</div><div className="stat-label">Niches covered</div></div>
+          <div className="stat"><div className="stat-num">Free</div><div className="stat-label">To start</div></div>
+        </div>
+      </div>
+
+      <div className="tool-section">
+        {/* Niche ticker */}
+        <div className="niche-ticker">
+          <div className="ticker-track">
+            {[...INDUSTRIES, ...INDUSTRIES].map((n, i) => (
+              <span key={i} className="ticker-item"
+                onClick={() => setNiche(n)}>
+                {n}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Search Card */}
+        <div className="search-card">
+          <div className="search-label">LEAD FINDER</div>
+          <form onSubmit={handleSearch}>
+            <div className="search-row">
+              <div className="field">
+                <label>Business Type / Niche</label>
+                <input
+                  list="industry-list"
+                  value={niche}
+                  onChange={e => setNiche(e.target.value)}
+                  placeholder="e.g. Dentist, HVAC Company..."
+                  required
+                />
+                <datalist id="industry-list">
+                  {INDUSTRIES.map(n => <option key={n} value={n} />)}
+                </datalist>
+              </div>
+              <div className="field">
+                <label>City / Location</label>
+                <input
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  placeholder="e.g. Austin TX, Miami FL..."
+                  required
+                />
+              </div>
+              <button className="btn btn-primary" type="submit" style={{ height: 48, marginTop: 22 }}>
+                Find Leads ⚡
+              </button>
+            </div>
+
+            <div className="options-row">
+              <label className={`toggle-chip ${scrapeEmails ? "active" : ""}`}
+                onClick={() => setScrapeEmails(p => !p)}>
+                <span className="check">{scrapeEmails ? "✓" : ""}</span>
+                Scrape Emails
+              </label>
+              {user?.plan !== "free" && (
+                <label className="toggle-chip">
+                  <select value={limitChoice} onChange={e => setLimitChoice(Number(e.target.value))}
+                    onClick={e => e.stopPropagation()}
+                    style={{ background: "transparent", border: "none", color: "inherit", fontFamily: "inherit", fontSize: "inherit", cursor: "pointer" }}>
+                    <option value={20}>20 leads</option>
+                    <option value={40}>40 leads</option>
+                    <option value={60}>60 leads</option>
+                  </select>
+                </label>
+              )}
+              <span className="options-hint mono" style={{ fontSize: 11, color: "var(--muted)" }}>
+                {user?.plan === "free" ? "Free plan: 5 leads shown · Upgrade for more" : `${user?.plan} plan · Up to 60 leads`}
+              </span>
+            </div>
+          </form>
+        </div>
+
+        {/* Demo Preview */}
+        <div className="demo-section">
+          <div className="demo-header">
+            <div className="demo-label">SAMPLE OUTPUT — {demoNiche.toUpperCase()} IN {DEMO_DATA[demoNiche]?.city?.toUpperCase()}</div>
+          </div>
+          <div className="demo-wrap">
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Business</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Website</th>
+                    <th>Rating</th>
+                    <th>Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {demoLeads.map((lead, idx) => (
+                    <tr key={idx}>
+                      <td>
+                        <div className="name-cell">{lead.name}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", fontFamily: "IBM Plex Mono", marginTop: 2 }}>{lead.address}</div>
+                      </td>
+                      <td className="email-cell">{lead.email || "—"}</td>
+                      <td className="phone-cell">{lead.phone}</td>
+                      <td className="site-cell"><a href={`https://${lead.website}`} target="_blank" rel="noopener noreferrer">{lead.website}</a></td>
+                      <td className="rating-cell"><span className="star">★</span>{lead.rating}</td>
+                      <td><span className={`score-pill ${scoreToClass(lead.score)}`}>{lead.score}/100</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="demo-cta">
+              <p>Search any niche, any city — results in 60 seconds</p>
+              <button className="btn btn-primary" onClick={() => document.querySelector(".search-card input")?.focus()}>
+                ⚡ Try it free now
+              </button>
+              <div className="sub">No credit card required</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Landing content */}
+        <div className="m-landing">
+          <div className="m-section-label" style={{ marginBottom: 16, marginTop: 8 }}>HOW IT WORKS</div>
+          <div className="m-how">
+            {[
+              { num: "1", title: "Enter your niche + city", desc: "Type any business type and location. We handle the rest." },
+              { num: "2", title: "We scrape Google Maps", desc: "Our engine finds every matching business with contact details." },
+              { num: "3", title: "Get verified leads instantly", desc: "Email, phone, website, rating, and a lead score — ready to use." },
+            ].map(s => (
+              <div key={s.num} className="m-how-step">
+                <div className="m-how-num">{s.num}</div>
+                <div className="m-how-text">
+                  <div className="m-how-title">{s.title}</div>
+                  <div className="m-how-desc">{s.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing modal (lazy) */}
+      {showPricing && (
+        <PricingModal onClose={() => setShowPricing(false)} onCheckout={handleStartCheckout} loading={checkoutLoading} />
+      )}
+      {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
+
+      <Footer onLegal={setShowLegal} />
+    </div>
+  );
+}
+
+// ─── Sub-components used by LeadReap ──────────────────────────
+
+function Nav({ user, onLoginClick, onLogout, onDash, onSearch, activePlan }) {
+  return (
+    <>
+    <style>{STYLE}</style>
+    <nav className="nav">
+      <div className="logo" onClick={onSearch} style={{ cursor: "pointer" }}>
+        <div className="logo-mark"><LogoMark /></div>
+        Lead<span>Reap</span>
+      </div>
+      <div className="nav-actions">
+        {activePlan && activePlan !== "free" && (
+          <span className="badge nav-beta">{activePlan.toUpperCase()}</span>
+        )}
+        {user ? (
+          <>
+            <span className="mono nav-email" style={{ fontSize: 12, color: "var(--muted)" }}>{user.email}</span>
+            <button className="btn btn-outline btn-sm" onClick={onDash}>Dashboard</button>
+            <button className="btn btn-ghost btn-sm" onClick={onLogout}>Sign out</button>
+          </>
+        ) : (
+          <button className="btn btn-outline btn-sm" onClick={onLoginClick}>Sign in</button>
+        )}
+      </div>
+    </nav>
+    </>
+  );
+}
+
+function Footer({ onLegal }) {
+  return (
+    <footer className="footer">
+      <div className="footer-left">© {new Date().getFullYear()} LeadReap · Built for agencies</div>
+      <div className="footer-right">
+        <span className="footer-link" onClick={() => onLegal("privacy")}>Privacy</span>
+        <span className="footer-link" onClick={() => onLegal("terms")}>Terms</span>
+        <a className="footer-link" href="mailto:support@leadreap.com" style={{ textDecoration: "none", color: "inherit" }}>Support</a>
+      </div>
+    </footer>
+  );
+}
+
+function PricingModal({ onClose, onCheckout, loading }) {
+  const PLANS = [
+    {
+      id: "starter", name: "Starter", price: 29, note: "per month",
+      features: ["200 leads/day", "Email + Phone scraping", "XLSX export", "Search history", "Email support"],
+    },
+    {
+      id: "pro", name: "Pro", price: 79, note: "per month", featured: true,
+      features: ["600 leads/day", "Everything in Starter", "Saved Lists (up to 2,000 leads)", "Email sequences (5 steps)", "Webhooks & API access", "Priority support"],
+    },
+    {
+      id: "agency", name: "Agency", price: 149, note: "per month",
+      features: ["Unlimited leads", "Everything in Pro", "Team seats (up to 6)", "White-label PDF reports", "One-click site audits", "Dedicated onboarding"],
+    },
+  ];
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <button className="modal-close" onClick={onClose}>&times;</button>
+        <h2>Unlock More Leads</h2>
+        <p>Choose a plan to remove limits and access every feature.</p>
+        <div className="pricing-grid">
+          {PLANS.map(plan => (
+            <div key={plan.id} className={`plan-card ${plan.featured ? "featured" : ""}`}>
+              {plan.featured && <div className="plan-badge">MOST POPULAR</div>}
+              <div className="plan-name">{plan.name}</div>
+              <div className="plan-price"><sup>$</sup>{plan.price}</div>
+              <div className="plan-note">{plan.note}</div>
+              <div className="plan-features">
+                {plan.features.map(f => (
+                  <div key={f} className="plan-feature">
+                    <span className="check-icon">✓</span>
+                    <span>{f}</span>
+                  </div>
+                ))}
+              </div>
+              <button className={`btn ${plan.featured ? "btn-primary" : "btn-outline"} btn-sm`}
+                style={{ width: "100%", justifyContent: "center" }}
+                onClick={() => onCheckout(plan.id)} disabled={loading}>
+                {loading ? "Loading..." : `Get ${plan.name}`}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SavedListsGrid({ apiBase, token, onSelectList }) {
+  const [lists, setLists] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => { loadLists(); }, []);
+
+  async function loadLists() {
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/api/lists`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setLists(data.lists || []);
+    } catch {}
+    setLoading(false);
+  }
+
+  async function createList() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch(`${apiBase}/api/lists`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: newName }),
+      });
+      const data = await res.json();
+      if (res.ok) { setNewName(""); loadLists(); }
+      else alert(data.error || "Failed to create list");
+    } catch {}
+    setCreating(false);
+  }
+
+  async function deleteList(id, e) {
+    e.stopPropagation();
+    if (!confirm("Delete this list and all its leads?")) return;
+    await fetch(`${apiBase}/api/lists/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    loadLists();
+  }
+
+  if (loading) return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted)" }}>Loading lists...</div>;
+
+  return (
+    <>
+      <div className="lists-grid">
+        {lists.map(list => (
+          <div key={list.id} className="list-card" onClick={() => onSelectList(list.id)}>
+            <button className="list-card-delete" onClick={e => deleteList(list.id, e)}>&times;</button>
+            <div className="list-card-name">{list.name}</div>
+            {list.description && <div className="list-card-desc">{list.description}</div>}
+            <div className="list-card-meta">
+              <span><strong>{list.leadCount || 0}</strong> leads</span>
+              <span>{new Date(list.createdAt || Date.now()).toLocaleDateString()}</span>
+            </div>
+          </div>
+        ))}
+        <div className="list-card new-list-card">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", padding: 8 }}>
+            <div style={{ textAlign: "center", color: "var(--muted)", fontSize: 13 }}>+ New List</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                style={{ flex: 1, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "var(--text)", fontFamily: "IBM Plex Mono", outline: "none" }}
+                placeholder="List name..."
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && createList()}
+                onClick={e => e.stopPropagation()}
+              />
+              <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }}
+                onClick={e => { e.stopPropagation(); createList(); }}
+                disabled={!newName.trim() || creating}>
+                {creating ? "..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function LegalModal({ type, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="legal-modal">
+        <button className="legal-close" onClick={onClose}>&times;</button>
+        <h2>{type === "privacy" ? "Privacy Policy" : "Terms of Service"}</h2>
+        <div className="legal-updated">Last updated: January 2025</div>
+        {type === "privacy" ? (
+          <>
+            <h3>What We Collect</h3>
+            <p>We collect your email address when you sign up, and usage data such as searches performed and leads generated.</p>
+            <h3>How We Use It</h3>
+            <p>Your email is used only for account authentication (magic links) and optional product updates. We do not sell your data.</p>
+            <h3>Lead Data</h3>
+            <p>All business data surfaced by LeadReap is publicly available from Google Maps and business websites. We do not scrape or store personal data of private individuals.</p>
+            <h3>Contact</h3>
+            <p>For privacy requests, email: privacy@leadreap.com</p>
+          </>
+        ) : (
+          <>
+            <h3>Acceptable Use</h3>
+            <p>LeadReap is intended for legitimate B2B outreach, market research, and lead generation by businesses and agencies. You agree not to use the platform for spam, harassment, or any unlawful purpose.</p>
+            <h3>Data Accuracy</h3>
+            <p>Lead data is scraped from public sources and may not always be current or accurate. LeadReap makes no warranty as to the accuracy or completeness of any lead data.</p>
+            <h3>Refunds</h3>
+            <p>We offer a 7-day money-back guarantee on all paid plans. Contact support@leadreap.com to request a refund.</p>
+            <h3>Changes</h3>
+            <p>We may update these terms at any time. Continued use of the service constitutes acceptance of the updated terms.</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
