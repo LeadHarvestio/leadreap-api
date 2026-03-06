@@ -2458,8 +2458,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 {dashData.plan === "starter" && (
                   <div className="dash-upgrade-card">
                     <div className="upgrade-info">
-                      <div className="upgrade-title">Upgrade to Pro &mdash; just $50</div>
-                      <div className="upgrade-desc">Unlimited leads, email sequences, enrichment data, and webhook integrations</div>
+                      <div className="upgrade-title">Upgrade to Pro &mdash; just $100</div>
+                      <div className="upgrade-desc">Unlimited leads, email sequences, AI pitch writer, enrichment data, intent monitoring, and webhooks</div>
                     </div>
                     <button className="btn btn-primary btn-sm" onClick={() => onCheckout?.("pro")}>Upgrade &rarr;</button>
                   </div>
@@ -2467,8 +2467,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 {dashData.plan === "pro" && (
                   <div className="dash-upgrade-card">
                     <div className="upgrade-info">
-                      <div className="upgrade-title">Upgrade to Agency &mdash; just $100</div>
-                      <div className="upgrade-desc">Team seats, white-label PDF reports, public API, and shared lists</div>
+                      <div className="upgrade-title">Upgrade to Agency &mdash; just $200</div>
+                      <div className="upgrade-desc">Team seats, white-label PDF reports, proposal generator, public API, and shared lists</div>
                     </div>
                     <button className="btn btn-primary btn-sm" onClick={() => onCheckout?.("agency")}>Upgrade &rarr;</button>
                   </div>
@@ -3342,18 +3342,18 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             <div className="pricing-grid">
               {[
                 {
-                  name: "STARTER", planId: "starter", price: 47, note: "one-time payment",
+                  name: "STARTER", planId: "starter", price: 97, note: "one-time payment",
                   features: ["250 leads/month", "5 niches", "XLSX + CSV export", "Email + phone data", "Saved lists", "Email support"],
                   featured: false
                 },
                 {
-                  name: "PRO", planId: "pro", price: 97, note: "one-time payment",
-                  features: ["Unlimited leads", "All niches + custom", "XLSX + CSV export", "Lead enrichment data", "Email sequences", "Webhooks + integrations", "Priority support"],
+                  name: "PRO", planId: "pro", price: 197, note: "one-time payment",
+                  features: ["Unlimited leads", "All niches + custom", "XLSX + CSV export", "Lead enrichment data", "AI pitch writer", "Email sequences", "Intent monitoring", "Webhooks + integrations", "Priority support"],
                   featured: true, badge: "MOST POPULAR"
                 },
                 {
-                  name: "AGENCY", planId: "agency", price: 197, note: "one-time payment",
-                  features: ["Everything in Pro", "Team seats (up to 5)", "White-label PDF reports", "Public API access", "Shared team lists", "Dedicated support"],
+                  name: "AGENCY", planId: "agency", price: 397, note: "one-time payment",
+                  features: ["Everything in Pro", "Team seats (up to 5)", "White-label PDF reports", "Proposal generator", "Public API access", "Shared team lists", "Dedicated support"],
                   featured: false
                 }
               ].map((plan, i) => {
@@ -3362,7 +3362,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 const isCurrent = currentPlan === plan.planId;
                 const isDowngrade = (planOrder[currentPlan] || 0) > (planOrder[plan.planId] || 0);
                 const isUpgrade = currentPlan && currentPlan !== "free" && !isCurrent && !isDowngrade;
-                const priceDiffs = { starter: { pro: 50, agency: 150 }, pro: { agency: 100 } };
+                const priceDiffs = { starter: { pro: 100, agency: 300 }, pro: { agency: 200 } };
                 const upgradePrice = isUpgrade ? priceDiffs[currentPlan]?.[plan.planId] : null;
 
                 return (
