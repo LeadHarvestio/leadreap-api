@@ -1708,6 +1708,13 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   // Reports
   const [showReportModal, setShowReportModal] = useState(null);
 
+  // Intent monitoring
+  const [intentMonitors, setIntentMonitors] = useState([]);
+  const [intentSignals, setIntentSignals] = useState([]);
+  const [intentNewCount, setIntentNewCount] = useState(0);
+  const [intentScanning, setIntentScanning] = useState(false);
+  const [showIntentFeed, setShowIntentFeed] = useState(false);
+
   function loadDashLists() {
     if (!token) return;
     const endpoint = user?.plan === "agency" ? "/api/team/lists" : "/api/lists";
@@ -1741,6 +1748,30 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
       .then(r => r.json()).then(d => setApiKeysData(d.keys || [])).catch(() => {});
   }
 
+  function loadIntentData() {
+    if (!token || !isPro) return;
+    fetch(`${API_BASE}/api/intent/monitors`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => {
+        setIntentMonitors(d.monitors || []);
+        setIntentNewCount(d.newSignals || 0);
+      }).catch(() => {});
+  }
+  function loadIntentSignals() {
+    if (!token) return;
+    fetch(`${API_BASE}/api/intent/signals?limit=50`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setIntentSignals(d.signals || [])).catch(() => {});
+  }
+  async function triggerIntentScan() {
+    setIntentScanning(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/intent/scan`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (d.newSignals > 0) loadIntentSignals();
+      loadIntentData();
+    } catch {}
+    setIntentScanning(false);
+  }
+
   function openDashboard() {
     setShowDashboard(true);
     setViewingListId(null);
@@ -1749,9 +1780,11 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
     setEditingSequence(null);
     setShowSettings(false);
     setShowReportModal(null);
+    setShowIntentFeed(false);
     setDashLoading(true);
     loadDashLists();
     loadSequences();
+    if (isPro) loadIntentData();
     fetch(`${API_BASE}/api/account`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => r.json()).then(d => {
@@ -2061,9 +2094,10 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               if (showSequenceBuilder) { setShowSequenceBuilder(false); setEditingSequence(null); }
               else if (viewingSequenceId) { setViewingSequenceId(null); loadSequences(); }
               else if (showSettings) { setShowSettings(false); }
+              else if (showIntentFeed) { setShowIntentFeed(false); loadIntentData(); }
               else if (viewingListId) { setViewingListId(null); }
               else { setShowDashboard(false); }
-            }}>&larr; {showSequenceBuilder ? "Back to sequences" : viewingSequenceId ? "Back to dashboard" : showSettings ? "Back to dashboard" : viewingListId ? "Back to dashboard" : "Back to search"}</span>
+            }}>&larr; {showSequenceBuilder ? "Back to sequences" : viewingSequenceId ? "Back to dashboard" : showSettings ? "Back to dashboard" : showIntentFeed ? "Back to dashboard" : viewingListId ? "Back to dashboard" : "Back to search"}</span>
 
             {showSequenceBuilder ? (
               <SequenceBuilder
@@ -2242,6 +2276,101 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 onOutreach={(lead) => { setOutreachLead(lead); setShowOutreach(true); }}
                 onRunAudit={onRunAudit}
               />
+            ) : showIntentFeed ? (
+              /* ── Intent Signal Feed ──────────────────── */
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+                  <h3 style={{fontSize:18,fontWeight:700,margin:0}}>
+                    🎯 Intent Signals
+                    {intentNewCount > 0 && <span style={{marginLeft:8,fontSize:12,background:"rgba(240,180,41,0.12)",color:"var(--accent)",padding:"2px 8px",borderRadius:4,fontFamily:"IBM Plex Mono"}}>{intentNewCount} new</span>}
+                  </h3>
+                  <button className="btn btn-primary btn-sm" onClick={triggerIntentScan} disabled={intentScanning} style={{fontSize:12}}>
+                    {intentScanning ? "Scanning..." : "Scan Now"}
+                  </button>
+                </div>
+                <div style={{marginBottom:20,padding:"14px 16px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:intentMonitors.length > 0 ? 12 : 0}}>
+                    <span style={{fontSize:12,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>{intentMonitors.length} monitor{intentMonitors.length !== 1 ? "s" : ""} active</span>
+                    <button className="btn btn-outline btn-sm" style={{fontSize:11,padding:"4px 12px"}} onClick={() => {
+                      const name = prompt("Monitor name (e.g., 'Web Design Leads'):");
+                      if (!name?.trim()) return;
+                      const niches = prompt("Target niches, comma-separated (e.g., 'web design, marketing, SEO'):");
+                      const nicheList = niches ? niches.split(",").map(n => n.trim()).filter(Boolean) : [];
+                      fetch(`${API_BASE}/api/intent/monitors`, {
+                        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ name, niches: nicheList, keywords: nicheList }),
+                      }).then(r => r.json()).then(() => { loadIntentData(); loadIntentSignals(); });
+                    }}>+ New Monitor</button>
+                  </div>
+                  {intentMonitors.map(m => (
+                    <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderTop:"1px solid var(--border)",gap:8}}>
+                      <div>
+                        <span style={{fontSize:13,fontWeight:600}}>{m.name}</span>
+                        <span style={{fontSize:11,color:"var(--muted)",marginLeft:8,fontFamily:"IBM Plex Mono"}}>{m.niches?.join(", ") || "general"}</span>
+                      </div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"2px 8px",color:m.active ? "var(--green)" : "var(--muted)"}} onClick={() => {
+                          fetch(`${API_BASE}/api/intent/monitors/${m.id}/toggle`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ active: !m.active }) }).then(() => loadIntentData());
+                        }}>{m.active ? "Active" : "Paused"}</button>
+                        <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"2px 8px",color:"var(--red)"}} onClick={() => {
+                          if (confirm(`Delete monitor "${m.name}"?`)) fetch(`${API_BASE}/api/intent/monitors/${m.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }).then(() => loadIntentData());
+                        }}>×</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {intentSignals.length === 0 ? (
+                  <div style={{textAlign:"center",padding:"48px 20px",color:"var(--muted)"}}>
+                    <div style={{fontSize:32,marginBottom:12}}>🎯</div>
+                    <p style={{fontSize:14,marginBottom:8}}>No intent signals yet</p>
+                    <p style={{fontSize:12}}>Create a monitor and click "Scan Now" to find buy-ready leads on Reddit</p>
+                  </div>
+                ) : (
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    {intentSignals.map(sig => (
+                      <div key={sig.id} style={{
+                        padding:"16px 20px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:12,
+                        borderLeft:`3px solid ${sig.intent_score >= 70 ? "var(--green)" : sig.intent_score >= 50 ? "var(--accent)" : "var(--border)"}`,
+                        opacity: sig.status === "dismissed" ? 0.4 : 1,
+                      }}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:8}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
+                              <span style={{fontSize:11,fontFamily:"IBM Plex Mono",color:"var(--muted)",background:"var(--surface2)",padding:"2px 8px",borderRadius:4}}>r/{sig.subreddit}</span>
+                              <span style={{fontSize:10,fontFamily:"IBM Plex Mono",color:"var(--muted)"}}>{Math.round(sig.hours_ago)}h ago</span>
+                            </div>
+                            <a href={sig.url} target="_blank" rel="noopener noreferrer" style={{fontSize:14,fontWeight:600,color:"var(--text)",textDecoration:"none",lineHeight:1.4,display:"block"}}>{sig.title}</a>
+                            {sig.body && <p style={{fontSize:12,color:"var(--muted)",marginTop:6,lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{sig.body}</p>}
+                          </div>
+                          <div style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                            <div style={{
+                              width:40,height:40,borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",
+                              fontSize:14,fontWeight:800,fontFamily:"IBM Plex Mono",
+                              background:sig.intent_score >= 70 ? "rgba(34,197,94,0.1)" : sig.intent_score >= 50 ? "rgba(240,180,41,0.1)" : "var(--surface2)",
+                              color:sig.intent_score >= 70 ? "var(--green)" : sig.intent_score >= 50 ? "var(--accent)" : "var(--muted)",
+                              border:`1px solid ${sig.intent_score >= 70 ? "rgba(34,197,94,0.3)" : sig.intent_score >= 50 ? "rgba(240,180,41,0.3)" : "var(--border)"}`,
+                            }}>{sig.intent_score}</div>
+                            <span style={{fontSize:9,color:"var(--muted)",fontFamily:"IBM Plex Mono"}}>INTENT</span>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                          {sig.matched_niches?.map((n, i) => <span key={i} style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:"rgba(240,180,41,0.08)",color:"var(--accent)",fontFamily:"IBM Plex Mono",fontWeight:600}}>{n}</span>)}
+                          {sig.matched_phrases?.slice(0, 2).map((p, i) => <span key={`p${i}`} style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:"var(--surface2)",color:"var(--muted)",fontFamily:"IBM Plex Mono",fontStyle:"italic"}}>"{p}"</span>)}
+                        </div>
+                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                          <a href={sig.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{fontSize:11,padding:"5px 14px",textDecoration:"none"}}>Reply on Reddit ↗</a>
+                          {sig.status === "new" && <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"5px 10px"}} onClick={() => {
+                            fetch(`${API_BASE}/api/intent/signals/${sig.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: "viewed" }) }).then(() => loadIntentSignals());
+                          }}>Mark Read</button>}
+                          <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:"5px 10px",color:"var(--muted)"}} onClick={() => {
+                            fetch(`${API_BASE}/api/intent/signals/${sig.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: "dismissed" }) }).then(() => loadIntentSignals());
+                          }}>Dismiss</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : dashLoading ? (
               <div style={{textAlign:"center",padding:"60px 0",color:"var(--muted)"}}>Loading dashboard...</div>
             ) : dashData ? (
@@ -2423,6 +2552,30 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                     </div>
                   </div>
                 </div>
+
+                {/* Intent Signals */}
+                {isPro && (
+                  <div className="dash-section">
+                    <div className="dash-section-title">
+                      🎯 Intent Signals
+                      {intentNewCount > 0 && (
+                        <span style={{marginLeft:8,fontSize:11,background:"rgba(240,180,41,0.12)",color:"var(--accent)",padding:"2px 8px",borderRadius:4,fontFamily:"IBM Plex Mono",fontWeight:600}}>{intentNewCount} new</span>
+                      )}
+                    </div>
+                    <div className="lists-grid">
+                      <div className="list-card" onClick={() => { setShowIntentFeed(true); loadIntentSignals(); }} style={{borderLeft:"3px solid var(--accent)"}}>
+                        <div className="list-card-name">Reddit Monitoring</div>
+                        <div className="list-card-desc">
+                          {intentMonitors.length} monitor{intentMonitors.length !== 1 ? "s" : ""}
+                          {intentNewCount > 0 && <span style={{color:"var(--accent)"}}> &middot; {intentNewCount} new signals</span>}
+                        </div>
+                        <div className="list-card-meta">
+                          <span style={{fontSize:11,color:"var(--muted)"}}>Find buy-ready leads in real-time</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="dash-section">
                   <div className="dash-section-title">Search History</div>
