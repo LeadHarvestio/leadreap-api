@@ -303,3 +303,229 @@ export async function generateReport({
     doc.end();
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// AI PITCH WRITER — Generates hyper-personalized outreach
+// ─────────────────────────────────────────────────────────────
+
+export async function generateAIPitch(lead, { style = "casual", agencyName = "", agencyService = "" } = {}) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return generateFallbackPitch(lead, { style, agencyName, agencyService });
+  }
+
+  const signals = [];
+  if (lead.unclaimed) signals.push("Their Google Business listing is UNCLAIMED — anyone could claim it");
+  if (!lead.website) signals.push("They have NO website at all");
+  if (lead.gbpSignals?.isStale) signals.push("Their listing appears stale with no recent activity");
+  if (lead.gbpSignals?.isNewBusiness) signals.push("They opened within the last year — brand new business");
+  if (lead.gbpSignals?.photoCount < 5) signals.push("Very few photos on their Google listing");
+  if (!lead.gbpSignals?.hasOwnerResponses && lead.reviews >= 10) signals.push("They never respond to customer reviews");
+  if (lead.techStackSummary?.includes("Wix")) signals.push("Their website is built on Wix — likely needs a professional upgrade");
+  if (lead.techStackSummary?.includes("Weebly")) signals.push("Their website is built on Weebly — outdated platform");
+  if (!lead.facebook && !lead.instagram) signals.push("No social media presence found");
+  if (lead.reviews < 20 && lead.rating) signals.push(`Only ${lead.reviews} reviews despite being established`);
+  if (lead.rating && lead.rating < 4.0) signals.push(`Below-average ${lead.rating}-star rating — reputation management opportunity`);
+
+  const prompt = `You are writing a cold outreach email for a marketing/web agency to send to a local business owner. Write ONLY the email body — no subject line, no explanation, no formatting notes.
+
+BUSINESS DATA:
+- Name: ${lead.name}
+- Category: ${lead.category || "Local Business"}
+- Rating: ${lead.rating || "N/A"} stars (${lead.reviews || 0} reviews)
+- Website: ${lead.website || "NONE"}
+- Location: ${lead.address || "Unknown"}
+${lead.ownerName ? `- Owner: ${lead.ownerName}` : ""}
+
+KEY SIGNALS (these are your pitch angles):
+${signals.length > 0 ? signals.map(s => `• ${s}`).join("\n") : "• General local business with room for digital growth"}
+
+STYLE: ${style === "formal" ? "Professional and polished" : style === "bold" ? "Confident and direct, mention specific numbers/stats" : "Casual, friendly, like a helpful neighbor"}
+${agencyName ? `AGENCY: ${agencyName}` : ""}
+${agencyService ? `PRIMARY SERVICE: ${agencyService}` : ""}
+
+RULES:
+- Reference their SPECIFIC business name and at least 2 signals above
+- Keep it under 150 words
+- End with a soft call-to-action (quick call, not a hard sell)
+- Sound human, not like a template
+- Do NOT use placeholder brackets like [Your Name]
+- Sign off with just a first name or the agency name`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 500,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text;
+    if (!text) throw new Error("No response from AI");
+
+    return {
+      pitch: text.trim(),
+      signals,
+      model: "claude-sonnet",
+      generated: true,
+    };
+  } catch (err) {
+    console.error("[AI Pitch] API error:", err.message);
+    return generateFallbackPitch(lead, { style, agencyName, agencyService });
+  }
+}
+
+function generateFallbackPitch(lead, { style, agencyName, agencyService }) {
+  const biz = lead.name || "your business";
+  const greeting = lead.ownerName ? `Hi ${lead.ownerName.split(" ")[0]}` : "Hi there";
+
+  const angles = [];
+  if (lead.unclaimed) angles.push(`I noticed your Google listing for ${biz} hasn't been claimed yet — this means you're missing out on a ton of free visibility and anyone could potentially take control of it.`);
+  if (!lead.website) angles.push(`I couldn't find a website for ${biz} — in today's market, that's leaving a lot of potential customers on the table.`);
+  if (lead.reviews < 20 && lead.rating) angles.push(`With ${lead.reviews} reviews and a solid ${lead.rating}-star rating, there's a huge opportunity to boost your online presence and get more customers through the door.`);
+  if (lead.gbpSignals?.isNewBusiness) angles.push(`Congrats on the new business! The first year is when establishing a strong online presence makes the biggest impact.`);
+
+  const mainAngle = angles[0] || `I came across ${biz} and was impressed by your ${lead.rating ? lead.rating + "-star rating" : "presence"} — I think there's room to turn that into even more customers.`;
+
+  const pitch = `${greeting},
+
+${mainAngle}
+
+I help local businesses like yours get more customers through ${agencyService || "digital marketing and web presence optimization"}. I had a few specific ideas for ${biz} that I think could make a real difference.
+
+Would you be open to a quick 10-minute call this week? No pressure — just want to share what I found.
+
+Best,
+${agencyName || "[Your Name]"}`;
+
+  return {
+    pitch: pitch.trim(),
+    signals: angles.length > 0 ? ["Custom pitch based on business signals"] : ["Generic outreach"],
+    model: "template-fallback",
+    generated: false,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROPOSAL GENERATOR — Branded PDF proposal from lead + audit data
+// ─────────────────────────────────────────────────────────────
+
+export function generateProposal({ lead, auditData, agencyName, contactEmail, contactPhone, services }) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 50, bufferPages: true });
+    const chunks = [];
+    doc.on("data", chunk => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const W = doc.page.width;
+    const leftM = 50;
+    const contentW = W - 100;
+    const biz = lead.name || "Business";
+
+    // ── Cover Page ──
+    doc.rect(0, 0, W, 180).fill(COLORS.dark);
+    doc.fontSize(28).font("Helvetica-Bold").fillColor("#ffffff")
+      .text(agencyName || "Growth Proposal", leftM, 60, { width: contentW });
+    doc.fontSize(14).fillColor(COLORS.accent)
+      .text(`Prepared for ${biz}`, leftM, 100, { width: contentW });
+    doc.fontSize(10).fillColor("#888888")
+      .text(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), leftM, 130, { width: contentW });
+
+    doc.moveDown(6);
+
+    // ── Business Overview ──
+    doc.fontSize(18).font("Helvetica-Bold").fillColor(COLORS.dark).text("Business Overview");
+    doc.moveDown(0.5);
+
+    const overview = [
+      ["Business", biz],
+      ["Category", lead.category || "Local Business"],
+      ["Location", lead.address || "—"],
+      ["Rating", lead.rating ? `${lead.rating} stars (${lead.reviews || 0} reviews)` : "—"],
+      ["Website", lead.website || "None"],
+      ["Email", lead.email || "—"],
+    ];
+
+    for (const [label, value] of overview) {
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(COLORS.muted).text(label.toUpperCase(), leftM, doc.y, { continued: true, width: 100 });
+      doc.font("Helvetica").fillColor(COLORS.dark).text(`  ${value}`);
+      doc.moveDown(0.3);
+    }
+
+    doc.moveDown(1);
+
+    // ── Key Findings ──
+    doc.fontSize(18).font("Helvetica-Bold").fillColor(COLORS.dark).text("Key Findings");
+    doc.moveDown(0.5);
+
+    const findings = [];
+    if (lead.unclaimed) findings.push({ issue: "Unclaimed Google Listing", severity: "high", detail: "Anyone could claim this listing. The business is missing out on free features like responding to reviews, updating hours, and posting updates." });
+    if (!lead.website) findings.push({ issue: "No Website", severity: "high", detail: "This business has no web presence beyond Google Maps. They're invisible to anyone searching online." });
+    if (lead.gbpSignals?.isStale) findings.push({ issue: "Stale Online Presence", severity: "medium", detail: "No recent activity on their Google listing. This signals to customers and Google that the business may be inactive." });
+    if (!lead.gbpSignals?.hasOwnerResponses && lead.reviews >= 10) findings.push({ issue: "No Review Responses", severity: "medium", detail: `${lead.reviews} reviews and the owner has never responded. This is a missed opportunity to build trust and loyalty.` });
+    if (lead.gbpSignals?.photoCount < 5) findings.push({ issue: "Few Photos", severity: "low", detail: "Listings with 10+ photos get 35% more clicks. This business has fewer than 5." });
+    if (lead.reviews < 20) findings.push({ issue: "Low Review Count", severity: "medium", detail: `Only ${lead.reviews} reviews. A structured review generation campaign could significantly boost visibility.` });
+    if (lead.techStackSummary?.includes("Wix") || lead.techStackSummary?.includes("Weebly")) findings.push({ issue: "Outdated Website Platform", severity: "medium", detail: "Built on a DIY platform that limits SEO performance and conversion optimization." });
+    if (!lead.facebook && !lead.instagram) findings.push({ issue: "No Social Media", severity: "medium", detail: "No Facebook or Instagram presence found. Missing out on the #1 discovery channel for local businesses." });
+
+    if (findings.length === 0) {
+      findings.push({ issue: "General Digital Presence", severity: "low", detail: "Solid foundation, but there's always room to optimize and grow online visibility." });
+    }
+
+    for (const f of findings) {
+      const color = f.severity === "high" ? "#ef4444" : f.severity === "medium" ? COLORS.accent : COLORS.muted;
+      doc.fontSize(12).font("Helvetica-Bold").fillColor(color).text(`● ${f.issue}`);
+      doc.fontSize(10).font("Helvetica").fillColor(COLORS.dark).text(f.detail, { indent: 16 });
+      doc.moveDown(0.5);
+    }
+
+    // ── Page break for recommendations ──
+    doc.addPage();
+
+    // ── Recommended Services ──
+    doc.fontSize(18).font("Helvetica-Bold").fillColor(COLORS.dark).text("Recommended 3-Month Plan");
+    doc.moveDown(0.5);
+
+    const recs = services?.length > 0 ? services : [
+      { name: "Google Business Optimization", desc: "Claim, verify, and fully optimize the Google Business Profile with photos, posts, hours, and keyword-rich descriptions.", timeline: "Week 1-2" },
+      { name: "Website Design & SEO", desc: "Build a fast, mobile-optimized website with local SEO targeting and clear calls-to-action.", timeline: "Week 2-4" },
+      { name: "Review Generation Strategy", desc: "Implement automated review request system to build social proof and improve search rankings.", timeline: "Week 3-6" },
+      { name: "Social Media Setup", desc: "Create and optimize Facebook and Instagram profiles. Establish content calendar and posting schedule.", timeline: "Week 4-8" },
+      { name: "Ongoing Management", desc: "Monthly reporting, review monitoring, content updates, and performance optimization.", timeline: "Month 2-3+" },
+    ];
+
+    for (let i = 0; i < recs.length; i++) {
+      const r = recs[i];
+      doc.fontSize(12).font("Helvetica-Bold").fillColor(COLORS.accent).text(`${i + 1}. ${r.name}`);
+      doc.fontSize(10).font("Helvetica").fillColor(COLORS.dark).text(r.desc, { indent: 16 });
+      if (r.timeline) {
+        doc.fontSize(9).fillColor(COLORS.muted).text(`Timeline: ${r.timeline}`, { indent: 16 });
+      }
+      doc.moveDown(0.5);
+    }
+
+    doc.moveDown(1);
+
+    // ── CTA ──
+    const ctaY = doc.y;
+    doc.rect(leftM, ctaY, contentW, 70).fill(COLORS.dark);
+    doc.fontSize(14).font("Helvetica-Bold").fillColor("#ffffff")
+      .text("Ready to get started?", leftM + 20, ctaY + 15, { width: contentW - 40 });
+    doc.fontSize(10).fillColor(COLORS.accent)
+      .text(`${contactEmail || ""}${contactPhone ? "  •  " + contactPhone : ""}`, leftM + 20, ctaY + 40, { width: contentW - 40 });
+
+    doc.fontSize(8).font("Helvetica").fillColor(COLORS.muted)
+      .text(`Prepared by ${agencyName || "Your Agency"} — Confidential`, leftM, doc.page.height - 40, { width: contentW, align: "center" });
+
+    doc.end();
+  });
+}
