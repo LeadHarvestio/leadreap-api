@@ -314,20 +314,22 @@ export default function App() {
 
                 <button onClick={async () => {
                   try {
-                    const html2canvas = (await import("html2canvas")).default;
-                    const jsPDF = (await import("jspdf")).default;
-                    const el = document.getElementById("audit-report-content");
-                    if (!el) return;
-                    const canvas = await html2canvas(el, { backgroundColor: "#111114", scale: 2 });
-                    const imgData = canvas.toDataURL("image/png");
-                    const pdf = new jsPDF("p", "mm", "a4");
-                    const w = pdf.internal.pageSize.getWidth();
-                    const h = (canvas.height * w) / canvas.width;
-                    pdf.addImage(imgData, "PNG", 0, 0, w, h);
-                    pdf.save(`LeadReap-Audit-${auditData.url.replace(/[^a-z0-9]/gi, "_").slice(0, 40)}.pdf`);
+                    const res = await fetch(`${API_BASE}/api/audit/pdf`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ auditData }),
+                    });
+                    if (!res.ok) throw new Error("PDF generation failed");
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `LeadReap-Audit-${auditData.url.replace(/[^a-z0-9]/gi, "_").slice(0, 40)}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
                   } catch (e) {
                     console.error("PDF export failed:", e);
-                    alert("PDF export failed — try right-click → Print → Save as PDF instead.");
+                    alert("PDF export failed — try again.");
                   }
                 }} style={{
                   width:"100%",background:"#f0b429",color:"#000",border:"none",
