@@ -1569,12 +1569,18 @@ const LOADING_TIPS = [
 
 // ── Feature Carousel (auto-rotating, one at a time) ─────────
 const FEATURES = [
+  { icon: "✨", title: "AI Pitch Writer", desc: "Click a button and get a hyper-personalized cold email — not a template. References the lead's actual website, reviews, and gaps. Powered by AI." },
+  { icon: "🎯", title: "Reddit Intent Monitoring", desc: "Find people actively posting \"looking for a web designer\" or \"need marketing help\" on Reddit. Real-time buy-ready signals delivered to your dashboard." },
+  { icon: "🔍", title: "Site Audit Engine", desc: "Run a 10-point diagnostic on any lead's website — SSL, SEO, analytics, social tracking, mobile optimization. Auto-generates sales angles for your pitch." },
   { icon: "📧", title: "Email Sequences", desc: "Automate 3-step cold outreach that sends on autopilot. Personalize with lead data — name, business, city — and let the follow-ups run themselves." },
-  { icon: "📊", title: "Lead Enrichment", desc: "Every lead comes with estimated revenue, employee count, tech stack detection, and business signals — so you know exactly who to target first." },
+  { icon: "📊", title: "Lead Enrichment + GBP Signals", desc: "Revenue estimates, employee count, tech stack, plus Google Business signals — stale listings, no review responses, few photos, new businesses." },
+  { icon: "🤖", title: "AI Lead Scoring", desc: "Every lead scored 0–100 based on reviews, website quality, social presence, and online signals. Focus your outreach on leads most likely to convert." },
+  { icon: "💼", title: "Job Posting Signals", desc: "Businesses hiring for marketing roles are literally advertising they need help. We surface these signals so you can pitch before they hire." },
+  { icon: "📄", title: "Proposal Generator", desc: "Auto-generate branded PDF proposals for any lead — findings, recommended services, 3-month plan. Turn cold emails into warm pitches." },
   { icon: "💾", title: "Saved Lists + CRM", desc: "Organize leads into named lists. Tag status (new, contacted, closed), add notes, and build a lightweight pipeline — no external CRM needed." },
   { icon: "⬇️", title: "XLSX + CSV Export", desc: "Download all your leads as a clean spreadsheet. Import directly into HubSpot, GoHighLevel, Mailchimp, or any CRM you already use." },
-  { icon: "🤖", title: "AI Lead Scoring", desc: "Every lead scored 0–100 based on reviews, website quality, social presence, and online signals. Focus your outreach on leads most likely to convert." },
   { icon: "🔗", title: "Webhooks + API", desc: "Push new leads to Zapier, Make.com, or your own backend in real-time. Build custom integrations with the public REST API and signed webhooks." },
+  { icon: "👥", title: "Team Seats + White-Label", desc: "Invite up to 5 team members, share lists, and generate white-label PDF reports for clients. Built for agencies managing multiple accounts." },
 ];
 
 function FeatureCarousel({ onShowPricing }) {
@@ -2639,10 +2645,10 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         ) : (
         <>
         <div className="hero">
-          <div className="hero-tag"><div className="dot" /> AI-POWERED LEAD INTELLIGENCE</div>
-          <h1 className="hero-desktop">Find <em>verified</em> local business leads<br />in under 30 seconds</h1>
-          <h1 className="hero-mobile">Find <em>verified</em> local leads in seconds</h1>
-          <p>Search any niche, any city. Get emails, phone numbers, revenue estimates, and AI lead scores &mdash; export to CSV and start outreach today.</p>
+          <div className="hero-tag"><div className="dot" /> AI-POWERED LOCAL LEAD PLATFORM</div>
+          <h1 className="hero-desktop">Find, score, and close<br /><em>local business</em> leads</h1>
+          <h1 className="hero-mobile">Find &amp; close <em>local</em> leads faster</h1>
+          <p>Search any niche, any city. Get verified emails, AI-written pitches, site audits, intent signals from Reddit, and revenue estimates &mdash; all in one platform.</p>
           <div className="hero-stats">
             <div className="stat"><div className="stat-num">80+</div><div className="stat-label">Built-in niches</div></div>
             <div className="stat"><div className="stat-num">94%</div><div className="stat-label">Email accuracy</div></div>
@@ -3164,31 +3170,45 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                 <div className="m-section-label">What you get</div>
                 <div className="m-feat-list">
                   <div className="m-feat">
-                    <div className="m-feat-icon">📧</div>
+                    <div className="m-feat-icon">✨</div>
                     <div className="m-feat-text">
-                      <div className="m-feat-title">Verified emails</div>
-                      <div className="m-feat-desc">Live MX-checked, not scraped from stale databases</div>
+                      <div className="m-feat-title">AI pitch writer</div>
+                      <div className="m-feat-desc">Personalized cold emails based on each lead's actual data</div>
                     </div>
                   </div>
                   <div className="m-feat">
-                    <div className="m-feat-icon">🤖</div>
+                    <div className="m-feat-icon">🎯</div>
                     <div className="m-feat-text">
-                      <div className="m-feat-title">AI lead scoring</div>
-                      <div className="m-feat-desc">Every lead scored 0–100 based on online signals</div>
+                      <div className="m-feat-title">Reddit intent signals</div>
+                      <div className="m-feat-desc">Find people actively looking for your services</div>
                     </div>
                   </div>
                   <div className="m-feat">
-                    <div className="m-feat-icon">📊</div>
+                    <div className="m-feat-icon">🔍</div>
                     <div className="m-feat-text">
-                      <div className="m-feat-title">Revenue estimates</div>
-                      <div className="m-feat-desc">Employee count, tech stack, and business signals</div>
+                      <div className="m-feat-title">Site audit engine</div>
+                      <div className="m-feat-desc">10-point diagnostic with ready-to-use sales angles</div>
                     </div>
                   </div>
                   <div className="m-feat">
                     <div className="m-feat-icon">📧</div>
                     <div className="m-feat-text">
                       <div className="m-feat-title">Email sequences</div>
-                      <div className="m-feat-desc">3-step automated outreach with personalization</div>
+                      <div className="m-feat-desc">3-step automated outreach on autopilot</div>
+                    </div>
+                  </div>
+                  <div className="m-feat">
+                    <div className="m-feat-icon">📊</div>
+                    <div className="m-feat-text">
+                      <div className="m-feat-title">Lead enrichment</div>
+                      <div className="m-feat-desc">Revenue, employees, tech stack, GBP signals</div>
+                    </div>
+                  </div>
+                  <div className="m-feat">
+                    <div className="m-feat-icon">📄</div>
+                    <div className="m-feat-text">
+                      <div className="m-feat-title">Proposal generator</div>
+                      <div className="m-feat-desc">Branded PDF proposals from lead data</div>
                     </div>
                   </div>
                 </div>
@@ -3267,6 +3287,37 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
 
               {/* Auto-rotating feature carousel */}
               <FeatureCarousel onShowPricing={() => { setPricingContext(null); setShowPricing(true); }} />
+
+              {/* Platform differentiators — desktop only */}
+              <div style={{marginTop:48,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,maxWidth:900,marginLeft:"auto",marginRight:"auto"}}>
+                <div style={{padding:"24px",borderRadius:14,border:"1px solid var(--border)",background:"var(--surface)",textAlign:"center"}}>
+                  <div style={{fontSize:28,marginBottom:10}}>🧠</div>
+                  <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>AI-Powered Outreach</div>
+                  <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.6}}>
+                    AI writes personalized pitches referencing each lead's actual website, reviews, and gaps. Plus automated email sequences.
+                  </div>
+                </div>
+                <div style={{padding:"24px",borderRadius:14,border:"1px solid var(--border)",background:"var(--surface)",textAlign:"center"}}>
+                  <div style={{fontSize:28,marginBottom:10}}>🎯</div>
+                  <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>Buy-Ready Intent Signals</div>
+                  <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.6}}>
+                    Monitor Reddit for people actively looking for your services. Spot businesses hiring for marketing. Find stale listings and new openings.
+                  </div>
+                </div>
+                <div style={{padding:"24px",borderRadius:14,border:"1px solid var(--border)",background:"var(--surface)",textAlign:"center"}}>
+                  <div style={{fontSize:28,marginBottom:10}}>🔍</div>
+                  <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>Audit &amp; Close</div>
+                  <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.6}}>
+                    Run site audits that generate sales angles automatically. Create branded PDF proposals. Turn cold leads into warm pitches.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{textAlign:"center",marginTop:32,marginBottom:16}}>
+                <div style={{fontSize:12,color:"var(--muted)",fontFamily:"IBM Plex Mono",lineHeight:1.7}}>
+                  Everything your competitors charge <span style={{color:"var(--accent)"}}>$100+/month</span> for &mdash; yours with a one-time purchase.
+                </div>
+              </div>
             </div>
           )}
         </div>
