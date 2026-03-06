@@ -18,6 +18,9 @@ export default function App() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
+  // Upgrade celebration
+  const [upgradedPlan, setUpgradedPlan] = useState(null);
+
   // Audit state
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditData, setAuditData] = useState(null);
@@ -49,15 +52,16 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
-    const plan = params.get("plan"); // from post-payment redirect
+    const upgradedParam = params.get("upgraded");
 
     if (code) {
       verifyCode(code);
       window.history.replaceState({}, "", "/");
     }
-    if (plan) {
-      // User returned from successful payment — refresh their auth
-      checkAuth();
+    if (upgradedParam) {
+      // User returned from successful Stripe payment
+      setUpgradedPlan(upgradedParam);
+      checkAuth(); // refresh their plan
       window.history.replaceState({}, "", "/");
     }
   }, []);
@@ -218,6 +222,8 @@ export default function App() {
         onCheckout={handleCheckout}
         onRefreshAuth={checkAuth}
         onRunAudit={handleRunAudit}
+        upgradedPlan={upgradedPlan}
+        onDismissUpgrade={() => setUpgradedPlan(null)}
       />
 
       {/* AUDIT RESULTS MODAL */}
