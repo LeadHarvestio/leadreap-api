@@ -41,46 +41,12 @@ const PLANS = {
 // CREATE CHECKOUT — generates a Stripe Checkout Session URL
 // ─────────────────────────────────────────────────────────────
 export async function createCheckout(plan, email) {
-  // 1. Fetch the user from your DB to check their current plan
-  const user = await db.get("SELECT plan FROM users WHERE email = ?", [email]);
-  
-  let priceInCents = 0;
-  const currentPlan = user?.plan || "free";
+  const planConfig = PLANS[plan];
+  if (!planConfig) throw new Error(`Unknown plan: ${plan}`);
 
-  // 2. Logic to calculate the "Difference" price
-  if (currentPlan === "free") {
-    if (plan === "starter") priceInCents = 4700;
-    if (plan === "pro") priceInCents = 9700;
-    if (plan === "agency") priceInCents = 19700;
-  } else if (currentPlan === "starter") {
-    if (plan === "pro") priceInCents = 5000;   // $97 - $47
-    if (plan === "agency") priceInCents = 15000; // $197 - $47
-  } else if (currentPlan === "pro") {
-    if (plan === "agency") priceInCents = 10000; // $197 - $97
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not set");
   }
-
-  // 3. Create the Stripe Session with the dynamic price
-  const session = await stripe.checkout.sessions.create({
-    customer_email: email,
-    payment_method_types: ["card"],
-    line_items: [{
-      price_data: {
-        currency: "usd",
-        product_data: { 
-          name: `LeadReap ${plan.toUpperCase()} Upgrade`,
-          description: `Upgrading from ${currentPlan} to ${plan}`
-        },
-        unit_amount: priceInCents,
-      },
-      quantity: 1,
-    }],
-    mode: "payment",
-    success_url: `${process.env.FRONTEND_URL}/dashboard?success=true`,
-    cancel_url: `${process.env.FRONTEND_URL}/dashboard`,
-  });
-
-  return { checkoutUrl: session.url };
-}
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
