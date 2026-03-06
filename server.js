@@ -45,7 +45,7 @@ import {
 } from "./auth.js";
 import { createCheckout, createUpgradeCheckout, getUpgradePrice, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail, sendSequenceEmail, sendTeamInviteEmail, sendWelcomeEmail, sendFollowUpEmail } from "./email.js";
-import { generateReport, generateAIPitch, generateProposal } from "./reports.js";
+import { generateReport, generateAIPitch, generateProposal, generateAuditPDF } from "./reports.js";
 import { scanForIntentSignals, DEFAULT_SUBREDDITS } from "./scraper/reddit.js";
 import { scanJobPostings, checkBusinessHiring } from "./scraper/jobs.js";
 import { attachUser, requireAuth, requireSearchQuota, ipRateLimit, requireAgency, requirePro } from "./middleware.js";
@@ -1024,6 +1024,26 @@ app.post("/api/audit", requireAuth, async (req, res) => {
       : e.code === "ENOTFOUND" ? "Domain not found — check the URL"
       : "Could not reach the site — it may be down or blocking requests";
     return res.status(400).json({ error: errorMsg });
+  }
+});
+
+
+// ═════════════════════════════════════════════════════════════
+// AUDIT PDF EXPORT
+// ═════════════════════════════════════════════════════════════
+
+app.post("/api/audit/pdf", requireAuth, async (req, res) => {
+  try {
+    const { auditData } = req.body;
+    if (!auditData?.url) return res.status(400).json({ error: "Audit data required" });
+
+    const buffer = await generateAuditPDF(auditData);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="LeadReap-Audit-${auditData.url.replace(/[^a-z0-9]/gi, "_").slice(0, 40)}.pdf"`);
+    return res.send(buffer);
+  } catch (e) {
+    console.error("[Audit PDF] Error:", e.message);
+    return res.status(500).json({ error: "PDF generation failed" });
   }
 });
 
