@@ -874,6 +874,160 @@ app.post("/api/cache/clear", (req, res) => {
 });
 
 // ═════════════════════════════════════════════════════════════
+// SITE AUDIT ENGINE
+// ═════════════════════════════════════════════════════════════
+
+app.post("/api/audit", requireAuth, async (req, res) => {
+  let { url } = req.body;
+  if (!url) return res.status(400).json({ error: "URL required" });
+
+  // Normalize URL
+  if (!url.startsWith("http")) url = "https://" + url;
+  url = url.replace(/\/+$/, "");
+
+  try {
+    // Fetch the page HTML
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    const html = await response.text();
+    const lower = html.toLowerCase();
+    const finalUrl = response.url || url;
+
+    // ── SSL Check ──
+    const ssl = finalUrl.startsWith("https://");
+
+    // ── SEO Checks ──
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const hasTitle = !!(titleMatch && titleMatch[1].trim().length > 0);
+    const titleText = titleMatch ? titleMatch[1].trim() : "";
+
+    const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([\s\S]*?)["']/i)
+                   || html.match(/<meta[^>]*content=["']([\s\S]*?)["'][^>]*name=["']description["']/i);
+    const hasDescription = !!(descMatch && descMatch[1].trim().length > 0);
+    const descText = descMatch ? descMatch[1].trim() : "";
+
+    const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    const hasH1 = !!(h1Match && h1Match[1].replace(/<[^>]+>/g, "").trim().length > 0);
+
+    // ── Tech Detection ──
+    const hasPixel = lower.includes("fbq(") || lower.includes("facebook.com/tr") || lower.includes("connect.facebook.net");
+    const hasAnalytics = lower.includes("gtag(") || lower.includes("google-analytics.com") || lower.includes("googletagmanager.com") || lower.includes("ga('");
+    const hasGTM = lower.includes("googletagmanager.com/gtm.js");
+
+    // Additional tech signals
+    const hasWordPress = lower.includes("wp-content") || lower.includes("wp-includes");
+    const hasWix = lower.includes("wix.com") || lower.includes("parastorage.com");
+    const hasSquarespace = lower.includes("squarespace.com") || lower.includes("sqsp.com");
+    const hasShopify = lower.includes("shopify.com") || lower.includes("cdn.shopify");
+    const hasHotjar = lower.includes("hotjar.com");
+    const hasChatWidget = lower.includes("tawk.to") || lower.includes("crisp.chat") || lower.includes("intercom") || lower.includes("drift.com") || lower.includes("livechat");
+    const hasSchemaMarkup = lower.includes("schema.org") || lower.includes("application/ld+json");
+    const hasViewport = lower.includes('name="viewport"') || lower.includes("name='viewport'");
+    const hasOgTags = lower.includes('property="og:') || lower.includes("property='og:");
+
+    // ── Calculate Score ──
+    let score = 0;
+    if (ssl) score += 15;
+    if (hasTitle) score += 15;
+    if (hasDescription) score += 15;
+    if (hasH1) score += 10;
+    if (hasPixel) score += 10;
+    if (hasAnalytics) score += 10;
+    if (hasViewport) score += 10;
+    if (hasSchemaMarkup) score += 5;
+    if (hasOgTags) score += 5;
+    if (hasChatWidget) score += 5;
+
+    // ── Generate Sales Angles ──
+    const salesAngles = [];
+
+    if (!ssl) salesAngles.push({
+      issue: "No SSL certificate (site loads over HTTP)",
+      hook: "Your site isn't secure — browsers show a 'Not Secure' warning to every visitor. This kills trust instantly. We can fix this in 24 hours.",
+    });
+    if (!hasTitle || titleText.length < 10) salesAngles.push({
+      issue: "Missing or weak page title",
+      hook: "Your homepage title is what shows up in Google search results. Right now it's either missing or too short to rank well. A proper title alone can boost your click-through rate by 20-30%.",
+    });
+    if (!hasDescription) salesAngles.push({
+      issue: "No meta description",
+      hook: "When people search for your business on Google, there's no description showing up under your link. That means Google is pulling random text from your page. A custom description could double your clicks from search.",
+    });
+    if (!hasH1) salesAngles.push({
+      issue: "No H1 heading tag",
+      hook: "Your homepage is missing a main heading — this is one of the first things Google looks at to understand what your business does. Easy fix, big SEO impact.",
+    });
+    if (!hasPixel) salesAngles.push({
+      issue: "No Facebook Pixel installed",
+      hook: "You're not tracking visitors with a Facebook Pixel, which means you can't retarget people who visit your site. Every day without it is lost data you can never get back.",
+    });
+    if (!hasAnalytics) salesAngles.push({
+      issue: "No Google Analytics or Tag Manager",
+      hook: "There's no analytics tracking on your site — you literally can't see how many people visit, where they come from, or what they do. Flying blind.",
+    });
+    if (!hasViewport) salesAngles.push({
+      issue: "Not mobile-optimized",
+      hook: "Your site doesn't have a mobile viewport tag — it probably looks broken on phones. Over 60% of local searches happen on mobile. This is costing you customers right now.",
+    });
+    if (!hasSchemaMarkup) salesAngles.push({
+      issue: "No schema markup / structured data",
+      hook: "Your site doesn't use schema markup, which means Google can't show rich results like star ratings, hours, and pricing in search. Your competitors who do this get more clicks.",
+    });
+    if (hasWix) salesAngles.push({
+      issue: "Built on Wix — limited SEO potential",
+      hook: "Your site is built on Wix, which has real limitations for SEO and page speed. A professional rebuild on a faster platform could significantly improve your rankings and conversions.",
+    });
+    if (!hasOgTags) salesAngles.push({
+      issue: "No Open Graph tags for social sharing",
+      hook: "When someone shares your site on Facebook, LinkedIn, or iMessage, it shows a blank preview with no image or description. Adding OG tags takes 5 minutes and makes every share look professional.",
+    });
+
+    return res.json({
+      url: finalUrl,
+      score,
+      seo: {
+        title: hasTitle,
+        titleText,
+        description: hasDescription,
+        descriptionText: descText,
+        h1: hasH1,
+        schemaMarkup: hasSchemaMarkup,
+        ogTags: hasOgTags,
+        viewport: hasViewport,
+      },
+      tech: {
+        ssl,
+        pixel: hasPixel,
+        analytics: hasAnalytics,
+        gtm: hasGTM,
+        wordpress: hasWordPress,
+        wix: hasWix,
+        squarespace: hasSquarespace,
+        shopify: hasShopify,
+        hotjar: hasHotjar,
+        chatWidget: hasChatWidget,
+      },
+      salesAngles,
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error("[Audit] Error auditing", url, ":", e.message);
+    const errorMsg = e.name === "AbortError" ? "Site took too long to respond (>12s)"
+      : e.code === "ENOTFOUND" ? "Domain not found — check the URL"
+      : "Could not reach the site — it may be down or blocking requests";
+    return res.status(400).json({ error: errorMsg });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
 // AI PITCH WRITER
 // ═════════════════════════════════════════════════════════════
 
