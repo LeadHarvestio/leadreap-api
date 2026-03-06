@@ -248,62 +248,63 @@ export default function App() {
                 <p style={{color:"#6b6b80",fontSize:14}}>Running a 6-point SEO &amp; tech diagnostic</p>
               </div>
             ) : auditData ? (
-              <div id="audit-report-content">
-                <div style={{display:"flex",alignItems:"center",gap:20,marginBottom:28}}>
-                  <div style={{
-                    width:72,height:72,borderRadius:36,
-                    border:`4px solid ${auditData.score >= 70 ? "#22c55e" : auditData.score >= 40 ? "#f0b429" : "#ef4444"}`,
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:24,fontWeight:800,flexShrink:0,
-                  }}>{auditData.score}</div>
-                  <div>
-                    <h2 style={{fontSize:20,fontWeight:800,marginBottom:4}}>Site Audit Report</h2>
-                    <p style={{color:"#6b6b80",fontSize:13,fontFamily:"IBM Plex Mono, monospace",wordBreak:"break-all"}}>{auditData.url}</p>
-                  </div>
-                </div>
-
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
-                  {[
-                    { label: "SSL Security", pass: auditData.tech.ssl },
-                    { label: "H1 Header", pass: auditData.seo.h1 },
-                    { label: "SEO Title", pass: auditData.seo.title },
-                    { label: "Meta Description", pass: auditData.seo.description },
-                    { label: "Facebook Pixel", pass: auditData.tech.pixel },
-                    { label: "Google Analytics", pass: auditData.tech.analytics },
-                  ].map((item, i) => (
-                    <div key={i} style={{
-                      padding:"12px 16px",background:"#18181d",border:"1px solid #2a2a35",
-                      borderRadius:10,display:"flex",alignItems:"center",justifyContent:"space-between",
-                    }}>
-                      <span style={{fontSize:13,color:"#a1a1aa"}}>{item.label}</span>
-                      <span style={{color:item.pass ? "#22c55e" : "#ef4444",fontWeight:700,fontSize:12,fontFamily:"IBM Plex Mono"}}>
-                        {item.pass ? "✓ PASS" : "✕ FAIL"}
-                      </span>
+              <>
+                <div id="audit-report-content">
+                  <div style={{display:"flex",alignItems:"center",gap:20,marginBottom:28}}>
+                    <div style={{
+                      width:72,height:72,borderRadius:36,
+                      border:`4px solid ${auditData.score >= 70 ? "#22c55e" : auditData.score >= 40 ? "#f0b429" : "#ef4444"}`,
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:24,fontWeight:800,flexShrink:0,
+                    }}>{auditData.score}</div>
+                    <div>
+                      <h2 style={{fontSize:20,fontWeight:800,marginBottom:4}}>Site Audit Report</h2>
+                      <p style={{color:"#6b6b80",fontSize:13,fontFamily:"IBM Plex Mono, monospace",wordBreak:"break-all"}}>{auditData.url}</p>
                     </div>
-                  ))}
-                </div>
+                  </div>
 
-                {auditData.salesAngles?.length > 0 && (
-                  <div style={{
-                    background:"rgba(240,180,41,0.04)",border:"1px solid rgba(240,180,41,0.15)",
-                    borderRadius:14,padding:20,marginBottom:20,
-                  }}>
-                    <h3 style={{fontSize:14,fontWeight:700,color:"#f0b429",marginBottom:12,fontFamily:"IBM Plex Mono"}}>
-                      SALES ANGLES
-                    </h3>
-                    {auditData.salesAngles.map((angle, i) => (
-                      <div key={i} style={{marginBottom:i < auditData.salesAngles.length - 1 ? 12 : 0}}>
-                        <div style={{fontSize:13,fontWeight:600,color:"#e8e8f0",marginBottom:2}}>{angle.issue}</div>
-                        <div style={{fontSize:12,color:"#a1a1aa",lineHeight:1.6,fontStyle:"italic"}}>"{angle.hook}"</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
+                    {[
+                      { label: "SSL Security", pass: auditData.tech.ssl },
+                      { label: "H1 Header", pass: auditData.seo.h1 },
+                      { label: "SEO Title", pass: auditData.seo.title },
+                      { label: "Meta Description", pass: auditData.seo.description },
+                      { label: "Facebook Pixel", pass: auditData.tech.pixel },
+                      { label: "Google Analytics", pass: auditData.tech.analytics },
+                    ].map((item, i) => (
+                      <div key={i} style={{
+                        padding:"12px 16px",background:"#18181d",border:"1px solid #2a2a35",
+                        borderRadius:10,display:"flex",alignItems:"center",justifyContent:"space-between",
+                      }}>
+                        <span style={{fontSize:13,color:"#a1a1aa"}}>{item.label}</span>
+                        <span style={{color:item.pass ? "#22c55e" : "#ef4444",fontWeight:700,fontSize:12,fontFamily:"IBM Plex Mono"}}>
+                          {item.pass ? "✓ PASS" : "✕ FAIL"}
+                        </span>
                       </div>
                     ))}
                   </div>
-                )}
 
-                <div style={{fontSize:11,color:"#6b6b80",textAlign:"center",fontFamily:"IBM Plex Mono",marginTop:8}}>
-                  Audited {new Date(auditData.checkedAt).toLocaleString()}
+                  {auditData.salesAngles?.length > 0 && (
+                    <div style={{
+                      background:"rgba(240,180,41,0.04)",border:"1px solid rgba(240,180,41,0.15)",
+                      borderRadius:14,padding:20,marginBottom:20,
+                    }}>
+                      <h3 style={{fontSize:14,fontWeight:700,color:"#f0b429",marginBottom:12,fontFamily:"IBM Plex Mono"}}>
+                        SALES ANGLES
+                      </h3>
+                      {auditData.salesAngles.map((angle, i) => (
+                        <div key={i} style={{marginBottom:i < auditData.salesAngles.length - 1 ? 12 : 0}}>
+                          <div style={{fontSize:13,fontWeight:600,color:"#e8e8f0",marginBottom:2}}>{angle.issue}</div>
+                          <div style={{fontSize:12,color:"#a1a1aa",lineHeight:1.6,fontStyle:"italic"}}>"{angle.hook}"</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{fontSize:11,color:"#6b6b80",textAlign:"center",fontFamily:"IBM Plex Mono",marginTop:8}}>
+                    Audited {new Date(auditData.checkedAt).toLocaleString()}
+                  </div>
                 </div>
-              </div>
 
                 <button onClick={async () => {
                   try {
@@ -329,8 +330,8 @@ export default function App() {
                 }}>
                   📥 Download PDF Report
                 </button>
+              </>
             ) : null}
-            </div>
           </div>
         </div>
       )}
