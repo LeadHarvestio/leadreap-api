@@ -211,7 +211,7 @@ function generateNote({ rating, reviews, hasWebsite, emailQuality, techStack, sc
  *   - Category heuristics
  *   - Year opened (longevity)
  */
-function estimateEnrichment({ rating, reviews, techStack, category, yearOpened, unclaimed, hasWebsite }) {
+function estimateEnrichment({ rating, reviews, techStack, category, yearOpened, unclaimed, hasWebsite, gbpSignals }) {
   // ── Revenue estimation ────────────────────────────────────
   let revenueMin = 100000, revenueMax = 500000; // default: $100K–$500K
 
@@ -259,7 +259,18 @@ function estimateEnrichment({ rating, reviews, techStack, category, yearOpened, 
   if (techStack?.some(t => t.name === "Wix" || t.name === "Squarespace" || t.name === "Weebly")) signals.push("DIY website builder");
   if (!hasWebsite) signals.push("No website");
   if (yearsInBusiness && yearsInBusiness >= 10) signals.push("10+ years in business");
+  else if (yearsInBusiness && yearsInBusiness <= 1) signals.push("🆕 New business (<1 yr)");
   else if (yearsInBusiness && yearsInBusiness <= 2) signals.push("New business (<2 yrs)");
+
+  // GBP-specific signals
+  if (gbpSignals) {
+    if (gbpSignals.isStale) signals.push("⚠️ Stale listing");
+    if (!gbpSignals.hasOwnerResponses && reviews >= 10) signals.push("Never responds to reviews");
+    if (gbpSignals.isClosed) signals.push("Temporarily/permanently closed");
+    if (!gbpSignals.hasHours) signals.push("No hours listed");
+    if (gbpSignals.photoCount < 5 && reviews >= 5) signals.push("Few photos (<5)");
+    if (gbpSignals.isNewBusiness) signals.push("🆕 Opened this year");
+  }
 
   // Format revenue as readable strings
   const fmtRev = (n) => {
@@ -446,6 +457,32 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
         return text.includes('claim this business') || text.includes('own this business');
       }).catch(() => false);
 
+      // ── GBP Signals: review activity, stale presence, new business ──
+      const gbpSignals = await page.evaluate(() => {
+        const text = (document.body?.innerText || '');
+        const lower = text.toLowerCase();
+
+        // Check if owner responds to reviews
+        const hasOwnerResponses = lower.includes('response from the owner') || lower.includes('owner responded');
+
+        // Check for recent Google posts/updates
+        const hasRecentPosts = lower.includes('posted by') || lower.includes('update from');
+
+        // Check for "temporarily closed" or "permanently closed"
+        const isClosed = lower.includes('temporarily closed') || lower.includes('permanently closed');
+
+        // Check if hours are listed (no hours = stale/incomplete listing)
+        const hasHours = lower.includes('open now') || lower.includes('closed now') || 
+                         lower.includes('opens at') || lower.includes('closes at') ||
+                         /\b(mon|tue|wed|thu|fri|sat|sun)\w*\s*[\u2013\-]\s*\d/i.test(text);
+
+        // Check for photos count — low photos = opportunity
+        const photosMatch = text.match(/(\d+)\s+photo/i);
+        const photoCount = photosMatch ? parseInt(photosMatch[1]) : 0;
+
+        return { hasOwnerResponses, hasRecentPosts, isClosed, hasHours, photoCount };
+      }).catch(() => ({ hasOwnerResponses: false, hasRecentPosts: false, isClosed: false, hasHours: true, photoCount: 0 }));
+
       const websiteEl = await page.$(SEL.website);
       const rawWebsite = websiteEl ? await websiteEl.getAttribute("href") : null;
 
@@ -478,6 +515,16 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
         ownerTitle: null,
         unclaimed: unclaimed || false,
         mapsUrl: url,
+        // GBP signals
+        gbpSignals: {
+          hasOwnerResponses: gbpSignals.hasOwnerResponses,
+          hasRecentPosts: gbpSignals.hasRecentPosts,
+          isClosed: gbpSignals.isClosed,
+          hasHours: gbpSignals.hasHours,
+          photoCount: gbpSignals.photoCount,
+          isNewBusiness: yearOpened ? (new Date().getFullYear() - yearOpened) <= 1 : false,
+          isStale: !gbpSignals.hasRecentPosts && !gbpSignals.hasOwnerResponses && (finalReviews < 10),
+        },
       };
     } finally {
       await page.close();
@@ -867,6 +914,7 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, offset = 0
       yearOpened: lead.yearOpened,
       unclaimed: lead.unclaimed,
       hasWebsite: !!lead.website,
+      gbpSignals: lead.gbpSignals,
     });
     return {
       ...lead,
