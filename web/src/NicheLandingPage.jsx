@@ -6,7 +6,7 @@ const STYLE = `
   .niche-page {
     background-color: #0a0a0b;
     color: #ededed;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Syne', sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -166,7 +166,7 @@ const STYLE = `
     border: 1px solid #333;
     padding: 32px;
     border-radius: 12px;
-    font-family: -apple-system, sans-serif;
+    font-family: 'Syne', sans-serif;
     font-size: 15px;
     line-height: 1.6;
     color: #ddd;
