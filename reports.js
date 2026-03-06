@@ -415,6 +415,160 @@ ${agencyName || "[Your Name]"}`;
 }
 
 // ─────────────────────────────────────────────────────────────
+// AUDIT PDF — Clean server-generated PDF for site audits
+// ─────────────────────────────────────────────────────────────
+
+export function generateAuditPDF(auditData) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "LETTER", margin: 0, bufferPages: true });
+    const chunks = [];
+    doc.on("data", chunk => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const W = doc.page.width;   // 612
+    const H = doc.page.height;  // 792
+    const M = 40;               // margin
+    const cW = W - M * 2;       // content width 532
+
+    // ── Full dark background ──
+    doc.rect(0, 0, W, H).fill("#0f1117");
+
+    // ── Gold accent bar at top ──
+    doc.rect(0, 0, W, 4).fill(COLORS.accent);
+
+    // ── Branding ──
+    doc.fontSize(10).font("Helvetica-Bold").fillColor(COLORS.accent).text("LEADREAP", M, 22);
+    doc.fontSize(8).font("Helvetica").fillColor("#555").text("SITE AUDIT REPORT", M + 72, 24);
+
+    // ── Score circle (centered, prominent) ──
+    const scoreColor = auditData.score >= 70 ? COLORS.green : auditData.score >= 40 ? COLORS.amber : COLORS.red;
+    const cx = W / 2, cy = 96;
+    doc.circle(cx, cy, 40).lineWidth(4).strokeColor(scoreColor).stroke();
+    doc.circle(cx, cy, 34).lineWidth(1).strokeColor(scoreColor).opacity(0.3).stroke();
+    doc.opacity(1);
+    doc.fontSize(32).font("Helvetica-Bold").fillColor(scoreColor)
+      .text(String(auditData.score), cx - 28, cy - 16, { width: 56, align: "center" });
+    doc.fontSize(7).font("Helvetica").fillColor("#888")
+      .text("OUT OF 100", cx - 28, cy + 18, { width: 56, align: "center" });
+
+    // ── URL + timestamp ──
+    doc.fontSize(12).font("Helvetica-Bold").fillColor("#eee")
+      .text(auditData.url, M, 152, { width: cW, align: "center" });
+    doc.fontSize(8).font("Helvetica").fillColor("#555")
+      .text(`Audited ${new Date(auditData.checkedAt).toLocaleString()}`, M, 170, { width: cW, align: "center" });
+
+    // ── Divider ──
+    doc.moveTo(M, 192).lineTo(W - M, 192).lineWidth(0.5).strokeColor("#1f2029").stroke();
+
+    // ── Section: Diagnostic Results ──
+    doc.fontSize(11).font("Helvetica-Bold").fillColor(COLORS.accent).text("DIAGNOSTIC RESULTS", M, 206);
+
+    const checks = [
+      { label: "SSL Security", pass: auditData.tech?.ssl },
+      { label: "SEO Title", pass: auditData.seo?.title },
+      { label: "Meta Description", pass: auditData.seo?.description },
+      { label: "H1 Header", pass: auditData.seo?.h1 },
+      { label: "Mobile Viewport", pass: auditData.seo?.viewport },
+      { label: "Facebook Pixel", pass: auditData.tech?.pixel },
+      { label: "Google Analytics", pass: auditData.tech?.analytics },
+      { label: "Schema Markup", pass: auditData.seo?.schemaMarkup },
+      { label: "Open Graph Tags", pass: auditData.seo?.ogTags },
+    ];
+
+    // 2-column card grid
+    const colW = (cW - 14) / 2;
+    const rowH = 32;
+    const gridY = 228;
+
+    checks.forEach((check, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = M + col * (colW + 14);
+      const y = gridY + row * (rowH + 6);
+
+      doc.roundedRect(x, y, colW, rowH, 5).fill("#181a24");
+      doc.fontSize(9.5).font("Helvetica").fillColor("#ccc")
+        .text(check.label, x + 12, y + 10, { width: colW - 80 });
+      const badge = check.pass ? "✓  PASS" : "✕  FAIL";
+      doc.fontSize(9).font("Helvetica-Bold").fillColor(check.pass ? COLORS.green : COLORS.red)
+        .text(badge, x + colW - 72, y + 10, { width: 60, align: "right" });
+    });
+
+    // ── Summary bar ──
+    const passCount = checks.filter(c => c.pass).length;
+    const failCount = checks.length - passCount;
+    const barY = gridY + Math.ceil(checks.length / 2) * (rowH + 6) + 10;
+
+    doc.roundedRect(M, barY, cW, 42, 5).fill("#181a24");
+    const third = cW / 3;
+    doc.fontSize(17).font("Helvetica-Bold").fillColor(COLORS.green)
+      .text(String(passCount), M, barY + 6, { width: third, align: "center" });
+    doc.fontSize(7).font("Helvetica").fillColor("#666")
+      .text("PASSED", M, barY + 26, { width: third, align: "center" });
+    doc.fontSize(17).font("Helvetica-Bold").fillColor(COLORS.red)
+      .text(String(failCount), M + third, barY + 6, { width: third, align: "center" });
+    doc.fontSize(7).font("Helvetica").fillColor("#666")
+      .text("FAILED", M + third, barY + 26, { width: third, align: "center" });
+    doc.fontSize(17).font("Helvetica-Bold").fillColor(scoreColor)
+      .text(`${auditData.score}/100`, M + third * 2, barY + 6, { width: third, align: "center" });
+    doc.fontSize(7).font("Helvetica").fillColor("#666")
+      .text("SCORE", M + third * 2, barY + 26, { width: third, align: "center" });
+
+    // ── Tech Stack ──
+    let curY = barY + 60;
+    const techItems = [];
+    if (auditData.tech?.wordpress) techItems.push("WordPress");
+    if (auditData.tech?.wix) techItems.push("Wix");
+    if (auditData.tech?.squarespace) techItems.push("Squarespace");
+    if (auditData.tech?.shopify) techItems.push("Shopify");
+    if (auditData.tech?.gtm) techItems.push("Google Tag Manager");
+    if (auditData.tech?.hotjar) techItems.push("Hotjar");
+    if (auditData.tech?.chatWidget) techItems.push("Live Chat Widget");
+
+    if (techItems.length > 0) {
+      doc.fontSize(11).font("Helvetica-Bold").fillColor(COLORS.accent).text("DETECTED TECHNOLOGY", M, curY);
+      curY += 18;
+      doc.roundedRect(M, curY, cW, 28, 5).fill("#181a24");
+      doc.fontSize(9.5).font("Helvetica").fillColor("#ccc")
+        .text(techItems.join("   •   "), M + 12, curY + 9, { width: cW - 24 });
+      curY += 42;
+    }
+
+    // ── Sales Angles ──
+    if (auditData.salesAngles?.length > 0) {
+      doc.fontSize(11).font("Helvetica-Bold").fillColor(COLORS.accent).text("SALES ANGLES", M, curY);
+      curY += 20;
+
+      for (const angle of auditData.salesAngles) {
+        if (curY > H - 80) break; // don't overflow page
+        const hookLen = angle.hook.length;
+        const cardH = hookLen > 100 ? 56 : hookLen > 60 ? 48 : 42;
+
+        doc.roundedRect(M, curY, cW, cardH, 5).fill("#181a24");
+        // Red severity accent on left
+        doc.roundedRect(M, curY, 3, cardH, 1.5).fill(COLORS.red);
+
+        doc.fontSize(10).font("Helvetica-Bold").fillColor("#eee")
+          .text(angle.issue, M + 14, curY + 8, { width: cW - 26 });
+        doc.fontSize(8.5).font("Helvetica").fillColor("#999")
+          .text(angle.hook, M + 14, curY + 22, { width: cW - 26 });
+
+        curY += cardH + 6;
+      }
+    }
+
+    // ── Footer ──
+    doc.rect(0, H - 36, W, 36).fill("#0a0b0e");
+    doc.moveTo(0, H - 36).lineTo(W, H - 36).lineWidth(0.5).strokeColor("#1f2029").stroke();
+    doc.fontSize(7.5).font("Helvetica").fillColor("#555")
+      .text("Generated by LeadReap  •  leadreap.com", M, H - 24, { width: cW, align: "center" });
+
+    doc.end();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 // PROPOSAL GENERATOR — Branded PDF proposal from lead + audit data
 // ─────────────────────────────────────────────────────────────
 
