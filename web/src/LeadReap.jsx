@@ -516,6 +516,68 @@ const STYLE = `
   .mobile-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .mobile-card-socials { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 
+  /* Celebration Banner */
+  .celebration-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.9); backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    animation: celebFadeIn 0.3s ease;
+  }
+  @keyframes celebFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .celebration-card {
+    background: var(--surface); border: 1px solid rgba(240,180,41,0.3);
+    border-radius: 24px; padding: 48px 40px; max-width: 460px; width: 90%;
+    text-align: center; position: relative; overflow: hidden;
+    animation: celebSlideUp 0.5s ease 0.1s both;
+  }
+  @keyframes celebSlideUp { from { opacity:0; transform: translateY(30px) scale(0.95); } to { opacity:1; transform: none; } }
+  .celebration-card::before {
+    content: ''; position: absolute; inset: -2px;
+    background: conic-gradient(from 0deg, var(--accent), var(--accent2), var(--green), var(--accent));
+    border-radius: 25px; z-index: -1; opacity: 0.3;
+    animation: celebGlow 3s linear infinite;
+  }
+  @keyframes celebGlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .celebration-card::after {
+    content: ''; position: absolute; inset: 1px;
+    background: var(--surface); border-radius: 23px; z-index: -1;
+  }
+  .celebration-emoji { font-size: 56px; margin-bottom: 16px; animation: celebBounce 0.6s ease 0.4s both; }
+  @keyframes celebBounce { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+  .celebration-title { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
+  .celebration-plan { color: var(--accent); }
+  .celebration-sub { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 28px; }
+  .celebration-features {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 28px;
+  }
+  .celebration-feat {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    padding: 5px 12px; border-radius: 6px;
+    background: rgba(240,180,41,0.08); color: var(--accent);
+    border: 1px solid rgba(240,180,41,0.15);
+  }
+  .celebration-confetti {
+    position: absolute; top: 0; left: 50%; width: 4px; height: 12px;
+    border-radius: 2px; opacity: 0;
+    animation: confettiFall 1.5s ease 0.3s both;
+  }
+  @keyframes confettiFall {
+    0% { opacity: 1; transform: translateY(-40px) rotate(0deg); }
+    100% { opacity: 0; transform: translateY(200px) rotate(720deg); }
+  }
+
+  /* Upgrade nudge in dashboard */
+  .dash-upgrade-card {
+    padding: 16px 20px; border-radius: 12px; margin-bottom: 16px;
+    border: 1px solid rgba(240,180,41,0.2);
+    background: linear-gradient(135deg, rgba(240,180,41,0.04), rgba(232,93,4,0.02));
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .dash-upgrade-card .upgrade-info { flex: 1; }
+  .dash-upgrade-card .upgrade-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .dash-upgrade-card .upgrade-desc { font-size: 12px; color: var(--muted); }
+
   /* Mobile-only elements — hidden by default, shown in mobile media query */
   .hero-mobile { display: none; }
   .m-landing { display: none; }
@@ -1537,7 +1599,7 @@ function FeatureCarousel({ onShowPricing }) {
   );
 }
 
-export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLogout, onCheckout, onRefreshAuth, onRunAudit }) {
+export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLogout, onCheckout, onRefreshAuth, onRunAudit, upgradedPlan, onDismissUpgrade }) {
   const API_BASE = apiBase;
   const [niche, setNiche] = useState(() => {
     // 1. Try to get it from ?niche=...
@@ -2196,6 +2258,9 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                     {dashData.plan === "free" && (
                       <button className="btn btn-primary btn-sm" onClick={() => { setShowDashboard(false); setPricingContext(null); setShowPricing(true); }}>Upgrade</button>
                     )}
+                    {dashData.plan && dashData.plan !== "free" && dashData.plan !== "agency" && (
+                      <button className="btn btn-outline btn-sm" style={{fontSize:11}} onClick={() => { setShowDashboard(false); setPricingContext(null); setShowPricing(true); }}>Upgrade Plan</button>
+                    )}
                   </div>
                 </div>
 
@@ -2227,6 +2292,26 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                     <button className="btn btn-outline btn-sm" style={{fontSize:12}} onClick={() => { setShowDashboard(false); setPricingContext(null); setShowPricing(true); }}>
                       See Plans
                     </button>
+                  </div>
+                )}
+
+                {/* Paid user upgrade nudge (Starter → Pro, Pro → Agency) */}
+                {dashData.plan === "starter" && (
+                  <div className="dash-upgrade-card">
+                    <div className="upgrade-info">
+                      <div className="upgrade-title">Upgrade to Pro &mdash; just $50</div>
+                      <div className="upgrade-desc">Unlimited leads, email sequences, enrichment data, and webhook integrations</div>
+                    </div>
+                    <button className="btn btn-primary btn-sm" onClick={() => onCheckout?.("pro")}>Upgrade &rarr;</button>
+                  </div>
+                )}
+                {dashData.plan === "pro" && (
+                  <div className="dash-upgrade-card">
+                    <div className="upgrade-info">
+                      <div className="upgrade-title">Upgrade to Agency &mdash; just $100</div>
+                      <div className="upgrade-desc">Team seats, white-label PDF reports, public API, and shared lists</div>
+                    </div>
+                    <button className="btn btn-primary btn-sm" onClick={() => onCheckout?.("agency")}>Upgrade &rarr;</button>
                   </div>
                 )}
 
@@ -3088,12 +3173,31 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                   features: ["Everything in Pro", "Team seats (up to 5)", "White-label PDF reports", "Public API access", "Shared team lists", "Dedicated support"],
                   featured: false
                 }
-              ].map((plan, i) => (
-                <div key={i} className={`plan-card ${plan.featured ? "featured" : ""}`}>
-                  {plan.badge && <div className="plan-badge">{plan.badge}</div>}
+              ].map((plan, i) => {
+                const currentPlan = user?.plan;
+                const planOrder = { free: 0, starter: 1, pro: 2, agency: 3 };
+                const isCurrent = currentPlan === plan.planId;
+                const isDowngrade = (planOrder[currentPlan] || 0) > (planOrder[plan.planId] || 0);
+                const isUpgrade = currentPlan && currentPlan !== "free" && !isCurrent && !isDowngrade;
+                const priceDiffs = { starter: { pro: 50, agency: 150 }, pro: { agency: 100 } };
+                const upgradePrice = isUpgrade ? priceDiffs[currentPlan]?.[plan.planId] : null;
+
+                return (
+                <div key={i} className={`plan-card ${plan.featured ? "featured" : ""}`} style={isCurrent ? {borderColor:"var(--green)",opacity:0.8} : isDowngrade ? {opacity:0.5,pointerEvents:"none"} : {}}>
+                  {isCurrent && <div className="plan-badge" style={{background:"var(--green)",color:"#000"}}>CURRENT PLAN</div>}
+                  {plan.badge && !isCurrent && <div className="plan-badge">{plan.badge}</div>}
                   <div className="plan-name">{plan.name}</div>
-                  <div className="plan-price"><sup>$</sup>{plan.price}</div>
-                  <div className="plan-note">{plan.note}</div>
+                  {upgradePrice ? (
+                    <>
+                      <div className="plan-price"><sup>$</sup>{upgradePrice}</div>
+                      <div className="plan-note" style={{color:"var(--green)"}}>pro-rated upgrade</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="plan-price"><sup>$</sup>{plan.price}</div>
+                      <div className="plan-note">{plan.note}</div>
+                    </>
+                  )}
                   <div className="plan-features">
                     {plan.features.map((f, j) => (
                       <div key={j} className="plan-feature">
@@ -3101,15 +3205,22 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
                       </div>
                     ))}
                   </div>
-                  <button
-                    className={`btn ${plan.featured ? "btn-primary" : "btn-outline"}`}
-                    style={{width:"100%", justifyContent:"center"}}
-                    onClick={() => handleUnlock(plan.planId)}
-                  >
-                    Get {plan.name} Access &rarr;
-                  </button>
+                  {isCurrent ? (
+                    <button className="btn btn-outline" style={{width:"100%",justifyContent:"center",opacity:0.5,cursor:"default"}} disabled>
+                      Current Plan
+                    </button>
+                  ) : (
+                    <button
+                      className={`btn ${plan.featured ? "btn-primary" : "btn-outline"}`}
+                      style={{width:"100%", justifyContent:"center"}}
+                      onClick={() => handleUnlock(plan.planId)}
+                    >
+                      {upgradePrice ? `Upgrade for $${upgradePrice}` : `Get ${plan.name} Access`} &rarr;
+                    </button>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Value anchor + guarantee */}
@@ -3266,6 +3377,50 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             <p>We may update these terms at any time. Continued use of the service after changes constitutes acceptance. Material changes will be communicated via email.</p>
             <h3>Contact</h3>
             <p>For questions about these terms, contact us at support@leadreap.com.</p>
+          </div>
+        </div>
+      )}
+
+      {/* UPGRADE CELEBRATION */}
+      {upgradedPlan && (
+        <div className="celebration-overlay" onClick={e => e.target === e.currentTarget && onDismissUpgrade?.()}>
+          {/* Confetti particles */}
+          {[...Array(20)].map((_, i) => (
+            <div key={i} className="celebration-confetti" style={{
+              left: `${10 + Math.random() * 80}%`,
+              background: ["#f0b429","#22c55e","#e85d04","#3b82f6","#a855f7"][i % 5],
+              animationDelay: `${0.2 + Math.random() * 0.6}s`,
+              animationDuration: `${1 + Math.random() * 1}s`,
+              width: `${3 + Math.random() * 4}px`,
+              height: `${8 + Math.random() * 8}px`,
+            }} />
+          ))}
+          <div className="celebration-card">
+            <div className="celebration-emoji">🎉</div>
+            <div className="celebration-title">
+              Welcome to <span className="celebration-plan">{upgradedPlan.toUpperCase()}</span>
+            </div>
+            <div className="celebration-sub">
+              {upgradedPlan === "agency"
+                ? "You now have full access to the entire LeadReap platform — team seats, API, white-label reports, and everything else."
+                : upgradedPlan === "pro"
+                ? "You've unlocked unlimited leads, email sequences, enrichment data, and all the tools to grow your business."
+                : "You've unlocked more leads, CSV export, and the tools to start closing more clients."
+              }
+            </div>
+            <div className="celebration-features">
+              {(upgradedPlan === "agency"
+                ? ["Unlimited Leads", "Team Seats", "API Access", "PDF Reports", "Email Sequences"]
+                : upgradedPlan === "pro"
+                ? ["Unlimited Leads", "Email Sequences", "Lead Enrichment", "Webhooks", "CSV Export"]
+                : ["250 Leads/mo", "CSV Export", "Saved Lists", "Email + Phone"]
+              ).map((f, i) => (
+                <span key={i} className="celebration-feat">{f}</span>
+              ))}
+            </div>
+            <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",fontSize:16,padding:"14px 0"}} onClick={() => { onDismissUpgrade?.(); onRefreshAuth?.(); }}>
+              Start Using {upgradedPlan.charAt(0).toUpperCase() + upgradedPlan.slice(1)} &rarr;
+            </button>
           </div>
         </div>
       )}
