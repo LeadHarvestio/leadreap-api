@@ -22,17 +22,17 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 const PLANS = {
   starter: {
     productId: process.env.STRIPE_PRODUCT_STARTER || "prod_U4kYWh7G59zknT",
-    amount: 4700, // $47.00 in cents
+    amount: 9700, // $97.00 in cents
     name: "LeadReap Starter",
   },
   pro: {
     productId: process.env.STRIPE_PRODUCT_PRO || "prod_U4kcR4aYnop2pB",
-    amount: 9700, // $97.00 in cents
+    amount: 19700, // $197.00 in cents
     name: "LeadReap Pro",
   },
   agency: {
     productId: process.env.STRIPE_PRODUCT_AGENCY || "prod_U4kcUrer7izt17",
-    amount: 19700, // $197.00 in cents
+    amount: 39700, // $397.00 in cents
     name: "LeadReap Agency",
   },
 };
