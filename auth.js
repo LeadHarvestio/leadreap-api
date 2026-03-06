@@ -212,6 +212,48 @@ try { db.exec("ALTER TABLE users ADD COLUMN followup_sent INTEGER DEFAULT 0"); }
 try { db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"); } catch (e) {}
 try { db.exec("CREATE TABLE IF NOT EXISTS processed_webhooks (id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"); } catch (e) {}
 
+// Intent monitoring tables
+try { db.exec(`
+  CREATE TABLE IF NOT EXISTS intent_monitors (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    niches      TEXT DEFAULT '[]',
+    keywords    TEXT DEFAULT '[]',
+    subreddits  TEXT DEFAULT '[]',
+    active      INTEGER DEFAULT 1,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS intent_signals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitor_id  TEXT NOT NULL,
+    user_id     TEXT NOT NULL,
+    source      TEXT DEFAULT 'reddit',
+    post_id     TEXT NOT NULL,
+    subreddit   TEXT,
+    title       TEXT NOT NULL,
+    body        TEXT DEFAULT '',
+    author      TEXT,
+    url         TEXT NOT NULL,
+    score       INTEGER DEFAULT 0,
+    intent_score INTEGER DEFAULT 0,
+    matched_phrases TEXT DEFAULT '[]',
+    matched_niches  TEXT DEFAULT '[]',
+    hours_ago   REAL DEFAULT 0,
+    status      TEXT DEFAULT 'new',
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (monitor_id) REFERENCES intent_monitors(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_intent_monitors_user ON intent_monitors(user_id);
+  CREATE INDEX IF NOT EXISTS idx_intent_signals_monitor ON intent_signals(monitor_id);
+  CREATE INDEX IF NOT EXISTS idx_intent_signals_user ON intent_signals(user_id);
+  CREATE INDEX IF NOT EXISTS idx_intent_signals_postid ON intent_signals(post_id);
+`); } catch (e) { console.warn("[Auth] Intent tables migration:", e.message); }
+
 // ─────────────────────────────────────────────────────────────
 // PREPARED STATEMENTS
 // ─────────────────────────────────────────────────────────────
@@ -331,6 +373,24 @@ const stmts = {
   downgradeUserByEmail:  db.prepare("UPDATE users SET plan = 'free' WHERE email = ?"),
   checkWebhook:          db.prepare("SELECT 1 FROM processed_webhooks WHERE id = ?"),
   markWebhookProcessed:  db.prepare("INSERT INTO processed_webhooks (id) VALUES (?)"),
+
+  // Intent monitors
+  createMonitor:         db.prepare("INSERT INTO intent_monitors (id, user_id, name, niches, keywords, subreddits) VALUES (?, ?, ?, ?, ?, ?)"),
+  getUserMonitors:       db.prepare("SELECT * FROM intent_monitors WHERE user_id = ? ORDER BY created_at DESC"),
+  getMonitorById:        db.prepare("SELECT * FROM intent_monitors WHERE id = ? AND user_id = ?"),
+  updateMonitor:         db.prepare("UPDATE intent_monitors SET name = ?, niches = ?, keywords = ?, subreddits = ?, active = ? WHERE id = ? AND user_id = ?"),
+  deleteMonitor:         db.prepare("DELETE FROM intent_monitors WHERE id = ? AND user_id = ?"),
+  getActiveMonitors:     db.prepare("SELECT m.*, u.plan FROM intent_monitors m JOIN users u ON m.user_id = u.id WHERE m.active = 1 AND u.plan != 'free'"),
+  toggleMonitor:         db.prepare("UPDATE intent_monitors SET active = ? WHERE id = ? AND user_id = ?"),
+
+  // Intent signals
+  insertSignal:          db.prepare("INSERT INTO intent_signals (monitor_id, user_id, source, post_id, subreddit, title, body, author, url, score, intent_score, matched_phrases, matched_niches, hours_ago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
+  getSignalByPostId:     db.prepare("SELECT id FROM intent_signals WHERE monitor_id = ? AND post_id = ?"),
+  getUserSignals:        db.prepare("SELECT * FROM intent_signals WHERE user_id = ? ORDER BY intent_score DESC, created_at DESC LIMIT ?"),
+  getMonitorSignals:     db.prepare("SELECT * FROM intent_signals WHERE monitor_id = ? ORDER BY intent_score DESC, created_at DESC LIMIT 50"),
+  updateSignalStatus:    db.prepare("UPDATE intent_signals SET status = ? WHERE id = ? AND user_id = ?"),
+  deleteOldSignals:      db.prepare("DELETE FROM intent_signals WHERE created_at < datetime('now', '-7 days')"),
+  countUserSignals:      db.prepare("SELECT COUNT(*) AS count FROM intent_signals WHERE user_id = ? AND status = 'new'"),
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -900,5 +960,113 @@ export function handleRefund(email) {
   console.log(`[Auth] Refund: ${email} → free`);
 }
 
+// ─────────────────────────────────────────────────────────────
+// INTENT MONITORS
+// ─────────────────────────────────────────────────────────────
+
+/** Create an intent monitor */
+export function createIntentMonitor(userId, name, niches = [], keywords = [], subreddits = []) {
+  const id = randomUUID();
+  stmts.createMonitor.run(id, userId, name.trim(), JSON.stringify(niches), JSON.stringify(keywords), JSON.stringify(subreddits));
+  return { id, name: name.trim(), niches, keywords, subreddits, active: 1 };
+}
+
+/** Get all monitors for a user */
+export function getUserIntentMonitors(userId) {
+  const monitors = stmts.getUserMonitors.all(userId);
+  return monitors.map(m => ({
+    ...m,
+    niches: JSON.parse(m.niches || "[]"),
+    keywords: JSON.parse(m.keywords || "[]"),
+    subreddits: JSON.parse(m.subreddits || "[]"),
+    signalCount: stmts.countUserSignals.get(userId)?.count || 0,
+  }));
+}
+
+/** Get a single monitor */
+export function getIntentMonitor(monitorId, userId) {
+  const m = stmts.getMonitorById.get(monitorId, userId);
+  if (!m) return null;
+  return { ...m, niches: JSON.parse(m.niches || "[]"), keywords: JSON.parse(m.keywords || "[]"), subreddits: JSON.parse(m.subreddits || "[]") };
+}
+
+/** Update a monitor */
+export function updateIntentMonitor(monitorId, userId, name, niches, keywords, subreddits, active) {
+  stmts.updateMonitor.run(name, JSON.stringify(niches), JSON.stringify(keywords), JSON.stringify(subreddits), active ? 1 : 0, monitorId, userId);
+}
+
+/** Delete a monitor */
+export function deleteIntentMonitor(monitorId, userId) {
+  stmts.deleteMonitor.run(monitorId, userId);
+}
+
+/** Toggle monitor active state */
+export function toggleIntentMonitor(monitorId, userId, active) {
+  stmts.toggleMonitor.run(active ? 1 : 0, monitorId, userId);
+}
+
+/** Get all active monitors (for scheduler) */
+export function getActiveIntentMonitors() {
+  const monitors = stmts.getActiveMonitors.all();
+  return monitors.map(m => ({
+    ...m,
+    niches: JSON.parse(m.niches || "[]"),
+    keywords: JSON.parse(m.keywords || "[]"),
+    subreddits: JSON.parse(m.subreddits || "[]"),
+  }));
+}
+
+/** Save a discovered intent signal (deduped by post_id per monitor) */
+export function saveIntentSignal(monitorId, userId, signal) {
+  const existing = stmts.getSignalByPostId.get(monitorId, signal.id);
+  if (existing) return false;
+  stmts.insertSignal.run(
+    monitorId, userId, "reddit", signal.id, signal.subreddit,
+    signal.title, (signal.body || "").slice(0, 2000), signal.author, signal.url,
+    signal.score || 0, signal.intentScore || 0,
+    JSON.stringify(signal.matchedPhrases || []),
+    JSON.stringify(signal.matchedNiches || []),
+    signal.hoursAgo || 0
+  );
+  return true;
+}
+
+/** Get signals for a user */
+export function getUserIntentSignals(userId, limit = 50) {
+  const signals = stmts.getUserSignals.all(userId, limit);
+  return signals.map(s => ({
+    ...s,
+    matched_phrases: JSON.parse(s.matched_phrases || "[]"),
+    matched_niches: JSON.parse(s.matched_niches || "[]"),
+  }));
+}
+
+/** Get signals for a specific monitor */
+export function getMonitorSignals(monitorId) {
+  const signals = stmts.getMonitorSignals.all(monitorId);
+  return signals.map(s => ({
+    ...s,
+    matched_phrases: JSON.parse(s.matched_phrases || "[]"),
+    matched_niches: JSON.parse(s.matched_niches || "[]"),
+  }));
+}
+
+/** Update a signal's status (new/viewed/contacted/dismissed) */
+export function updateIntentSignalStatus(signalId, userId, status) {
+  stmts.updateSignalStatus.run(status, signalId, userId);
+}
+
+/** Clean up signals older than 7 days */
+export function cleanupIntentSignals() {
+  stmts.deleteOldSignals.run();
+}
+
+/** Count new signals for a user */
+export function countNewIntentSignals(userId) {
+  return stmts.countUserSignals.get(userId)?.count || 0;
+}
+
 // Run cleanup every hour
 setInterval(cleanupAuth, 60 * 60 * 1000);
+// Clean up old signals daily
+setInterval(cleanupIntentSignals, 24 * 60 * 60 * 1000);
