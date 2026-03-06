@@ -2364,7 +2364,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
           <h1 className="hero-mobile">Find <em>verified</em> local leads in seconds</h1>
           <p>Search any niche, any city. Get emails, phone numbers, revenue estimates, and AI lead scores &mdash; export to CSV and start outreach today.</p>
           <div className="hero-stats">
-            <div className="stat"><div className="stat-num">47+</div><div className="stat-label">Built-in niches</div></div>
+            <div className="stat"><div className="stat-num">80+</div><div className="stat-label">Built-in niches</div></div>
             <div className="stat"><div className="stat-num">94%</div><div className="stat-label">Email accuracy</div></div>
             <div className="stat"><div className="stat-num">$0/mo</div><div className="stat-label">No subscriptions</div></div>
             <div className="stat"><div className="stat-num">30s</div><div className="stat-label">Avg search time</div></div>
@@ -2790,7 +2790,7 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
               {/* Social proof numbers */}
               <div className="m-proof">
                 <div className="m-proof-item">
-                  <div className="m-proof-num">47+</div>
+                  <div className="m-proof-num">80+</div>
                   <div className="m-proof-label">Niches</div>
                 </div>
                 <div className="m-proof-item">
