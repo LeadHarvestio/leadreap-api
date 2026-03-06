@@ -1624,6 +1624,39 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
   const [dashData, setDashData] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
 
+  {/* UPGRADE HUB - Only visible to non-Agency users */}
+{user.plan !== "agency" && (
+  <div style={{
+    background: "linear-gradient(90deg, rgba(240, 180, 41, 0.1) 0%, transparent 100%)",
+    border: "1px solid var(--border)",
+    borderRadius: "16px",
+    padding: "24px",
+    marginBottom: "32px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "20px",
+    flexWrap: "wrap"
+  }}>
+    <div>
+      <h3 style={{ fontSize: "18px", fontWeight: "800", marginBottom: "4px" }}>
+        🚀 Upgrade to {user.plan === "starter" ? "Pro" : "Agency"}
+      </h3>
+      <p style={{ fontSize: "14px", color: "var(--muted)" }}>
+        {user.plan === "starter" 
+          ? "Unlock unlimited leads, email sequences, and professional site audits." 
+          : "Unlock white-label PDF reports, team seats, and API access."}
+      </p>
+    </div>
+    <button 
+      className="btn btn-primary"
+      onClick={() => onCheckout(user.plan === "starter" ? "pro" : "agency")}
+    >
+      Upgrade for ${user.plan === "starter" ? "50" : "100"} &rarr;
+    </button>
+  </div>
+)}
+
   // Saved Lists
   const [showSaveToList, setShowSaveToList] = useState(false);
   const [dashLists, setDashLists] = useState([]);
