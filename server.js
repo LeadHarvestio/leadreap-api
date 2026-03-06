@@ -45,8 +45,9 @@ import {
 } from "./auth.js";
 import { createCheckout, createUpgradeCheckout, getUpgradePrice, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail, sendSequenceEmail, sendTeamInviteEmail, sendWelcomeEmail, sendFollowUpEmail } from "./email.js";
-import { generateReport } from "./reports.js";
+import { generateReport, generateAIPitch, generateProposal } from "./reports.js";
 import { scanForIntentSignals, DEFAULT_SUBREDDITS } from "./scraper/reddit.js";
+import { scanJobPostings, checkBusinessHiring } from "./scraper/jobs.js";
 import { attachUser, requireAuth, requireSearchQuota, ipRateLimit, requireAgency, requirePro } from "./middleware.js";
 
 const app = express();
@@ -870,6 +871,69 @@ app.post("/api/cache/clear", (req, res) => {
   const { niche, location } = req.body;
   const cleared = clearCache(niche, location);
   res.json({ cleared, message: `Cleared ${cleared} cache entries` });
+});
+
+// ═════════════════════════════════════════════════════════════
+// AI PITCH WRITER
+// ═════════════════════════════════════════════════════════════
+
+app.post("/api/pitch/generate", requirePro, async (req, res) => {
+  try {
+    const { lead, style, agencyName, agencyService } = req.body;
+    if (!lead?.name) return res.status(400).json({ error: "Lead data required" });
+
+    const result = await generateAIPitch(lead, { style, agencyName, agencyService });
+    return res.json(result);
+  } catch (e) {
+    console.error("[AI Pitch] Error:", e.message);
+    return res.status(500).json({ error: "Failed to generate pitch" });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+// PROPOSAL GENERATOR
+// ═════════════════════════════════════════════════════════════
+
+app.post("/api/proposals/generate", requireAgency, async (req, res) => {
+  try {
+    const { lead, auditData, agencyName, contactEmail, contactPhone, services } = req.body;
+    if (!lead?.name) return res.status(400).json({ error: "Lead data required" });
+
+    const buffer = await generateProposal({ lead, auditData, agencyName, contactEmail, contactPhone, services });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Proposal-${lead.name.replace(/[^a-z0-9]/gi, "-")}.pdf"`);
+    return res.send(buffer);
+  } catch (e) {
+    console.error("[Proposal] Error:", e.message);
+    return res.status(500).json({ error: "Failed to generate proposal" });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+// JOB POSTING SIGNALS
+// ═════════════════════════════════════════════════════════════
+
+app.post("/api/jobs/scan", requirePro, async (req, res) => {
+  try {
+    const { niche, location } = req.body;
+    if (!niche || !location) return res.status(400).json({ error: "Niche and location required" });
+    const signals = await scanJobPostings(niche, location, 15);
+    return res.json({ signals });
+  } catch (e) {
+    console.error("[Jobs] Scan error:", e.message);
+    return res.status(500).json({ error: "Job scan failed" });
+  }
+});
+
+app.post("/api/jobs/check", requirePro, async (req, res) => {
+  try {
+    const { businessName, location } = req.body;
+    if (!businessName) return res.status(400).json({ error: "Business name required" });
+    const result = await checkBusinessHiring(businessName, location || "");
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: "Check failed" });
+  }
 });
 
 // ═════════════════════════════════════════════════════════════
