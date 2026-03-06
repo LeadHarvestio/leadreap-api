@@ -36,11 +36,17 @@ import {
   createWebhook, getUserWebhooks, deleteWebhook, toggleWebhook,
   getActiveWebhooks, touchWebhookTimestamp,
   createApiKey, getUserApiKeys, deleteApiKey,
-  markWelcomeSent, markFollowupSent, getPendingFollowups
+  markWelcomeSent, markFollowupSent, getPendingFollowups,
+  createIntentMonitor, getUserIntentMonitors, getIntentMonitor,
+  updateIntentMonitor, deleteIntentMonitor, toggleIntentMonitor,
+  getActiveIntentMonitors, saveIntentSignal,
+  getUserIntentSignals, getMonitorSignals, updateIntentSignalStatus,
+  countNewIntentSignals, cleanupIntentSignals
 } from "./auth.js";
 import { createCheckout, createUpgradeCheckout, getUpgradePrice, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail, sendSequenceEmail, sendTeamInviteEmail, sendWelcomeEmail, sendFollowUpEmail } from "./email.js";
 import { generateReport } from "./reports.js";
+import { scanForIntentSignals, DEFAULT_SUBREDDITS } from "./scraper/reddit.js";
 import { attachUser, requireAuth, requireSearchQuota, ipRateLimit, requireAgency, requirePro } from "./middleware.js";
 
 const app = express();
@@ -866,6 +872,110 @@ app.post("/api/cache/clear", (req, res) => {
   res.json({ cleared, message: `Cleared ${cleared} cache entries` });
 });
 
+// ═════════════════════════════════════════════════════════════
+// INTENT MONITORING (Reddit buy-ready signals)
+// ═════════════════════════════════════════════════════════════
+
+// ── GET /api/intent/monitors — List user's monitors ─────────
+app.get("/api/intent/monitors", requirePro, (req, res) => {
+  try {
+    const monitors = getUserIntentMonitors(req.user.id);
+    const newSignals = countNewIntentSignals(req.user.id);
+    return res.json({ monitors, newSignals });
+  } catch (e) {
+    console.error("[Intent] GET monitors error:", e.message);
+    return res.status(500).json({ error: "Failed to load monitors" });
+  }
+});
+
+// ── POST /api/intent/monitors — Create a monitor ────────────
+app.post("/api/intent/monitors", requirePro, (req, res) => {
+  try {
+    const { name, niches, keywords, subreddits } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "Monitor name required" });
+
+    const existing = getUserIntentMonitors(req.user.id);
+    if (existing.length >= 5) return res.status(400).json({ error: "Maximum 5 monitors" });
+
+    const monitor = createIntentMonitor(
+      req.user.id,
+      name,
+      niches || [],
+      keywords || [],
+      subreddits?.length > 0 ? subreddits : DEFAULT_SUBREDDITS.slice(0, 10)
+    );
+    return res.json({ ok: true, monitor });
+  } catch (e) {
+    console.error("[Intent] Create monitor error:", e.message);
+    return res.status(500).json({ error: "Failed to create monitor" });
+  }
+});
+
+// ── DELETE /api/intent/monitors/:id — Delete a monitor ──────
+app.delete("/api/intent/monitors/:id", requirePro, (req, res) => {
+  try {
+    deleteIntentMonitor(req.params.id, req.user.id);
+    return res.json({ ok: true });
+  } catch (e) { return res.status(500).json({ error: "Failed to delete monitor" }); }
+});
+
+// ── PATCH /api/intent/monitors/:id/toggle — Pause/resume ───
+app.patch("/api/intent/monitors/:id/toggle", requirePro, (req, res) => {
+  try {
+    toggleIntentMonitor(req.params.id, req.user.id, !!req.body.active);
+    return res.json({ ok: true });
+  } catch (e) { return res.status(500).json({ error: "Failed to toggle monitor" }); }
+});
+
+// ── GET /api/intent/signals — Get signals for user ──────────
+app.get("/api/intent/signals", requirePro, (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const signals = getUserIntentSignals(req.user.id, limit);
+    return res.json({ signals });
+  } catch (e) {
+    console.error("[Intent] GET signals error:", e.message);
+    return res.status(500).json({ error: "Failed to load signals" });
+  }
+});
+
+// ── PATCH /api/intent/signals/:id — Update signal status ────
+app.patch("/api/intent/signals/:id", requirePro, (req, res) => {
+  try {
+    const { status } = req.body;
+    const valid = ["new", "viewed", "contacted", "dismissed"];
+    if (!valid.includes(status)) return res.status(400).json({ error: "Invalid status" });
+    updateIntentSignalStatus(req.params.id, req.user.id, status);
+    return res.json({ ok: true });
+  } catch (e) { return res.status(500).json({ error: "Failed to update signal" }); }
+});
+
+// ── POST /api/intent/scan — Manual scan trigger ─────────────
+app.post("/api/intent/scan", requirePro, async (req, res) => {
+  try {
+    const monitors = getUserIntentMonitors(req.user.id);
+    if (monitors.length === 0) return res.status(400).json({ error: "No monitors configured" });
+
+    let totalNew = 0;
+    for (const monitor of monitors) {
+      if (!monitor.active) continue;
+      const signals = await scanForIntentSignals(
+        monitor.subreddits?.length > 0 ? monitor.subreddits : DEFAULT_SUBREDDITS.slice(0, 8),
+        monitor.niches || [],
+        monitor.keywords || []
+      );
+      for (const signal of signals) {
+        const saved = saveIntentSignal(monitor.id, req.user.id, signal);
+        if (saved) totalNew++;
+      }
+    }
+    return res.json({ ok: true, newSignals: totalNew });
+  } catch (e) {
+    console.error("[Intent] Manual scan error:", e.message);
+    return res.status(500).json({ error: "Scan failed" });
+  }
+});
+
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
@@ -943,6 +1053,52 @@ async function processDripCampaigns() {
 
 // Check for follow-ups every hour
 setInterval(processDripCampaigns, 60 * 60 * 1000);
+
+// ── Intent Signal Scanner ──────────────────────────────────
+async function processIntentScans() {
+  try {
+    const monitors = getActiveIntentMonitors();
+    if (!monitors.length) return;
+
+    console.log(`[Intent] Scanning ${monitors.length} active monitors`);
+    let totalNew = 0;
+
+    for (const monitor of monitors) {
+      try {
+        const subs = monitor.subreddits?.length > 0
+          ? monitor.subreddits
+          : DEFAULT_SUBREDDITS.slice(0, 8);
+
+        const signals = await scanForIntentSignals(
+          subs,
+          monitor.niches || [],
+          monitor.keywords || []
+        );
+
+        for (const signal of signals) {
+          const saved = saveIntentSignal(monitor.id, monitor.user_id, signal);
+          if (saved) totalNew++;
+        }
+      } catch (err) {
+        console.error(`[Intent] Monitor ${monitor.id} error:`, err.message);
+      }
+
+      // Pause between monitors to respect Reddit rate limits
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    if (totalNew > 0) {
+      console.log(`[Intent] Found ${totalNew} new intent signals`);
+    }
+  } catch (err) {
+    console.error("[Intent] Scanner error:", err.message);
+  }
+}
+
+// Scan every 5 minutes
+setInterval(processIntentScans, 5 * 60 * 1000);
+// Run first scan 30 seconds after startup
+setTimeout(processIntentScans, 30 * 1000);
 
 app.listen(PORT, () => {
   console.log(`
