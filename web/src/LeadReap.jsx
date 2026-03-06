@@ -98,7 +98,7 @@ const STYLE = `
   .hero h1 {
     font-size: clamp(30px, 4vw, 48px); font-weight: 800; line-height: 1.1;
     letter-spacing: -1.5px; margin-bottom: 14px;
-    max-width: 700px; margin-left: auto; margin-right: auto;
+    max-width: 900px; margin-left: auto; margin-right: auto;
   }
   .hero h1 em { font-style: normal; color: var(--accent); }
   .hero p {
