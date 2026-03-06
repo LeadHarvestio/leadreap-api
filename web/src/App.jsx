@@ -10,7 +10,7 @@ const API_BASE = import.meta.env.VITE_API_URL || "";
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("lh_token"));
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!localStorage.getItem("lh_token"));
   const [showLogin, setShowLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginCode, setLoginCode] = useState("");
