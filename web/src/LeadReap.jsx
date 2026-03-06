@@ -919,17 +919,39 @@ function getOutreachTemplates(lead) {
   return templates;
 }
 
-function OutreachModal({ templates, lead, onClose }) {
+function OutreachModal({ templates, lead, onClose, apiBase, token }) {
   const [activeTab, setActiveTab] = useState(0);
   const [subject, setSubject] = useState(templates[0]?.subject || "");
   const [body, setBody] = useState(templates[0]?.body || "");
   const [copied, setCopied] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiGenerated, setAiGenerated] = useState(false);
 
   function selectTemplate(idx) {
     setActiveTab(idx);
     setSubject(templates[idx].subject);
     setBody(templates[idx].body);
     setCopied(false);
+    setAiGenerated(false);
+  }
+
+  async function generateAiPitch() {
+    setAiLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/api/pitch/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ lead, style: "casual" }),
+      });
+      const data = await res.json();
+      if (data.pitch) {
+        setSubject(`Quick question about ${lead.name}`);
+        setBody(data.pitch);
+        setAiGenerated(true);
+        setActiveTab(-1); // deselect template tabs
+      }
+    } catch (e) { console.error("AI pitch failed:", e); }
+    setAiLoading(false);
   }
 
   function handleCopy() {
@@ -957,6 +979,14 @@ function OutreachModal({ templates, lead, onClose }) {
               {t.label}
             </button>
           ))}
+          <button
+            className={`outreach-tab ${aiGenerated ? "active" : ""}`}
+            onClick={generateAiPitch}
+            disabled={aiLoading}
+            style={aiGenerated ? {} : {borderColor:"rgba(240,180,41,0.3)",color:"var(--accent)"}}
+          >
+            {aiLoading ? "Writing..." : aiGenerated ? "✨ AI Pitch" : "✨ AI Pitch"}
+          </button>
         </div>
         <input className="outreach-subject" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject line..." />
         <textarea className="outreach-body" value={body} onChange={e => setBody(e.target.value)} />
@@ -3403,6 +3433,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
             templates={templates}
             lead={outreachLead}
             onClose={() => { setShowOutreach(false); setOutreachLead(null); }}
+            apiBase={API_BASE}
+            token={token}
           />
         );
       })()}
