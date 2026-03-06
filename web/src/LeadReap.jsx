@@ -592,8 +592,8 @@ const STYLE = `
     .badge { padding: 3px 8px; font-size: 10px; }
     .hero { padding: 28px 20px 20px; }
     .hero-tag { font-size: 9px; padding: 4px 12px; margin-bottom: 16px; }
-    .hero h1 { font-size: 26px; letter-spacing: -0.8px; margin-bottom: 10px; line-height: 1.2; }
-    .hero h1 br { display: none; }
+    .hero h1 { font-size: 26px; letter-spacing: -0.8px; margin-bottom: 10px; line-height: 1.25; }
+    .hero-desktop br { display: none; }
     .hero-desktop { display: none; }
     .hero-mobile { display: block; }
     .hero p { font-size: 13px; margin-bottom: 0; line-height: 1.5; max-width: 100%; }
@@ -2646,8 +2646,8 @@ export default function LeadReap({ apiBase = "", token, user, onLoginClick, onLo
         <>
         <div className="hero">
           <div className="hero-tag"><div className="dot" /> AI-POWERED LOCAL LEAD PLATFORM</div>
-          <h1 className="hero-desktop">Find, score, and <em>close</em> local leads<br />— all in one place</h1>
-          <h1 className="hero-mobile">Find, score, and <em>close</em><br />local leads</h1>
+          <h1 className="hero-desktop"><em>Find</em>, <em>score</em>, and <em>close</em> local leads<br />— all in one place</h1>
+          <h1 className="hero-mobile"><em>Find</em>, <em>score</em> &amp; <em>close</em><br />local leads</h1>
           <p>Search any niche, any city. Get verified contacts, AI-written pitches, site audits, and buy-ready intent signals &mdash; one platform, one payment.</p>
           <div className="hero-stats">
             <div className="stat"><div className="stat-num">$2.4k+</div><div className="stat-label">Worth of tools, one price</div></div>
