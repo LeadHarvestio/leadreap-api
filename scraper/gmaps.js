@@ -488,6 +488,7 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
 
       const phone = normalizePhone(rawPhone);
       const website = normalizeWebsite(rawWebsite);
+      const yearOpened = parseYearOpened(openedText);
 
       return {
         name,
@@ -503,7 +504,7 @@ async function scrapeListingByUrl(context, url, searchData = {}) {
         rating: finalRating,
         reviews: finalReviews,
         category: category || null,
-        yearOpened: parseYearOpened(openedText),
+        yearOpened,
         techStack: [],
         techStackSummary: null,
         linkedinCompany: null,
@@ -834,6 +835,16 @@ export async function scrapeGoogleMaps({ niche, location, limit = 20, offset = 0
     await searchPage.waitForSelector(SEL.resultLinks, { timeout: 15000 }).catch(() => {
       console.log("  ⚠ No result links found after all consent attempts");
     });
+
+    // ── Diagnostic logging ──
+    const diagUrl = searchPage.url();
+    const diagTitle = await searchPage.title().catch(() => "unknown");
+    const diagLinkCount = await searchPage.$$eval('a[href*="/maps/place/"]', els => els.length).catch(() => 0);
+    const diagFeedExists = await searchPage.$('div[role="feed"]').catch(() => null);
+    const diagBodySnippet = await searchPage.evaluate(() => document.body?.innerText?.slice(0, 300) || "").catch(() => "");
+    console.log(`  🔎 DIAG: URL=${diagUrl}`);
+    console.log(`  🔎 DIAG: title="${diagTitle}", resultLinks=${diagLinkCount}, feedExists=${!!diagFeedExists}`);
+    console.log(`  🔎 DIAG: body="${diagBodySnippet.replace(/\n/g, ' ').slice(0, 200)}"`);
 
     const check1 = await detectBlock(searchPage);
     if (check1.blocked) {
