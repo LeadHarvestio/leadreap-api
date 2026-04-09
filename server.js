@@ -41,7 +41,8 @@ import {
   updateIntentMonitor, deleteIntentMonitor, toggleIntentMonitor,
   getActiveIntentMonitors, saveIntentSignal,
   getUserIntentSignals, getMonitorSignals, updateIntentSignalStatus,
-  countNewIntentSignals, cleanupIntentSignals
+  countNewIntentSignals, cleanupIntentSignals,
+  upgradeUserFromStripe
 } from "./auth.js";
 import { createCheckout, createUpgradeCheckout, getUpgradePrice, constructWebhookEvent, handleWebhookEvent } from "./payments.js";
 import { sendMagicLinkEmail, sendSequenceEmail, sendTeamInviteEmail, sendWelcomeEmail, sendFollowUpEmail } from "./email.js";
@@ -1216,6 +1217,25 @@ app.post("/api/intent/scan", requirePro, async (req, res) => {
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// ── Admin: grant plan access ──
+app.post("/api/admin/grant", (req, res) => {
+  const secret = req.headers["x-admin-key"];
+  if (!secret || secret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const { email, plan } = req.body;
+  if (!email || !["starter", "pro", "agency"].includes(plan)) {
+    return res.status(400).json({ error: "Valid email and plan (starter/pro/agency) required" });
+  }
+  try {
+    upgradeUserFromStripe(email, plan, "admin-grant");
+    console.log(`[Admin] Granted ${plan} to ${email}`);
+    return res.json({ ok: true, email, plan });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
 });
 
 
